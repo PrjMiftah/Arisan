@@ -1413,7 +1413,16 @@
           <form id="formPembayaran">
             <div class="form-grid">
               <div class="form-group">
-                <label for="payNama">Nama Pembayar / Peserta <span class="required-star">*</span></label>
+                <label for="payNama">
+                  Nama Pembayar / Peserta <span class="required-star">*</span>
+                  <small id="payNamaRoleHint" style="color:var(--primary); font-weight:600;"></small>
+                </label>
+                <!-- Khusus Role Admin: Bisa pilih berdasarkan Peserta dari daftar anggota -->
+                <div id="payAdminSelectWrap" class="hidden" style="margin-bottom: 8px;">
+                  <select id="paySelectPesertaAdmin">
+                    <option value="">-- Pilih Berdasarkan Peserta (Mode Admin) --</option>
+                  </select>
+                </div>
                 <input type="text" id="payNama" required placeholder="Nama peserta pembayar" />
               </div>
 
@@ -1498,7 +1507,25 @@
         </div>
 
         <div class="card-box">
-          <h4>Daftar Riwayat Pembayaran Peserta</h4>
+          <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:14px; padding-bottom:10px; border-bottom:1px solid var(--border-light);">
+            <div>
+              <h4 id="titleRiwayatPembayaran" style="margin:0; padding:0; border:none;">Daftar Riwayat Pembayaran Peserta</h4>
+              <p id="subtitleRiwayatPembayaran" style="font-size:0.82rem; color:var(--text-muted); margin-top:2px;">
+                Menampilkan riwayat pembayaran sesuai hak akses login.
+              </p>
+            </div>
+            <!-- Filter Berdasarkan Peserta (Khusus Role Admin) -->
+            <div id="adminFilterPesertaBox" class="hidden" style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:var(--primary-light); border:1.5px solid var(--primary-border); padding:8px 12px; border-radius:10px;">
+              <label for="filterPembayaranPeserta" style="font-size:0.82rem; font-weight:700; color:var(--primary); margin:0;">
+                👑 Pilih Peserta:
+              </label>
+              <select id="filterPembayaranPeserta" style="padding:7px 12px; border:1.5px solid var(--primary); border-radius:8px; font-size:0.86rem; font-weight:600; background:#ffffff; color:var(--text-main); min-width:220px;">
+                <option value="ALL">-- Semua Peserta Arisan --</option>
+              </select>
+              <span id="filterPembayaranSummary" class="gallery-badge" style="background:#ffffff; color:var(--primary); border:1px solid var(--primary-border);"></span>
+            </div>
+          </div>
+
           <div class="table-responsive">
             <table class="data-table">
               <thead>
@@ -1954,9 +1981,20 @@
             <h3>👤 Biodata Peserta Arisan (Tabel: adnan_DataAnggota)</h3>
             <p>Data kepesertaan arisan, foto profil (Kamera / Upload), kontak domisili, dan rekening pencairan.</p>
           </div>
-          <button type="button" class="btn-secondary btn-sm" data-open-view="viewGalleryHome" id="btnBackToGalleryFromBio">
-            &larr; Kembali ke Menu Gallery
-          </button>
+          <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+            <!-- Pilihan Biodata Berdasarkan Peserta (Khusus Role Admin) -->
+            <div id="adminBiodataFilterBox" class="hidden" style="display:flex; align-items:center; gap:8px; background:var(--primary-light); border:1.5px solid var(--primary-border); padding:6px 12px; border-radius:10px;">
+              <label for="adminSelectBioPeserta" style="font-size:0.8rem; font-weight:700; color:var(--primary); margin:0;">
+                👑 Pilih Peserta:
+              </label>
+              <select id="adminSelectBioPeserta" style="padding:6px 10px; border:1.5px solid var(--primary); border-radius:8px; font-size:0.84rem; font-weight:600; background:#ffffff; min-width:200px;">
+                <option value="">-- Biodata Saya --</option>
+              </select>
+            </div>
+            <button type="button" class="btn-secondary btn-sm" data-open-view="viewGalleryHome" id="btnBackToGalleryFromBio">
+              &larr; Kembali ke Menu Gallery
+            </button>
+          </div>
         </div>
 
         <!-- 4 Sub-Tab Biodata Proporsional -->

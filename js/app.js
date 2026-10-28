@@ -260,27 +260,99 @@ function hideBiodataAlert() {
   biodataAlertBox.innerHTML = '';
 }
 
+const mediaPreviewRegistry = {};
+let activeModalBlobUrl = null;
+
+function registerMediaPreview(key, title, dataUrl) {
+  if (!dataUrl) return null;
+  mediaPreviewRegistry[key] = { title: title || 'Pratinjau Bukti / Dokumen', dataUrl };
+  return key;
+}
+
+function convertDataUrlToBlobUrl(dataUrl) {
+  try {
+    if (!dataUrl || typeof dataUrl !== 'string' || !dataUrl.startsWith('data:')) {
+      return { url: dataUrl, mime: '' };
+    }
+    const commaIdx = dataUrl.indexOf(',');
+    if (commaIdx === -1) return { url: dataUrl, mime: '' };
+
+    const header = dataUrl.slice(0, commaIdx);
+    const base64Clean = dataUrl.slice(commaIdx + 1).replace(/\s+/g, '');
+    const mimeMatch = header.match(/data:([^;]+)/i);
+    const mimeType = mimeMatch ? mimeMatch[1].toLowerCase() : 'application/octet-stream';
+
+    const binaryString = atob(base64Clean);
+    const len = binaryString.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+
+    const blob = new Blob([bytes], { type: mimeType });
+    if (activeModalBlobUrl) {
+      try {
+        URL.revokeObjectURL(activeModalBlobUrl);
+      } catch (_) {}
+    }
+    activeModalBlobUrl = URL.createObjectURL(blob);
+    return { url: activeModalBlobUrl, mime: mimeType };
+  } catch (err) {
+    console.error('Konversi DataURL ke Blob gagal:', err);
+    return { url: dataUrl, mime: '' };
+  }
+}
+
+function openMediaByKey(key) {
+  const item = mediaPreviewRegistry[key];
+  if (!item || !item.dataUrl) {
+    showGlobalAlert('Data bukti/dokumen tidak ditemukan.', 'error');
+    return;
+  }
+  openMediaModal(item.title, item.dataUrl);
+}
+
 function openMediaModal(title, dataUrl) {
   const modal = document.getElementById('mediaModal');
   const modalTitle = document.getElementById('modalTitle');
   const modalBody = document.getElementById('modalBodyContent');
   if (!modal || !dataUrl) return;
 
-  modalTitle.textContent = title || 'Pratinjau Dokumen / Bukti';
-  if (String(dataUrl).startsWith('data:application/pdf') || String(dataUrl).toLowerCase().endsWith('.pdf')) {
+  const safeTitle = title || 'Pratinjau Dokumen / Bukti Pembayaran';
+  modalTitle.textContent = safeTitle;
+
+  const { url: resolvedUrl, mime } = convertDataUrlToBlobUrl(dataUrl);
+  const isPdf =
+    mime === 'application/pdf' ||
+    String(dataUrl).startsWith('data:application/pdf') ||
+    String(dataUrl).toLowerCase().endsWith('.pdf');
+
+  const safeFileName = safeTitle.replace(/[^a-zA-Z0-9_-]/g, '_');
+
+  if (isPdf) {
     modalBody.innerHTML = `
-      <iframe src="${dataUrl}"></iframe>
-      <div style="margin-top:12px;">
-        <a href="${dataUrl}" download="${title || 'dokumen'}.pdf" class="btn-primary btn-sm">⬇️ Unduh Dokumen PDF</a>
+      <div style="margin-bottom:12px; display:flex; justify-content:center; gap:10px; flex-wrap:wrap;">
+        <a href="${resolvedUrl}" target="_blank" rel="noopener" class="btn-secondary btn-sm">🔎 Buka Bukti di Tab Baru</a>
+        <a href="${resolvedUrl}" download="${safeFileName}.pdf" class="btn-primary btn-sm">⬇️ Unduh Bukti PDF</a>
       </div>
+      <embed src="${resolvedUrl}#toolbar=1&navpanes=0" type="application/pdf" style="width:100%; height:70vh; border-radius:10px; border:1px solid #cbd5e1; background:#f8fafc;" />
     `;
   } else {
-    modalBody.innerHTML = `<img src="${dataUrl}" alt="${title}" />`;
+    modalBody.innerHTML = `
+      <div style="margin-bottom:12px; display:flex; justify-content:center; gap:10px; flex-wrap:wrap;">
+        <a href="${resolvedUrl}" target="_blank" rel="noopener" class="btn-secondary btn-sm">🔎 Perbesar di Tab Baru</a>
+        <a href="${resolvedUrl}" download="${safeFileName}.jpg" class="btn-primary btn-sm">⬇️ Unduh Gambar Bukti</a>
+      </div>
+      <div style="background:#f8fafc; padding:12px; border-radius:12px; border:1px solid #e2e8f0; display:flex; justify-content:center;">
+        <img src="${resolvedUrl}" alt="${safeTitle}" style="max-width:100%; max-height:68vh; border-radius:8px; object-fit:contain; box-shadow:0 4px 16px rgba(0,0,0,0.1);" />
+      </div>
+    `;
   }
   modal.classList.remove('hidden');
 }
 
 window.openMediaModal = openMediaModal;
+window.openMediaByKey = openMediaByKey;
 
 const closeModalBtn = document.getElementById('closeModalBtn');
 if (closeModalBtn) {
@@ -315,7 +387,7 @@ async function adaptiveSupabaseWrite(tableName, payloadObj, queryFilter = '') {
     let errData = {};
     try {
       errData = await response.json();
-    } catch (_) {}
+    } catch (_) { }
 
     if (errData.code === '42501') {
       throw new Error(
@@ -776,6 +848,8 @@ async function loadAllDashboardModules() {
     loadPengumumanData(),
     loadGaleriData()
   ]);
+  populateAdminPesertaDropdowns();
+  renderPembayaranTableRows();
   updateQuickStatsBar();
 }
 
@@ -924,7 +998,7 @@ function renderTransparencyBreakdown(activeFilter = 'ALL') {
   }
 
   tbodyEl.innerHTML = filteredRows
-    .map((r) => {
+    .map((r, idx) => {
       const statusLower = String(r.status || 'Pending').toLowerCase();
       const isPending = statusLower === 'pending' || statusLower === 'menunggu';
       const metodeText =
@@ -932,8 +1006,13 @@ function renderTransparencyBreakdown(activeFilter = 'ALL') {
           ? `Transfer ${r.nama_bank ? '(' + r.nama_bank + ')' : ''}`
           : 'Tunai';
 
+      const mediaKey = `trans_${r.id || idx}`;
+      if (r.bukti_bayar_url) {
+        registerMediaPreview(mediaKey, `Bukti Pembayaran - ${r.nama_pembayar || 'Peserta'}`, r.bukti_bayar_url);
+      }
+
       const buktiBtn = r.bukti_bayar_url
-        ? `<button type="button" class="btn-secondary btn-sm" onclick="openMediaModal('Bukti Pembayaran - ${r.nama_pembayar}', '${r.bukti_bayar_url}')">🖼️ Bukti</button>`
+        ? `<button type="button" class="btn-secondary btn-sm" onclick="openMediaByKey('${mediaKey}')">🖼️ Lihat Bukti</button>`
         : `<span style="color:#94a3b8; font-size:0.8rem;">-</span>`;
 
       return `
@@ -972,8 +1051,29 @@ if (closeTransparencyModalBtn) {
 }
 
 // ============================================================================
-// MODUL 1: PEMBAYARAN (JENIS SEBELUM PERIODE & DEFAULT STATUS PENDING)
+// MODUL 1: PEMBAYARAN (FILTER PER USER VS ROLE ADMIN & PREVIEW BUKTI)
 // ============================================================================
+let activeAdminFilterPeserta = 'ALL';
+
+function isPaymentOwnedByCurrentUser(row) {
+  if (!currentLoggedUser || !row) return false;
+  const myUid = String(currentLoggedUser.user_id || currentLoggedUser.username || '').trim().toLowerCase();
+  const myNamaUser = String(currentLoggedUser.nama_lengkap || currentLoggedUser.nama || '').trim().toLowerCase();
+  const myNamaBio = String((currentBiodataRecord && currentBiodataRecord.nama_lengkap) || '').trim().toLowerCase();
+  const myAnggotaId = String((currentBiodataRecord && currentBiodataRecord.id) || '').trim().toLowerCase();
+
+  const rowUid = String(row.user_id || '').trim().toLowerCase();
+  const rowNama = String(row.nama_pembayar || '').trim().toLowerCase();
+  const rowAnggotaId = String(row.anggota_id || '').trim().toLowerCase();
+
+  if (myUid && rowUid && rowUid === myUid) return true;
+  if (myAnggotaId && rowAnggotaId && rowAnggotaId === myAnggotaId) return true;
+  if (myNamaBio && rowNama && rowNama === myNamaBio) return true;
+  if (myNamaUser && rowNama && rowNama === myNamaUser) return true;
+  if (myUid && rowNama && rowNama === myUid) return true;
+  return false;
+}
+
 function syncPayPeriodeByJenis() {
   const payJenis = document.getElementById('payJenis');
   const payPeriode = document.getElementById('payPeriode');
@@ -1001,26 +1101,266 @@ if (payJenisSelect) {
   payJenisSelect.addEventListener('change', syncPayPeriodeByJenis);
 }
 
-async function approvePaymentStatus(paymentId) {
+async function updatePaymentStatusByAdmin(paymentId, newStatus) {
   if (!isUserAdmin()) return;
   try {
     await adaptiveSupabaseWrite(
       TABLES.PEMBAYARAN,
       {
-        status: 'disetujui',
+        status: newStatus,
         diverifikasi_oleh: currentLoggedUser ? currentLoggedUser.nama_lengkap || currentLoggedUser.user_id : 'Admin'
       },
       `?id=eq.${encodeURIComponent(paymentId)}`
     );
     await loadPembayaranData();
     updateQuickStatsBar();
-    showGlobalAlert('✅ Status pembayaran berhasil diverifikasi menjadi Disetujui!', 'success');
+    showGlobalAlert(`✅ Status pembayaran berhasil diperbarui menjadi <b>${newStatus}</b>!`, 'success');
   } catch (err) {
     showGlobalAlert(err.message, 'error');
   }
 }
 
-window.approvePaymentStatus = approvePaymentStatus;
+window.approvePaymentStatus = (paymentId) => updatePaymentStatusByAdmin(paymentId, 'disetujui');
+window.updatePaymentStatusByAdmin = updatePaymentStatusByAdmin;
+
+function populateAdminPesertaDropdowns() {
+  const adminFlag = isUserAdmin();
+  const filterSelect = document.getElementById('filterPembayaranPeserta');
+  const adminFilterBox = document.getElementById('adminFilterPesertaBox');
+  const payAdminWrap = document.getElementById('payAdminSelectWrap');
+  const paySelectAdmin = document.getElementById('paySelectPesertaAdmin');
+  const payNamaInput = document.getElementById('payNama');
+  const payNamaRoleHint = document.getElementById('payNamaRoleHint');
+  const titleRiwayat = document.getElementById('titleRiwayatPembayaran');
+  const subtitleRiwayat = document.getElementById('subtitleRiwayatPembayaran');
+  const adminBioBox = document.getElementById('adminBiodataFilterBox');
+  const adminSelectBio = document.getElementById('adminSelectBioPeserta');
+
+  const myDisplayName =
+    (currentBiodataRecord && currentBiodataRecord.nama_lengkap) ||
+    (currentLoggedUser && (currentLoggedUser.nama_lengkap || currentLoggedUser.nama || currentLoggedUser.user_id)) ||
+    '';
+
+  if (!adminFlag) {
+    // Mode User Peserta: Hanya menampilkan data milik User yang login
+    if (adminFilterBox) adminFilterBox.classList.add('hidden');
+    if (payAdminWrap) payAdminWrap.classList.add('hidden');
+    if (adminBioBox) adminBioBox.classList.add('hidden');
+    if (payNamaInput) {
+      payNamaInput.value = myDisplayName;
+      payNamaInput.readOnly = true;
+    }
+    if (payNamaRoleHint) {
+      payNamaRoleHint.textContent = '(Terkunci sesuai Akun Peserta Login)';
+    }
+    if (titleRiwayat) {
+      titleRiwayat.textContent = `Daftar Riwayat Pembayaran Saya (${myDisplayName || 'Peserta'})`;
+    }
+    if (subtitleRiwayat) {
+      subtitleRiwayat.textContent = 'Menampilkan khusus riwayat pembayaran milik akun Anda.';
+    }
+    return;
+  }
+
+  // Mode Role Admin: Bisa pilih & filter berdasarkan Peserta
+  if (adminFilterBox) adminFilterBox.classList.remove('hidden');
+  if (payAdminWrap) payAdminWrap.classList.remove('hidden');
+  if (adminBioBox) adminBioBox.classList.remove('hidden');
+  if (payNamaInput) {
+    payNamaInput.readOnly = false;
+  }
+  if (payNamaRoleHint) {
+    payNamaRoleHint.textContent = '(Mode Admin: Pilih Peserta dari daftar atau ketik nama)';
+  }
+  if (titleRiwayat) {
+    titleRiwayat.textContent = 'Daftar Riwayat Pembayaran Peserta (Mode Admin)';
+  }
+  if (subtitleRiwayat) {
+    subtitleRiwayat.textContent = 'Admin dapat memfilter riwayat pembayaran berdasarkan Peserta serta menyetujui bukti bayar.';
+  }
+
+  // Kumpulkan daftar unik nama peserta dari adnan_DataAnggota & adnan_Pembayaran
+  const pesertaMap = new Map();
+  (cachedAnggotaList || []).forEach((a) => {
+    const nama = String(a.nama_lengkap || '').trim();
+    if (nama) {
+      pesertaMap.set(nama.toLowerCase(), {
+        nama,
+        user_id: a.user_id || '',
+        anggota_id: a.id || ''
+      });
+    }
+  });
+  (cachedPembayaranList || []).forEach((p) => {
+    const nama = String(p.nama_pembayar || '').trim();
+    if (nama && !pesertaMap.has(nama.toLowerCase())) {
+      pesertaMap.set(nama.toLowerCase(), {
+        nama,
+        user_id: p.user_id || '',
+        anggota_id: p.anggota_id || ''
+      });
+    }
+  });
+
+  const sortedPeserta = Array.from(pesertaMap.values()).sort((a, b) => a.nama.localeCompare(b.nama, 'id'));
+
+  if (filterSelect) {
+    const prevVal = filterSelect.value || activeAdminFilterPeserta || 'ALL';
+    filterSelect.innerHTML = [
+      `<option value="ALL">-- Semua Peserta Arisan (${(cachedPembayaranList || []).length} Transaksi) --</option>`,
+      ...sortedPeserta.map((p) => {
+        const count = (cachedPembayaranList || []).filter(
+          (r) => String(r.nama_pembayar || '').trim().toLowerCase() === p.nama.toLowerCase()
+        ).length;
+        return `<option value="${p.nama}">${p.nama} (${count} Transaksi)</option>`;
+      })
+    ].join('');
+    filterSelect.value = Array.from(filterSelect.options).some((o) => o.value === prevVal) ? prevVal : 'ALL';
+    activeAdminFilterPeserta = filterSelect.value;
+  }
+
+  if (paySelectAdmin) {
+    paySelectAdmin.innerHTML = [
+      '<option value="">-- Pilih Berdasarkan Peserta (Mode Admin) --</option>',
+      ...sortedPeserta.map(
+        (p) =>
+          `<option value="${p.nama}" data-uid="${p.user_id || ''}" data-anggota-id="${p.anggota_id || ''}">${p.nama}${p.user_id ? ' (ID: ' + p.user_id + ')' : ''}</option>`
+      )
+    ].join('');
+  }
+
+  if (adminSelectBio) {
+    const currentBioId = currentBiodataRecord && currentBiodataRecord.id ? String(currentBiodataRecord.id) : '';
+    adminSelectBio.innerHTML = [
+      '<option value="">-- Pilih Peserta (adnan_DataAnggota) --</option>',
+      ...(cachedAnggotaList || []).map(
+        (a) =>
+          `<option value="${a.id}" ${String(a.id) === currentBioId ? 'selected' : ''}>${a.nama_lengkap} (${a.user_id || 'Tanpa ID'})</option>`
+      )
+    ].join('');
+  }
+}
+
+const filterPembayaranPesertaEl = document.getElementById('filterPembayaranPeserta');
+if (filterPembayaranPesertaEl) {
+  filterPembayaranPesertaEl.addEventListener('change', () => {
+    activeAdminFilterPeserta = filterPembayaranPesertaEl.value || 'ALL';
+    renderPembayaranTableRows();
+  });
+}
+
+const paySelectPesertaAdminEl = document.getElementById('paySelectPesertaAdmin');
+if (paySelectPesertaAdminEl) {
+  paySelectPesertaAdminEl.addEventListener('change', () => {
+    const chosenName = paySelectPesertaAdminEl.value;
+    if (chosenName) {
+      const payNamaInput = document.getElementById('payNama');
+      if (payNamaInput) payNamaInput.value = chosenName;
+    }
+  });
+}
+
+const adminSelectBioPesertaEl = document.getElementById('adminSelectBioPeserta');
+if (adminSelectBioPesertaEl) {
+  adminSelectBioPesertaEl.addEventListener('change', () => {
+    if (!isUserAdmin()) return;
+    const selectedId = adminSelectBioPesertaEl.value;
+    if (!selectedId) return;
+    const foundBio = (cachedAnggotaList || []).find((a) => String(a.id) === String(selectedId));
+    if (foundBio) {
+      currentBiodataRecord = foundBio;
+      populateBiodataForm(currentLoggedUser, foundBio);
+      renderBiodataSummary(foundBio);
+      showBiodataAlert(`👑 Mode Admin: Menampilkan Biodata Peserta <b>${foundBio.nama_lengkap}</b>.`, 'success');
+    }
+  });
+}
+
+function renderPembayaranTableRows() {
+  const tbody = document.getElementById('tableBodyPembayaran');
+  const summaryBadge = document.getElementById('filterPembayaranSummary');
+  if (!tbody) return;
+
+  const adminFlag = isUserAdmin();
+
+  // Jika Login User Peserta -> HANYA tampilkan data milik User tersebut
+  // Jika Login Role Admin -> tampilkan semua atau sesuai pilihan dropdown Peserta
+  const rowsToDisplay = (cachedPembayaranList || []).filter((r) => {
+    if (!adminFlag) {
+      return isPaymentOwnedByCurrentUser(r);
+    }
+    if (!activeAdminFilterPeserta || activeAdminFilterPeserta === 'ALL') {
+      return true;
+    }
+    return String(r.nama_pembayar || '').trim().toLowerCase() === activeAdminFilterPeserta.trim().toLowerCase();
+  });
+
+  if (summaryBadge && adminFlag) {
+    const sumFiltered = rowsToDisplay.reduce((acc, r) => acc + Number(r.nominal || 0), 0);
+    summaryBadge.textContent = `${rowsToDisplay.length} Data • Total: ${formatRupiah(sumFiltered)}`;
+  }
+
+  if (rowsToDisplay.length === 0) {
+    const emptyMsg = adminFlag
+      ? 'Belum ada transaksi pembayaran untuk filter peserta yang dipilih.'
+      : 'Belum ada riwayat pembayaran atas nama akun Anda.';
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--text-muted);">${emptyMsg}</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = rowsToDisplay
+    .map((r, idx) => {
+      const metodeText =
+        r.metode_bayar === 'Transfer Bank' || r.metode_bayar === 'Transfer'
+          ? `Transfer ${r.nama_bank ? '(' + r.nama_bank + ')' : ''}`
+          : 'Tunai (Cash)';
+
+      const mediaKey = `pay_${r.id || idx}`;
+      if (r.bukti_bayar_url) {
+        registerMediaPreview(mediaKey, `Bukti Pembayaran - ${r.nama_pembayar || 'Peserta'} (${r.kode_transaksi || ''})`, r.bukti_bayar_url);
+      }
+
+      const buktiBtn = r.bukti_bayar_url
+        ? `<button type="button" class="btn-secondary btn-sm" onclick="openMediaByKey('${mediaKey}')">🖼️ Lihat Bukti</button>`
+        : `<span style="color:#94a3b8; font-size:0.8rem;">Tidak ada</span>`;
+
+      const statusRaw = r.status || 'Pending';
+      const statusLower = String(statusRaw).toLowerCase();
+      const isPending = statusLower === 'pending' || statusLower === 'menunggu';
+
+      const statusCell = `
+        <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+          <span class="status-pill ${isPending ? 'incomplete' : 'complete'}">
+            ${isPending ? '⏳ Pending' : '✓ ' + statusRaw}
+          </span>
+          ${
+            adminFlag && isPending
+              ? `<button type="button" class="btn-primary btn-sm" onclick="approvePaymentStatus('${r.id}')">✓ Setujui</button>`
+              : ''
+          }
+          ${
+            adminFlag && !isPending
+              ? `<button type="button" class="btn-secondary btn-sm" style="padding:4px 8px; font-size:0.74rem;" onclick="updatePaymentStatusByAdmin('${r.id}', 'Pending')" title="Kembalikan status ke Pending">↺ Pending</button>`
+              : ''
+          }
+        </div>
+      `;
+
+      return `
+        <tr>
+          <td>${r.tanggal_bayar || '-'}</td>
+          <td><code>${r.kode_transaksi || 'TX-' + (idx + 1)}</code></td>
+          <td><strong>${r.nama_pembayar || '-'}</strong><br><small style="color:#64748b;">${r.keterangan || ''}</small></td>
+          <td>${r.jenis_bayar || 'Uang Arisan'}</td>
+          <td>${metodeText}</td>
+          <td><strong>${formatRupiah(r.nominal)}</strong></td>
+          <td>${buktiBtn}</td>
+          <td>${statusCell}</td>
+        </tr>
+      `;
+    })
+    .join('');
+}
 
 async function loadPembayaranData() {
   const tbody = document.getElementById('tableBodyPembayaran');
@@ -1035,7 +1375,7 @@ async function loadPembayaranData() {
     const rows = await res.json();
     cachedPembayaranList = rows || [];
 
-    // Hitung terpisah: Pemasukan Uang Arisan vs Pemasukan Lainnya
+    // Hitung terpisah untuk Transparansi Kas Keluarga: Pemasukan Uang Arisan vs Pemasukan Lainnya
     totalPemasukanArisan = 0;
     totalPemasukanLain = 0;
     cachedPembayaranList.forEach((r) => {
@@ -1047,55 +1387,8 @@ async function loadPembayaranData() {
       }
     });
 
-    if (cachedPembayaranList.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;">Belum ada transaksi pembayaran.</td></tr>`;
-      return;
-    }
-
-    const adminFlag = isUserAdmin();
-
-    tbody.innerHTML = cachedPembayaranList
-      .map((r, idx) => {
-        const metodeText =
-          r.metode_bayar === 'Transfer Bank' || r.metode_bayar === 'Transfer'
-            ? `Transfer ${r.nama_bank ? '(' + r.nama_bank + ')' : ''}`
-            : 'Tunai (Cash)';
-
-        const buktiBtn = r.bukti_bayar_url
-          ? `<button type="button" class="btn-secondary btn-sm" onclick="openMediaModal('Bukti Pembayaran - ${r.nama_pembayar}', '${r.bukti_bayar_url}')">🖼️ Lihat Bukti</button>`
-          : `<span style="color:#94a3b8; font-size:0.8rem;">Tidak ada</span>`;
-
-        const statusRaw = r.status || 'Pending';
-        const statusLower = String(statusRaw).toLowerCase();
-        const isPending = statusLower === 'pending' || statusLower === 'menunggu';
-
-        const statusCell = `
-          <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-            <span class="status-pill ${isPending ? 'incomplete' : 'complete'}">
-              ${isPending ? '⏳ Pending' : '✓ ' + statusRaw}
-            </span>
-            ${
-              adminFlag && isPending
-                ? `<button type="button" class="btn-primary btn-sm" onclick="approvePaymentStatus('${r.id}')">✓ Setujui</button>`
-                : ''
-            }
-          </div>
-        `;
-
-        return `
-          <tr>
-            <td>${r.tanggal_bayar || '-'}</td>
-            <td><code>${r.kode_transaksi || 'TX-' + (idx + 1)}</code></td>
-            <td><strong>${r.nama_pembayar || '-'}</strong><br><small style="color:#64748b;">${r.keterangan || ''}</small></td>
-            <td>${r.jenis_bayar || 'Uang Arisan'}</td>
-            <td>${metodeText}</td>
-            <td><strong>${formatRupiah(r.nominal)}</strong></td>
-            <td>${buktiBtn}</td>
-            <td>${statusCell}</td>
-          </tr>
-        `;
-      })
-      .join('');
+    populateAdminPesertaDropdowns();
+    renderPembayaranTableRows();
   } catch (err) {
     tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:#dc2626;">${err.message}</td></tr>`;
   }
@@ -1111,7 +1404,7 @@ if (payMetodeSelect) {
   });
 }
 
-// Preview Upload Bukti Pembayaran
+// Preview Upload Bukti Pembayaran (Gambar maupun PDF langsung bisa dipratinjau)
 const payBuktiFileInput = document.getElementById('payBuktiFile');
 if (payBuktiFileInput) {
   payBuktiFileInput.addEventListener('change', async (e) => {
@@ -1123,10 +1416,21 @@ if (payBuktiFileInput) {
       return;
     }
     uploadedPayBuktiDataUrl = await readFileAsDataURL(file);
+    registerMediaPreview('draft_pay_bukti', `Pratinjau Bukti: ${file.name}`, uploadedPayBuktiDataUrl);
     if (file.type.startsWith('image/')) {
-      previewBox.innerHTML = `<img src="${uploadedPayBuktiDataUrl}" alt="Preview Bukti Bayar" />`;
+      previewBox.innerHTML = `
+        <div style="display:flex; flex-direction:column; align-items:center; gap:8px;">
+          <img src="${uploadedPayBuktiDataUrl}" alt="Preview Bukti Bayar" style="cursor:pointer;" onclick="openMediaByKey('draft_pay_bukti')" />
+          <button type="button" class="btn-secondary btn-sm" onclick="openMediaByKey('draft_pay_bukti')">🖼️ Lihat Bukti Ukuran Penuh</button>
+        </div>
+      `;
     } else {
-      previewBox.innerHTML = `<span style="color:var(--primary); font-weight:600;">📄 File Bukti Siap Diunggah: ${file.name}</span>`;
+      previewBox.innerHTML = `
+        <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; justify-content:center;">
+          <span style="color:var(--primary); font-weight:600;">📄 File PDF Bukti Siap Diunggah: ${file.name}</span>
+          <button type="button" class="btn-secondary btn-sm" onclick="openMediaByKey('draft_pay_bukti')">🖼️ Lihat / Pratinjau Bukti PDF</button>
+        </div>
+      `;
     }
   });
 }
@@ -1163,12 +1467,28 @@ if (formPembayaran) {
         .filter(Boolean)
         .join(' | ');
 
+      const inputNamaPembayar = document.getElementById('payNama').value.trim();
+      // Cari apakah nama pembayar cocok dengan anggota di adnan_DataAnggota
+      const matchedAnggota = (cachedAnggotaList || []).find(
+        (a) => String(a.nama_lengkap || '').trim().toLowerCase() === inputNamaPembayar.toLowerCase()
+      );
+      const targetUserId = isUserAdmin()
+        ? (matchedAnggota && matchedAnggota.user_id) || (currentLoggedUser ? currentLoggedUser.user_id : null)
+        : currentLoggedUser
+        ? currentLoggedUser.user_id
+        : null;
+      const targetAnggotaId = isUserAdmin()
+        ? (matchedAnggota && matchedAnggota.id) || null
+        : currentBiodataRecord && currentBiodataRecord.id
+        ? currentBiodataRecord.id
+        : null;
+
       await adaptiveSupabaseWrite(TABLES.PEMBAYARAN, {
         kode_transaksi: kode,
-        anggota_id: currentBiodataRecord && currentBiodataRecord.id ? currentBiodataRecord.id : null,
+        anggota_id: targetAnggotaId,
         arisan_id: selectedPeriodeId,
-        user_id: currentLoggedUser ? currentLoggedUser.user_id : null,
-        nama_pembayar: document.getElementById('payNama').value.trim(),
+        user_id: targetUserId,
+        nama_pembayar: inputNamaPembayar,
         tanggal_bayar: document.getElementById('payTanggal').value || todayISO(),
         jenis_bayar: jenisBayar,
         nominal: Number(document.getElementById('payNominal').value || 0),
@@ -1183,7 +1503,7 @@ if (formPembayaran) {
       formPembayaran.reset();
       document.getElementById('payTanggal').value = todayISO();
       document.getElementById('payStatus').value = 'Pending';
-      if (currentBiodataRecord) {
+      if (!isUserAdmin() && currentBiodataRecord) {
         document.getElementById('payNama').value = currentBiodataRecord.nama_lengkap || '';
       }
       syncPayPeriodeByJenis();
@@ -1227,8 +1547,12 @@ async function loadPengeluaranData() {
     tbody.innerHTML = rows
       .map((r, idx) => {
         const notaUrl = r.bukti_url || r.nota_url || null;
+        const mediaKey = `exp_${r.id || idx}`;
+        if (notaUrl) {
+          registerMediaPreview(mediaKey, `Nota Pengeluaran - ${r.kategori || ''}`, notaUrl);
+        }
         const notaBtn = notaUrl
-          ? `<button type="button" class="btn-secondary btn-sm" onclick="openMediaModal('Nota Pengeluaran', '${notaUrl}')">🧾 Lihat Nota</button>`
+          ? `<button type="button" class="btn-secondary btn-sm" onclick="openMediaByKey('${mediaKey}')">🧾 Lihat Nota</button>`
           : `<span style="color:#94a3b8; font-size:0.8rem;">-</span>`;
 
         return `
@@ -1347,12 +1671,16 @@ async function loadPengumumanData() {
     }
 
     container.innerHTML = rows
-      .map((r) => {
+      .map((r, idx) => {
         const pdfUrl = r.file_pdf_url || r.lampiran_url || null;
         const pdfName = r.file_pdf_nama || 'Dokumen-Pengumuman.pdf';
+        const mediaKey = `ann_${r.id || idx}`;
+        if (pdfUrl) {
+          registerMediaPreview(mediaKey, r.judul || 'Dokumen Pengumuman', pdfUrl);
+        }
         const pdfActions = pdfUrl
           ? `<div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;">
-               <button type="button" class="btn-primary btn-sm" onclick="openMediaModal('${r.judul}', '${pdfUrl}')">📄 Buka / Pratinjau PDF</button>
+               <button type="button" class="btn-primary btn-sm" onclick="openMediaByKey('${mediaKey}')">📄 Buka / Pratinjau PDF</button>
                <a href="${pdfUrl}" download="${pdfName}" class="btn-secondary btn-sm">⬇️ Unduh PDF (${pdfName})</a>
              </div>`
           : '';
@@ -1452,12 +1780,16 @@ async function loadGaleriData() {
     }
 
     container.innerHTML = rows
-      .map((r) => {
+      .map((r, idx) => {
         const title = r.judul_kegiatan || r.judul || 'Kegiatan Keluarga Adnan';
         const imgUrl = r.foto_url || '';
+        const mediaKey = `gal_${r.id || idx}`;
+        if (imgUrl) {
+          registerMediaPreview(mediaKey, title, imgUrl);
+        }
         return `
           <div class="photo-card">
-            <img src="${imgUrl}" alt="${title}" onclick="openMediaModal('${title}', '${imgUrl}')" />
+            <img src="${imgUrl}" alt="${title}" onclick="openMediaByKey('${mediaKey}')" />
             <div class="photo-card-body">
               <h5>${title}</h5>
               <div class="meta">📅 ${r.tanggal_kegiatan || (r.created_at || '').slice(0, 10)} ${r.lokasi ? '• 📍 ' + r.lokasi : ''}</div>
@@ -1681,7 +2013,7 @@ if (formPeriodeArisan) {
           status: status,
           keterangan: keterangan
         });
-      } catch (_) {}
+      } catch (_) { }
 
       formPeriodeArisan.reset();
       await loadPeriodeAndPemenangData();
@@ -1772,7 +2104,7 @@ if (formPemenangArisan) {
           keterangan: keterangan,
           ditetapkan_oleh: currentLoggedUser ? currentLoggedUser.nama_lengkap || currentLoggedUser.user_id : 'Admin'
         });
-      } catch (_) {}
+      } catch (_) { }
 
       formPemenangArisan.reset();
       document.getElementById('winTanggal').value = todayISO();
@@ -1793,6 +2125,7 @@ if (formPemenangArisan) {
 // ============================================================================
 async function handlePostLoginFlow(user) {
   currentLoggedUser = user;
+  activeAdminFilterPeserta = 'ALL';
   const authView = document.getElementById('authView');
   const memberAppView = document.getElementById('memberAppView');
 
@@ -2102,3 +2435,4 @@ document.addEventListener('DOMContentLoaded', () => {
     localStorage.removeItem(SESSION_KEY);
   }
 });
+
