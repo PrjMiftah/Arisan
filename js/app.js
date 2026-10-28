@@ -84,7 +84,7 @@ const DAFTAR_BANK_INDONESIA = [
       'Blu by BCA Digital',
       'Allo Bank',
       'Superbank',
-      ' Krom Bank',
+      'Krom Bank',
       'DANA (E-Wallet)',
       'OVO (E-Wallet)',
       'GoPay (E-Wallet)',
@@ -135,13 +135,19 @@ let currentBiodataRecord = null;
 let cachedAnggotaList = [];
 let cachedPeriodeList = [];
 let cachedPemenangList = [];
+let cachedPembayaranList = [];
 
 // File DataURL sementara untuk upload bukti/foto/PDF
+let uploadedBioFotoDataUrl = null;
 let uploadedPayBuktiDataUrl = null;
 let uploadedExpBuktiDataUrl = null;
 let uploadedAnnPdfDataUrl = null;
 let uploadedAnnPdfName = null;
 let uploadedGalFotoDataUrl = null;
+
+// Kamera Live Stream State
+let activeCameraStream = null;
+let currentCameraFacingMode = 'user';
 
 // ============================================================================
 // INISIALISASI DROPDOWN BANK LENGKAP
@@ -175,11 +181,10 @@ function todayISO() {
   return new Date().toISOString().split('T')[0];
 }
 
-function readFileAsDataURL(file, maxWidth = 1100) {
+function readFileAsDataURL(file, maxWidth = 900) {
   return new Promise((resolve, reject) => {
     if (!file) return resolve(null);
 
-    // Jika file gambar, kompres secara proporsional agar ringan disimpan ke database
     if (file.type && file.type.startsWith('image/')) {
       const reader = new FileReader();
       reader.onload = (e) => {
@@ -196,7 +201,7 @@ function readFileAsDataURL(file, maxWidth = 1100) {
           canvas.height = h;
           const ctx = canvas.getContext('2d');
           ctx.drawImage(img, 0, 0, w, h);
-          resolve(canvas.toDataURL('image/jpeg', 0.8));
+          resolve(canvas.toDataURL('image/jpeg', 0.82));
         };
         img.onerror = () => resolve(e.target.result);
         img.src = e.target.result;
@@ -204,7 +209,6 @@ function readFileAsDataURL(file, maxWidth = 1100) {
       reader.onerror = reject;
       reader.readAsDataURL(file);
     } else {
-      // Untuk PDF atau dokumen lain
       const reader = new FileReader();
       reader.onload = (e) => resolve(e.target.result);
       reader.onerror = reject;
@@ -241,7 +245,7 @@ function showGlobalAlert(message, type = 'success') {
     if (type === 'success') {
       globalAppAlert.className = 'alert';
     }
-  }, 5500);
+  }, 6000);
 }
 
 function showBiodataAlert(message, type = 'error') {
@@ -293,7 +297,7 @@ async function adaptiveSupabaseWrite(tableName, payloadObj, queryFilter = '') {
   const method = queryFilter ? 'PATCH' : 'POST';
   const url = `${SUPABASE_REST_URL}/${tableName}${queryFilter}`;
 
-  for (let attempt = 0; attempt < 10; attempt++) {
+  for (let attempt = 0; attempt < 12; attempt++) {
     const response = await fetch(url, {
       method,
       headers: {
@@ -324,6 +328,17 @@ async function adaptiveSupabaseWrite(tableName, payloadObj, queryFilter = '') {
     if (errData.code === 'PGRST204' && missingColMatch && missingColMatch[1]) {
       delete payload[missingColMatch[1]];
       continue;
+    }
+
+    // Jika ada check constraint pada kolom status (23514) misal 'Pending' -> 'pending' atau 'menunggu'
+    if (errData.code === '23514' && payload.status) {
+      if (payload.status === 'Pending') {
+        payload.status = 'pending';
+        continue;
+      } else if (payload.status === 'pending') {
+        payload.status = 'menunggu';
+        continue;
+      }
     }
 
     // Jika ada kolom NOT NULL yang belum terisi (23502)
@@ -359,7 +374,15 @@ function isUserAdmin() {
 }
 
 function switchMainView(targetViewId) {
-  // Jika biodata peserta belum terdaftar di adnan_DataAnggota, wajibkan mengisi Biodata terlebih dahulu!
+  stopCameraStream();
+
+  // Proteksi Tab Pengeluaran: Hanya bisa dibuka oleh User Admin
+  if (targetViewId === 'viewPengeluaran' && !isUserAdmin()) {
+    showGlobalAlert('Menu Pengeluaran / Akuntansi hanya dapat diakses oleh User Admin.', 'error');
+    return;
+  }
+
+  // Jika biodata peserta belum terdaftar di adnan_DataAnggota, wajibkan mengisi Biodata terlebih dahulu
   if (!currentBiodataRecord && targetViewId !== 'viewBiodata') {
     showBiodataAlert(
       '⚠️ Anda wajib melengkapi dan menyimpan <b>Biodata Peserta Arisan</b> pada tabel <code>adnan_DataAnggota</code> terlebih dahulu sebelum membuka Menu Utama Gallery.',
@@ -380,6 +403,10 @@ function switchMainView(targetViewId) {
 }
 
 function switchBioSubTab(targetTabId) {
+  if (targetTabId !== 'tabPribadi') {
+    stopCameraStream();
+  }
+
   if (targetTabId === 'tabRingkasan' && !currentBiodataRecord) {
     showBiodataAlert('Silakan simpan Biodata Peserta terlebih dahulu.', 'error');
     return;
@@ -401,6 +428,145 @@ function switchPeriodeSubTab(targetSubTabId) {
 
   document.querySelectorAll('#viewPeriode .sub-tab-panel').forEach((panel) => {
     panel.classList.toggle('active', panel.id === targetSubTabId);
+  });
+}
+
+// ============================================================================
+// FITUR KAMERA LIVE & UPLOAD FOTO PESERTA (adnan_DataAnggota)
+// ============================================================================
+function updateBioPhotoPreviewUI(photoDataUrl, fallbackInitials = '👤') {
+  const previewBox = document.getElementById('bioFotoPreviewBox');
+  if (!previewBox) return;
+
+  if (photoDataUrl) {
+    previewBox.innerHTML = `<img src="${photoDataUrl}" alt="Foto Peserta" />`;
+  } else {
+    previewBox.textContent = fallbackInitials;
+  }
+}
+
+function updateHeaderAvatarPhoto(user, bio) {
+  const headerAvatar = document.getElementById('headerAvatar');
+  if (!headerAvatar) return;
+
+  const displayName = (bio && bio.nama_lengkap) || (user && (user.nama_lengkap || user.nama || user.user_id)) || 'Peserta';
+  const initials = displayName
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0].toUpperCase())
+    .join('');
+
+  const photoUrl =
+    (bio && (bio.foto_url || bio.foto)) ||
+    (user && (user.foto_url || user.foto)) ||
+    uploadedBioFotoDataUrl ||
+    null;
+
+  if (photoUrl) {
+    headerAvatar.innerHTML = `<img src="${photoUrl}" alt="${displayName}" />`;
+    headerAvatar.onclick = () => openMediaModal(`Foto Peserta - ${displayName}`, photoUrl);
+  } else {
+    headerAvatar.innerHTML = initials || 'KA';
+    headerAvatar.onclick = () => {
+      switchMainView('viewBiodata');
+      switchBioSubTab('tabPribadi');
+    };
+  }
+}
+
+async function startCameraStream() {
+  const cameraBox = document.getElementById('cameraLiveBox');
+  const videoEl = document.getElementById('cameraVideoEl');
+  if (!cameraBox || !videoEl) return;
+
+  stopCameraStream();
+
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    showBiodataAlert('Browser Anda tidak mendukung akses kamera langsung. Silakan gunakan tombol Upload dari Folder Lokal.', 'error');
+    return;
+  }
+
+  try {
+    activeCameraStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: currentCameraFacingMode, width: { ideal: 640 }, height: { ideal: 640 } },
+      audio: false
+    });
+    videoEl.srcObject = activeCameraStream;
+    cameraBox.classList.remove('hidden');
+  } catch (err) {
+    showBiodataAlert('Gagal membuka kamera: Pastikan izin kamera (Allow Camera) diaktifkan pada browser Anda.', 'error');
+  }
+}
+
+function stopCameraStream() {
+  const cameraBox = document.getElementById('cameraLiveBox');
+  const videoEl = document.getElementById('cameraVideoEl');
+  if (activeCameraStream) {
+    activeCameraStream.getTracks().forEach((track) => track.stop());
+    activeCameraStream = null;
+  }
+  if (videoEl) {
+    videoEl.srcObject = null;
+  }
+  if (cameraBox) {
+    cameraBox.classList.add('hidden');
+  }
+}
+
+const btnOpenCamera = document.getElementById('btnOpenCamera');
+if (btnOpenCamera) {
+  btnOpenCamera.addEventListener('click', () => startCameraStream());
+}
+
+const btnSwitchCamera = document.getElementById('btnSwitchCamera');
+if (btnSwitchCamera) {
+  btnSwitchCamera.addEventListener('click', () => {
+    currentCameraFacingMode = currentCameraFacingMode === 'user' ? 'environment' : 'user';
+    startCameraStream();
+  });
+}
+
+const btnCloseCamera = document.getElementById('btnCloseCamera');
+if (btnCloseCamera) {
+  btnCloseCamera.addEventListener('click', () => stopCameraStream());
+}
+
+const btnCapturePhoto = document.getElementById('btnCapturePhoto');
+if (btnCapturePhoto) {
+  btnCapturePhoto.addEventListener('click', () => {
+    const videoEl = document.getElementById('cameraVideoEl');
+    if (!videoEl || !activeCameraStream) return;
+
+    const canvas = document.createElement('canvas');
+    const size = Math.min(videoEl.videoWidth || 480, videoEl.videoHeight || 480);
+    const sx = ((videoEl.videoWidth || size) - size) / 2;
+    const sy = ((videoEl.videoHeight || size) - size) / 2;
+
+    canvas.width = 480;
+    canvas.height = 480;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(videoEl, sx, sy, size, size, 0, 0, 480, 480);
+
+    uploadedBioFotoDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+    updateBioPhotoPreviewUI(uploadedBioFotoDataUrl);
+    updateHeaderAvatarPhoto(currentLoggedUser, currentBiodataRecord);
+    stopCameraStream();
+    showBiodataAlert('📸 Foto berhasil diambil dari kamera! Jangan lupa klik "Simpan Biodata" pada langkah ke-3.', 'success');
+  });
+}
+
+const btnTriggerLocalUpload = document.getElementById('btnTriggerLocalUpload');
+const bioFotoFileInput = document.getElementById('bioFotoFileInput');
+if (btnTriggerLocalUpload && bioFotoFileInput) {
+  btnTriggerLocalUpload.addEventListener('click', () => bioFotoFileInput.click());
+  bioFotoFileInput.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    uploadedBioFotoDataUrl = await readFileAsDataURL(file, 520);
+    updateBioPhotoPreviewUI(uploadedBioFotoDataUrl);
+    updateHeaderAvatarPhoto(currentLoggedUser, currentBiodataRecord);
+    showBiodataAlert('📁 Foto dari folder lokal berhasil dimuat! Jangan lupa klik "Simpan Biodata" pada langkah ke-3.', 'success');
   });
 }
 
@@ -512,6 +678,10 @@ function populateBiodataForm(user, bio) {
   const defaultUid = (bio && bio.user_id) || user.user_id || user.username || '';
   const defaultNama = (bio && bio.nama_lengkap) || user.nama_lengkap || user.nama || '';
   const defaultHp = (bio && bio.no_hp) || user.no_hp || user.deskripsi || '';
+  const existingPhoto = (bio && (bio.foto_url || bio.foto)) || user.foto_url || user.foto || null;
+
+  uploadedBioFotoDataUrl = existingPhoto;
+  updateBioPhotoPreviewUI(existingPhoto);
 
   document.getElementById('bioUserId').value = defaultUid;
   document.getElementById('bioNamaLengkap').value = defaultNama;
@@ -537,7 +707,23 @@ function populateBiodataForm(user, bio) {
 
 function renderBiodataSummary(bio) {
   const container = document.getElementById('biodataSummaryContainer');
+  const photoTop = document.getElementById('bioSummaryPhotoTop');
   if (!container || !bio) return;
+
+  const photoUrl = bio.foto_url || bio.foto || uploadedBioFotoDataUrl || null;
+  if (photoTop) {
+    photoTop.innerHTML = `
+      <div class="bio-photo-frame" style="width:86px; height:86px;">
+        ${photoUrl ? `<img src="${photoUrl}" alt="${bio.nama_lengkap}" />` : '👤'}
+      </div>
+      <div>
+        <strong style="font-size:1.1rem;">${bio.nama_lengkap || '-'}</strong>
+        <p style="font-size:0.85rem; color:var(--text-muted); margin-top:3px;">
+          User ID: ${bio.user_id || '-'} • ${bio.jumlah_ikut_arisan || bio.jumlah_slot || 1} Slot Arisan
+        </p>
+      </div>
+    `;
+  }
 
   const items = [
     { label: 'User ID Peserta', value: bio.user_id || '-' },
@@ -575,8 +761,12 @@ function renderBiodataSummary(bio) {
 }
 
 // ============================================================================
-// LOAD DATA SEMUA MODUL (PEMBAYARAN, PENGELUARAN, PENGUMUMAN, GALERI, PERIODE)
+// LOAD DATA SEMUA MODUL & STATISTIK TRANSPARANSI (LAMPIRAN 2)
 // ============================================================================
+let totalPemasukanArisan = 0;
+let totalPemasukanLain = 0;
+let totalPengeluaranKas = 0;
+
 async function loadAllDashboardModules() {
   await Promise.all([
     fetchAllAnggota(),
@@ -589,20 +779,23 @@ async function loadAllDashboardModules() {
   updateQuickStatsBar();
 }
 
-let totalPemasukanKas = 0;
-let totalPengeluaranKas = 0;
+function isJenisArisan(jenisBayar) {
+  return String(jenisBayar || '').toLowerCase().includes('arisan');
+}
 
 function updateQuickStatsBar() {
-  const elMasuk = document.getElementById('statTotalMasuk');
+  const elMasukArisan = document.getElementById('statTotalMasukArisan');
+  const elMasukLain = document.getElementById('statTotalMasukLain');
   const elKeluar = document.getElementById('statTotalKeluar');
   const elSaldo = document.getElementById('statSaldoKas');
   const elPeriode = document.getElementById('statPeriodeAktif');
   const elTglPeriode = document.getElementById('statTanggalPeriode');
   const elPemenang = document.getElementById('statPemenangTerakhir');
 
-  if (elMasuk) elMasuk.textContent = formatRupiah(totalPemasukanKas);
+  if (elMasukArisan) elMasukArisan.textContent = formatRupiah(totalPemasukanArisan);
+  if (elMasukLain) elMasukLain.textContent = formatRupiah(totalPemasukanLain);
   if (elKeluar) elKeluar.textContent = formatRupiah(totalPengeluaranKas);
-  if (elSaldo) elSaldo.textContent = formatRupiah(totalPemasukanKas - totalPengeluaranKas);
+  if (elSaldo) elSaldo.textContent = formatRupiah(totalPemasukanArisan + totalPemasukanLain - totalPengeluaranKas);
 
   const activePeriode =
     cachedPeriodeList.find((p) => p.status === 'aktif') || cachedPeriodeList[0] || null;
@@ -611,7 +804,7 @@ function updateQuickStatsBar() {
     elTglPeriode.textContent = `${activePeriode.tanggal_arisan || '-'} • ${activePeriode.tempat_arisan || ''}`;
   } else {
     elPeriode.textContent = 'Belum Disetting';
-    elTglPeriode.textContent = 'Klik Menu 5 untuk setting';
+    elTglPeriode.textContent = 'Klik Menu 4 untuk setting';
   }
 
   const lastWinner =
@@ -626,8 +819,209 @@ function updateQuickStatsBar() {
 }
 
 // ============================================================================
-// MODUL 1: PEMBAYARAN (ARISAN, SUMBANGAN, ZAKAT, DLL)
+// MODAL TRANSPARANSI PEMASUKAN PER JENIS PEMBAYARAN (LAMPIRAN 2)
 // ============================================================================
+function openTransparencyModal(initialFilter = 'ALL') {
+  const modal = document.getElementById('transparencyModal');
+  if (!modal) return;
+  modal.classList.remove('hidden');
+  renderTransparencyBreakdown(initialFilter);
+}
+
+function renderTransparencyBreakdown(activeFilter = 'ALL') {
+  const gridEl = document.getElementById('transparencyBreakdownGrid');
+  const tbodyEl = document.getElementById('transparencyTableBody');
+  const titleEl = document.getElementById('transparencyModalTitle');
+  if (!gridEl || !tbodyEl) return;
+
+  // Hitung rekap per jenis_bayar dari cachedPembayaranList
+  const summaryMap = {};
+  let sumArisan = 0;
+  let countArisan = 0;
+  let sumNonArisan = 0;
+  let countNonArisan = 0;
+
+  (cachedPembayaranList || []).forEach((row) => {
+    const jenis = row.jenis_bayar || 'Lainnya';
+    const nom = Number(row.nominal || 0);
+    if (!summaryMap[jenis]) {
+      summaryMap[jenis] = { total: 0, count: 0 };
+    }
+    summaryMap[jenis].total += nom;
+    summaryMap[jenis].count += 1;
+
+    if (isJenisArisan(jenis)) {
+      sumArisan += nom;
+      countArisan += 1;
+    } else {
+      sumNonArisan += nom;
+      countNonArisan += 1;
+    }
+  });
+
+  const filterCards = [
+    {
+      key: 'Uang Arisan',
+      title: '💰 Pemasukan Uang Arisan',
+      amount: sumArisan,
+      count: countArisan
+    },
+    {
+      key: 'NON_ARISAN',
+      title: '🤝 Semua Pemasukan Lainnya',
+      amount: sumNonArisan,
+      count: countNonArisan
+    },
+    ...Object.keys(summaryMap)
+      .filter((k) => k !== 'Uang Arisan')
+      .map((k) => ({
+        key: k,
+        title: `📌 ${k}`,
+        amount: summaryMap[k].total,
+        count: summaryMap[k].count
+      })),
+    {
+      key: 'ALL',
+      title: '📊 Total Seluruh Pemasukan',
+      amount: sumArisan + sumNonArisan,
+      count: (cachedPembayaranList || []).length
+    }
+  ];
+
+  gridEl.innerHTML = filterCards
+    .map(
+      (c) => `
+      <div class="jenis-filter-card ${activeFilter === c.key ? 'active' : ''}" onclick="renderTransparencyBreakdown('${c.key}')">
+        <div class="jf-title">${c.title}</div>
+        <div class="jf-amount">${formatRupiah(c.amount)}</div>
+        <div class="jf-count">${c.count} Transaksi</div>
+      </div>
+    `
+    )
+    .join('');
+
+  // Filter baris transaksi sesuai pilihan
+  const filteredRows = (cachedPembayaranList || []).filter((r) => {
+    if (activeFilter === 'ALL') return true;
+    if (activeFilter === 'NON_ARISAN') return !isJenisArisan(r.jenis_bayar);
+    if (activeFilter === 'Uang Arisan') return isJenisArisan(r.jenis_bayar);
+    return String(r.jenis_bayar || '') === activeFilter;
+  });
+
+  if (titleEl) {
+    const labelFilter =
+      activeFilter === 'ALL'
+        ? 'Seluruh Pemasukan'
+        : activeFilter === 'NON_ARISAN'
+        ? 'Pemasukan Lainnya (Zakat, Sumbangan, Infaq, dll)'
+        : activeFilter;
+    titleEl.textContent = `📊 Transparansi Pemasukan: ${labelFilter}`;
+  }
+
+  if (filteredRows.length === 0) {
+    tbodyEl.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--text-muted);">Belum ada data pembayaran pada kategori ini.</td></tr>`;
+    return;
+  }
+
+  tbodyEl.innerHTML = filteredRows
+    .map((r) => {
+      const statusLower = String(r.status || 'Pending').toLowerCase();
+      const isPending = statusLower === 'pending' || statusLower === 'menunggu';
+      const metodeText =
+        r.metode_bayar === 'Transfer Bank' || r.metode_bayar === 'Transfer'
+          ? `Transfer ${r.nama_bank ? '(' + r.nama_bank + ')' : ''}`
+          : 'Tunai';
+
+      const buktiBtn = r.bukti_bayar_url
+        ? `<button type="button" class="btn-secondary btn-sm" onclick="openMediaModal('Bukti Pembayaran - ${r.nama_pembayar}', '${r.bukti_bayar_url}')">🖼️ Bukti</button>`
+        : `<span style="color:#94a3b8; font-size:0.8rem;">-</span>`;
+
+      return `
+        <tr>
+          <td>${r.tanggal_bayar || '-'}</td>
+          <td><strong>${r.nama_pembayar || '-'}</strong></td>
+          <td><strong>${r.jenis_bayar || '-'}</strong></td>
+          <td>${metodeText}</td>
+          <td>${r.keterangan || '-'}</td>
+          <td><strong>${formatRupiah(r.nominal)}</strong></td>
+          <td>${buktiBtn}</td>
+          <td><span class="status-pill ${isPending ? 'incomplete' : 'complete'}">${r.status || 'Pending'}</span></td>
+        </tr>
+      `;
+    })
+    .join('');
+}
+
+window.renderTransparencyBreakdown = renderTransparencyBreakdown;
+
+const statCardPemasukanArisan = document.getElementById('statCardPemasukanArisan');
+if (statCardPemasukanArisan) {
+  statCardPemasukanArisan.addEventListener('click', () => openTransparencyModal('Uang Arisan'));
+}
+
+const statCardPemasukanLain = document.getElementById('statCardPemasukanLain');
+if (statCardPemasukanLain) {
+  statCardPemasukanLain.addEventListener('click', () => openTransparencyModal('NON_ARISAN'));
+}
+
+const closeTransparencyModalBtn = document.getElementById('closeTransparencyModalBtn');
+if (closeTransparencyModalBtn) {
+  closeTransparencyModalBtn.addEventListener('click', () => {
+    document.getElementById('transparencyModal').classList.add('hidden');
+  });
+}
+
+// ============================================================================
+// MODUL 1: PEMBAYARAN (JENIS SEBELUM PERIODE & DEFAULT STATUS PENDING)
+// ============================================================================
+function syncPayPeriodeByJenis() {
+  const payJenis = document.getElementById('payJenis');
+  const payPeriode = document.getElementById('payPeriode');
+  const payPeriodeHint = document.getElementById('payPeriodeHint');
+  if (!payJenis || !payPeriode) return;
+
+  const isUangArisan = payJenis.value === 'Uang Arisan';
+  payPeriode.disabled = !isUangArisan;
+  if (!isUangArisan) {
+    payPeriode.value = '';
+    if (payPeriodeHint) {
+      payPeriodeHint.textContent = '(Nonaktif - Hanya untuk Uang Arisan)';
+      payPeriodeHint.style.color = '#64748b';
+    }
+  } else {
+    if (payPeriodeHint) {
+      payPeriodeHint.textContent = '(Aktif untuk Uang Arisan)';
+      payPeriodeHint.style.color = 'var(--primary)';
+    }
+  }
+}
+
+const payJenisSelect = document.getElementById('payJenis');
+if (payJenisSelect) {
+  payJenisSelect.addEventListener('change', syncPayPeriodeByJenis);
+}
+
+async function approvePaymentStatus(paymentId) {
+  if (!isUserAdmin()) return;
+  try {
+    await adaptiveSupabaseWrite(
+      TABLES.PEMBAYARAN,
+      {
+        status: 'disetujui',
+        diverifikasi_oleh: currentLoggedUser ? currentLoggedUser.nama_lengkap || currentLoggedUser.user_id : 'Admin'
+      },
+      `?id=eq.${encodeURIComponent(paymentId)}`
+    );
+    await loadPembayaranData();
+    updateQuickStatsBar();
+    showGlobalAlert('✅ Status pembayaran berhasil diverifikasi menjadi Disetujui!', 'success');
+  } catch (err) {
+    showGlobalAlert(err.message, 'error');
+  }
+}
+
+window.approvePaymentStatus = approvePaymentStatus;
+
 async function loadPembayaranData() {
   const tbody = document.getElementById('tableBodyPembayaran');
   if (!tbody) return;
@@ -639,15 +1033,28 @@ async function loadPembayaranData() {
     });
     if (!res.ok) throw new Error('Gagal memuat data pembayaran.');
     const rows = await res.json();
+    cachedPembayaranList = rows || [];
 
-    totalPemasukanKas = (rows || []).reduce((acc, r) => acc + Number(r.nominal || 0), 0);
+    // Hitung terpisah: Pemasukan Uang Arisan vs Pemasukan Lainnya
+    totalPemasukanArisan = 0;
+    totalPemasukanLain = 0;
+    cachedPembayaranList.forEach((r) => {
+      const nom = Number(r.nominal || 0);
+      if (isJenisArisan(r.jenis_bayar)) {
+        totalPemasukanArisan += nom;
+      } else {
+        totalPemasukanLain += nom;
+      }
+    });
 
-    if (!rows || rows.length === 0) {
+    if (cachedPembayaranList.length === 0) {
       tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;">Belum ada transaksi pembayaran.</td></tr>`;
       return;
     }
 
-    tbody.innerHTML = rows
+    const adminFlag = isUserAdmin();
+
+    tbody.innerHTML = cachedPembayaranList
       .map((r, idx) => {
         const metodeText =
           r.metode_bayar === 'Transfer Bank' || r.metode_bayar === 'Transfer'
@@ -658,6 +1065,23 @@ async function loadPembayaranData() {
           ? `<button type="button" class="btn-secondary btn-sm" onclick="openMediaModal('Bukti Pembayaran - ${r.nama_pembayar}', '${r.bukti_bayar_url}')">🖼️ Lihat Bukti</button>`
           : `<span style="color:#94a3b8; font-size:0.8rem;">Tidak ada</span>`;
 
+        const statusRaw = r.status || 'Pending';
+        const statusLower = String(statusRaw).toLowerCase();
+        const isPending = statusLower === 'pending' || statusLower === 'menunggu';
+
+        const statusCell = `
+          <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+            <span class="status-pill ${isPending ? 'incomplete' : 'complete'}">
+              ${isPending ? '⏳ Pending' : '✓ ' + statusRaw}
+            </span>
+            ${
+              adminFlag && isPending
+                ? `<button type="button" class="btn-primary btn-sm" onclick="approvePaymentStatus('${r.id}')">✓ Setujui</button>`
+                : ''
+            }
+          </div>
+        `;
+
         return `
           <tr>
             <td>${r.tanggal_bayar || '-'}</td>
@@ -667,7 +1091,7 @@ async function loadPembayaranData() {
             <td>${metodeText}</td>
             <td><strong>${formatRupiah(r.nominal)}</strong></td>
             <td>${buktiBtn}</td>
-            <td><span class="status-pill complete">${r.status || 'disetujui'}</span></td>
+            <td>${statusCell}</td>
           </tr>
         `;
       })
@@ -707,12 +1131,13 @@ if (payBuktiFileInput) {
   });
 }
 
-// Submit Form Pembayaran
+// Submit Form Pembayaran (Default Status: Pending)
 const formPembayaran = document.getElementById('formPembayaran');
 if (formPembayaran) {
   formPembayaran.addEventListener('submit', async (e) => {
     e.preventDefault();
     const btn = document.getElementById('btnSubmitPembayaran');
+    const jenisBayar = document.getElementById('payJenis').value;
     const metode = document.getElementById('payMetode').value;
     const namaBank = document.getElementById('payNamaBank').value;
 
@@ -726,7 +1151,8 @@ if (formPembayaran) {
 
     try {
       const kode = 'TX-ARS-' + Math.floor(1000 + Math.random() * 9000);
-      const selectedPeriodeId = document.getElementById('payPeriode').value || null;
+      const selectedPeriodeId =
+        jenisBayar === 'Uang Arisan' ? document.getElementById('payPeriode').value || null : null;
       const noRek = document.getElementById('payNoRekening').value.trim();
       const ketInput = document.getElementById('payKeterangan').value.trim();
       const fullKeterangan = [
@@ -744,38 +1170,40 @@ if (formPembayaran) {
         user_id: currentLoggedUser ? currentLoggedUser.user_id : null,
         nama_pembayar: document.getElementById('payNama').value.trim(),
         tanggal_bayar: document.getElementById('payTanggal').value || todayISO(),
-        jenis_bayar: document.getElementById('payJenis').value,
+        jenis_bayar: jenisBayar,
         nominal: Number(document.getElementById('payNominal').value || 0),
         metode_bayar: metode === 'Transfer Bank' ? 'Transfer' : 'Tunai',
         nama_bank: metode === 'Transfer Bank' ? namaBank : null,
         no_rekening_pengirim: metode === 'Transfer Bank' ? noRek : null,
         bukti_bayar_url: uploadedPayBuktiDataUrl,
         keterangan: fullKeterangan,
-        status: 'disetujui'
+        status: 'Pending'
       });
 
       formPembayaran.reset();
       document.getElementById('payTanggal').value = todayISO();
+      document.getElementById('payStatus').value = 'Pending';
       if (currentBiodataRecord) {
         document.getElementById('payNama').value = currentBiodataRecord.nama_lengkap || '';
       }
+      syncPayPeriodeByJenis();
       uploadedPayBuktiDataUrl = null;
       document.getElementById('payBuktiPreview').innerHTML = '';
 
       await loadPembayaranData();
       updateQuickStatsBar();
-      showGlobalAlert('✅ Data pembayaran beserta bukti berhasil disimpan ke tabel <b>adnan_Pembayaran</b>!', 'success');
+      showGlobalAlert('✅ Data pembayaran berhasil disimpan dengan status <b>Pending</b>!', 'success');
     } catch (err) {
       showGlobalAlert(err.message, 'error');
     } finally {
       btn.disabled = false;
-      btn.textContent = '💾 Simpan Pembayaran';
+      btn.textContent = '💾 Simpan Pembayaran (Status: Pending)';
     }
   });
 }
 
 // ============================================================================
-// MODUL 2: PENGELUARAN / AKUNTANSI (KHUSUS ADMIN)
+// MODUL PENGELUARAN / AKUNTANSI (HANYA MUNCUL UNTUK USER ADMIN)
 // ============================================================================
 async function loadPengeluaranData() {
   const tbody = document.getElementById('tableBodyPengeluaran');
@@ -899,7 +1327,7 @@ if (formPengeluaran) {
 }
 
 // ============================================================================
-// MODUL 3: PENGUMUMAN & DOKUMEN PDF (adnan_Pengumuman)
+// MODUL PENGUMUMAN & DOKUMEN PDF (adnan_Pengumuman)
 // ============================================================================
 async function loadPengumumanData() {
   const container = document.getElementById('announcementListContainer');
@@ -1004,7 +1432,7 @@ if (formPengumuman) {
 }
 
 // ============================================================================
-// MODUL 4: GALERI FOTO KEGIATAN (adnan_Galeri)
+// MODUL GALERI FOTO KEGIATAN (adnan_Galeri)
 // ============================================================================
 async function loadGaleriData() {
   const container = document.getElementById('photoGalleryContainer');
@@ -1100,7 +1528,7 @@ if (formGaleri) {
 }
 
 // ============================================================================
-// MODUL 5: SETTING PERIODE ARISAN & PEMENANG ARISAN
+// MODUL SETTING PERIODE ARISAN & PEMENANG ARISAN
 // ============================================================================
 async function loadPeriodeAndPemenangData() {
   const tbodyPeriode = document.getElementById('tableBodyPeriode');
@@ -1110,14 +1538,12 @@ async function loadPeriodeAndPemenangData() {
   const winAnggotaSelect = document.getElementById('winAnggota');
 
   try {
-    // 1. Ambil daftar periode dari adnan_Arisan
     const resPeriode = await fetch(`${SUPABASE_REST_URL}/${TABLES.ARISAN}?select=*&order=periode_ke.asc`, {
       method: 'GET',
       headers: supabaseHeaders
     });
     cachedPeriodeList = resPeriode.ok ? await resPeriode.json() : [];
 
-    // Populate dropdown periode di form Pembayaran & form Pemenang
     const periodeOptions = [
       '<option value="">-- Pilih Periode Arisan --</option>',
       ...cachedPeriodeList.map(
@@ -1127,8 +1553,8 @@ async function loadPeriodeAndPemenangData() {
 
     if (payPeriodeSelect) payPeriodeSelect.innerHTML = periodeOptions;
     if (winPeriodeSelect) winPeriodeSelect.innerHTML = periodeOptions;
+    syncPayPeriodeByJenis();
 
-    // Set default nomor periode berikutnya pada form tambah periode
     const nextPeriodeNum =
       cachedPeriodeList.length > 0
         ? Math.max(...cachedPeriodeList.map((p) => Number(p.periode_ke || 0))) + 1
@@ -1136,7 +1562,6 @@ async function loadPeriodeAndPemenangData() {
     const perNomorEl = document.getElementById('perNomor');
     if (perNomorEl) perNomorEl.value = nextPeriodeNum;
 
-    // Render tabel Periode Arisan
     if (tbodyPeriode) {
       if (cachedPeriodeList.length === 0) {
         tbodyPeriode.innerHTML = `<tr><td colspan="7" style="text-align:center;">Belum ada jadwal periode arisan.</td></tr>`;
@@ -1158,7 +1583,6 @@ async function loadPeriodeAndPemenangData() {
       }
     }
 
-    // 2. Populate dropdown Anggota pada form Pemenang Arisan
     if (winAnggotaSelect) {
       winAnggotaSelect.innerHTML = [
         '<option value="">-- Pilih Anggota Pemenang --</option>',
@@ -1169,7 +1593,6 @@ async function loadPeriodeAndPemenangData() {
       ].join('');
     }
 
-    // 3. Ambil daftar Pemenang Arisan dari adnan_PemenangArisan (atau fallback dari adnan_Arisan yang sudah ada pemenang_nama)
     let winnerRows = [];
     const resWin = await fetch(`${SUPABASE_REST_URL}/${TABLES.PEMENANG}?select=*&order=periode_ke.desc`, {
       method: 'GET',
@@ -1179,7 +1602,6 @@ async function loadPeriodeAndPemenangData() {
       winnerRows = await resWin.json();
     }
 
-    // Gabungkan juga dari adnan_Arisan jika ada pemenang yang tercatat langsung di adnan_Arisan
     cachedPeriodeList.forEach((p) => {
       if (p.pemenang_nama && !winnerRows.some((w) => Number(w.periode_ke) === Number(p.periode_ke))) {
         winnerRows.push({
@@ -1221,7 +1643,6 @@ async function loadPeriodeAndPemenangData() {
   }
 }
 
-// Submit Form Setting Periode Arisan
 const formPeriodeArisan = document.getElementById('formPeriodeArisan');
 if (formPeriodeArisan) {
   formPeriodeArisan.addEventListener('submit', async (e) => {
@@ -1239,7 +1660,6 @@ if (formPeriodeArisan) {
       const status = document.getElementById('perStatus').value;
       const keterangan = document.getElementById('perKeterangan').value.trim();
 
-      // Simpan ke adnan_Arisan
       await adaptiveSupabaseWrite(TABLES.ARISAN, {
         periode_ke: periodeKe,
         bulan_tahun: bulanTahun,
@@ -1250,7 +1670,6 @@ if (formPeriodeArisan) {
         keterangan: keterangan
       });
 
-      // Simpan juga ke adnan_PeriodeArisan jika tabel sudah diaktifkan dari supabase_schema.sql
       try {
         await adaptiveSupabaseWrite(TABLES.PERIODE, {
           nama_periode: `Periode Ke-${periodeKe} (${bulanTahun})`,
@@ -1277,7 +1696,6 @@ if (formPeriodeArisan) {
   });
 }
 
-// Tombol Kocok Undian Pemenang Otomatis
 const btnKocokUndian = document.getElementById('btnKocokUndian');
 if (btnKocokUndian) {
   btnKocokUndian.addEventListener('click', () => {
@@ -1293,7 +1711,6 @@ if (btnKocokUndian) {
   });
 }
 
-// Submit Form Penetapan Pemenang Arisan
 const formPemenangArisan = document.getElementById('formPemenangArisan');
 if (formPemenangArisan) {
   formPemenangArisan.addEventListener('submit', async (e) => {
@@ -1320,7 +1737,6 @@ if (formPemenangArisan) {
       const bank = document.getElementById('winBank').value;
       const keterangan = document.getElementById('winKeterangan').value.trim();
 
-      // 1. Update pemenang pada tabel adnan_Arisan
       await adaptiveSupabaseWrite(
         TABLES.ARISAN,
         {
@@ -1332,7 +1748,6 @@ if (formPemenangArisan) {
         `?id=eq.${encodeURIComponent(selectedPeriode.id)}`
       );
 
-      // 2. Tandai anggota sudah_menang pada adnan_DataAnggota
       await adaptiveSupabaseWrite(
         TABLES.ANGGOTA,
         {
@@ -1342,7 +1757,6 @@ if (formPemenangArisan) {
         `?id=eq.${encodeURIComponent(selectedAnggota.id)}`
       );
 
-      // 3. Simpan ke tabel adnan_PemenangArisan (jika tabel sudah dibuat di Supabase)
       try {
         await adaptiveSupabaseWrite(TABLES.PEMENANG, {
           periode_id: selectedPeriode.id,
@@ -1375,7 +1789,7 @@ if (formPemenangArisan) {
 }
 
 // ============================================================================
-// ALUR SETELAH LOGIN: CEK adnan_DataAnggota -> WAJIB ISI ATAU BUKA GALLERY
+// ALUR SETELAH LOGIN: CEK adnan_DataAnggota & TAMPILKAN FOTO + HAK AKSES ADMIN
 // ============================================================================
 async function handlePostLoginFlow(user) {
   currentLoggedUser = user;
@@ -1383,6 +1797,7 @@ async function handlePostLoginFlow(user) {
   const memberAppView = document.getElementById('memberAppView');
 
   if (!user) {
+    stopCameraStream();
     authView.classList.remove('hidden');
     memberAppView.classList.add('hidden');
     return;
@@ -1395,21 +1810,13 @@ async function handlePostLoginFlow(user) {
   const displayUid = user.user_id || user.username || '-';
   const adminFlag = isUserAdmin();
 
-  const initials = displayName
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((p) => p[0].toUpperCase())
-    .join('');
-
-  document.getElementById('headerAvatar').textContent = initials || 'KA';
   document.getElementById('welcomeUserText').textContent = displayName;
   document.getElementById('userDetailText').textContent = `User ID: ${displayUid} • Role: ${adminFlag ? 'Administrator' : 'Peserta Arisan'}`;
 
-  // Tampilkan badge Admin & atur akses form Pengeluaran Khusus Admin
+  // Tampilkan Tab Pengeluaran & Kartu Pengeluaran HANYA jika User adalah Admin
   document.getElementById('roleBadgePill').classList.toggle('hidden', !adminFlag);
-  document.getElementById('adminExpenseFormCard').classList.toggle('hidden', !adminFlag);
-  document.getElementById('nonAdminExpenseNotice').classList.toggle('hidden', adminFlag);
+  document.getElementById('navBtnPengeluaran').classList.toggle('hidden', !adminFlag);
+  document.getElementById('galleryCardPengeluaran').classList.toggle('hidden', !adminFlag);
 
   // Set default tanggal hari ini di semua form
   ['payTanggal', 'expTanggal', 'galTanggal', 'winTanggal'].forEach((id) => {
@@ -1421,6 +1828,7 @@ async function handlePostLoginFlow(user) {
     const biodata = await checkBiodataAnggotaInSupabase(user);
     currentBiodataRecord = biodata;
     populateBiodataForm(user, biodata);
+    updateHeaderAvatarPhoto(user, biodata);
 
     const statusPill = document.getElementById('biodataStatusPill');
     const mandatoryBanner = document.getElementById('mandatoryBanner');
@@ -1428,7 +1836,6 @@ async function handlePostLoginFlow(user) {
     const btnBackFromBio = document.getElementById('btnBackToGalleryFromBio');
 
     if (!biodata) {
-      // BELUM TEREGISTER DI adnan_DataAnggota -> WAJIB ISI ENTRY BIODATA DULU
       statusPill.textContent = '⚠️ Wajib Isi Biodata';
       statusPill.className = 'status-pill incomplete';
       mandatoryBanner.classList.remove('hidden');
@@ -1437,7 +1844,6 @@ async function handlePostLoginFlow(user) {
       switchMainView('viewBiodata');
       switchBioSubTab('tabPribadi');
     } else {
-      // SUDAH TEREGISTER DI adnan_DataAnggota -> TAMPILKAN LAYAR UTAMA MENU GALLERY
       statusPill.textContent = '✓ Anggota Terdaftar';
       statusPill.className = 'status-pill complete';
       mandatoryBanner.classList.add('hidden');
@@ -1518,7 +1924,7 @@ if (editBiodataBtn) {
   });
 }
 
-// Submit Form Entry Biodata (adnan_DataAnggota)
+// Submit Form Entry Biodata (adnan_DataAnggota) termasuk Foto Peserta
 const biodataForm = document.getElementById('biodataForm');
 if (biodataForm) {
   biodataForm.addEventListener('submit', async (e) => {
@@ -1557,6 +1963,8 @@ if (biodataForm) {
         nama_bank: document.getElementById('bioNamaBank').value || null,
         no_rekening: document.getElementById('bioNoRekening').value.trim() || null,
         atas_nama_rekening: document.getElementById('bioAtasNama').value.trim() || namaLengkap,
+        foto_url: uploadedBioFotoDataUrl || null,
+        foto: uploadedBioFotoDataUrl || null,
         status_aktif: true
       };
 
@@ -1568,6 +1976,8 @@ if (biodataForm) {
       const saved = await adaptiveSupabaseWrite(TABLES.ANGGOTA, payload, filter);
       currentBiodataRecord = saved || payload;
 
+      updateHeaderAvatarPhoto(currentLoggedUser, currentBiodataRecord);
+
       document.getElementById('biodataStatusPill').textContent = '✓ Anggota Terdaftar';
       document.getElementById('biodataStatusPill').className = 'status-pill complete';
       document.getElementById('mandatoryBanner').classList.add('hidden');
@@ -1577,7 +1987,7 @@ if (biodataForm) {
       renderBiodataSummary(currentBiodataRecord);
       await loadAllDashboardModules();
       switchMainView('viewGalleryHome');
-      showGlobalAlert('🎉 Biodata Anda telah teregister di <b>adnan_DataAnggota</b>! Selamat datang di Layar Utama Menu Gallery.', 'success');
+      showGlobalAlert('🎉 Biodata & Foto Peserta telah tersimpan di <b>adnan_DataAnggota</b>!', 'success');
     } catch (err) {
       showBiodataAlert(err.message, 'error');
     } finally {
@@ -1669,9 +2079,11 @@ if (registerForm) {
 const logoutBtn = document.getElementById('logoutBtn');
 if (logoutBtn) {
   logoutBtn.addEventListener('click', () => {
+    stopCameraStream();
     localStorage.removeItem(SESSION_KEY);
     currentLoggedUser = null;
     currentBiodataRecord = null;
+    uploadedBioFotoDataUrl = null;
     handlePostLoginFlow(null);
     setAuthMode(false);
   });
@@ -1680,6 +2092,7 @@ if (logoutBtn) {
 // Inisialisasi saat halaman dimuat
 document.addEventListener('DOMContentLoaded', () => {
   populateAllBankDropdowns();
+  syncPayPeriodeByJenis();
   try {
     const saved = localStorage.getItem(SESSION_KEY);
     if (saved) {

@@ -13,11 +13,16 @@ CREATE TABLE IF NOT EXISTS public."adnan_User" (
     nama_lengkap TEXT NOT NULL,
     nama TEXT,
     no_hp TEXT,
+    foto_url TEXT,
+    foto TEXT,
     deskripsi TEXT,
     status_aktif BOOLEAN DEFAULT true,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+ALTER TABLE public."adnan_User" ADD COLUMN IF NOT EXISTS foto_url TEXT;
+ALTER TABLE public."adnan_User" ADD COLUMN IF NOT EXISTS foto TEXT;
 
 -- Tambahkan akun Admin default
 INSERT INTO public."adnan_User" (user_id, username, password, role, nama_lengkap, nama, status_aktif)
@@ -25,7 +30,7 @@ VALUES ('admin', 'admin', 'admin123', 'admin', 'Admin Arisan Keluarga Adnan', 'A
 ON CONFLICT (user_id) DO UPDATE
 SET role = 'admin', status_aktif = true;
 
--- 2. Tabel Biodata Anggota (adnan_DataAnggota)
+-- 2. Tabel Biodata Anggota (adnan_DataAnggota) - Dilengkapi Header Kolom Foto
 CREATE TABLE IF NOT EXISTS public."adnan_DataAnggota" (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     user_id TEXT,
@@ -52,12 +57,31 @@ CREATE TABLE IF NOT EXISTS public."adnan_DataAnggota" (
     jumlah_slot INTEGER DEFAULT 1,
     jumlah_ikut_arisan INTEGER DEFAULT 1,
     foto_url TEXT,
+    foto TEXT,
     status_aktif BOOLEAN DEFAULT true,
     sudah_menang BOOLEAN DEFAULT false,
     periode_menang_ke INTEGER,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+ALTER TABLE public."adnan_DataAnggota" ADD COLUMN IF NOT EXISTS foto_url TEXT;
+ALTER TABLE public."adnan_DataAnggota" ADD COLUMN IF NOT EXISTS foto TEXT;
+ALTER TABLE public."adnan_DataAnggota" ADD COLUMN IF NOT EXISTS user_id TEXT;
+ALTER TABLE public."adnan_DataAnggota" ADD COLUMN IF NOT EXISTS nama_panggilan TEXT;
+ALTER TABLE public."adnan_DataAnggota" ADD COLUMN IF NOT EXISTS jenis_kelamin TEXT;
+ALTER TABLE public."adnan_DataAnggota" ADD COLUMN IF NOT EXISTS tempat_lahir TEXT;
+ALTER TABLE public."adnan_DataAnggota" ADD COLUMN IF NOT EXISTS tanggal_lahir DATE;
+ALTER TABLE public."adnan_DataAnggota" ADD COLUMN IF NOT EXISTS pekerjaan TEXT;
+ALTER TABLE public."adnan_DataAnggota" ADD COLUMN IF NOT EXISTS email TEXT;
+ALTER TABLE public."adnan_DataAnggota" ADD COLUMN IF NOT EXISTS kota TEXT;
+ALTER TABLE public."adnan_DataAnggota" ADD COLUMN IF NOT EXISTS nama_pasangan TEXT;
+ALTER TABLE public."adnan_DataAnggota" ADD COLUMN IF NOT EXISTS jumlah_anak INTEGER DEFAULT 0;
+ALTER TABLE public."adnan_DataAnggota" ADD COLUMN IF NOT EXISTS silsilah_keluarga TEXT;
+ALTER TABLE public."adnan_DataAnggota" ADD COLUMN IF NOT EXISTS nama_bank TEXT;
+ALTER TABLE public."adnan_DataAnggota" ADD COLUMN IF NOT EXISTS no_rekening TEXT;
+ALTER TABLE public."adnan_DataAnggota" ADD COLUMN IF NOT EXISTS atas_nama_rekening TEXT;
+ALTER TABLE public."adnan_DataAnggota" ADD COLUMN IF NOT EXISTS jumlah_ikut_arisan INTEGER DEFAULT 1;
 
 -- 3. Tabel Setting Periode Arisan Utama (adnan_Arisan & adnan_PeriodeArisan)
 CREATE TABLE IF NOT EXISTS public."adnan_Arisan" (
@@ -112,7 +136,7 @@ CREATE TABLE IF NOT EXISTS public."adnan_PemenangArisan" (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 5. Tabel Pembayaran: Arisan, Sumbangan, Zakat, dll (adnan_Pembayaran)
+-- 5. Tabel Pembayaran: Default Status Pending (adnan_Pembayaran)
 CREATE TABLE IF NOT EXISTS public."adnan_Pembayaran" (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     kode_transaksi TEXT,
@@ -128,12 +152,13 @@ CREATE TABLE IF NOT EXISTS public."adnan_Pembayaran" (
     no_rekening_pengirim TEXT,
     bukti_bayar_url TEXT,
     keterangan TEXT,
-    status TEXT DEFAULT 'disetujui',
+    status TEXT DEFAULT 'Pending',
     diverifikasi_oleh TEXT,
     diverifikasi_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+ALTER TABLE public."adnan_Pembayaran" ALTER COLUMN status SET DEFAULT 'Pending';
 ALTER TABLE public."adnan_Pembayaran" ADD COLUMN IF NOT EXISTS user_id TEXT;
 ALTER TABLE public."adnan_Pembayaran" ADD COLUMN IF NOT EXISTS nama_bank TEXT;
 ALTER TABLE public."adnan_Pembayaran" ADD COLUMN IF NOT EXISTS no_rekening_pengirim TEXT;
@@ -157,18 +182,6 @@ CREATE TABLE IF NOT EXISTS public."adnan_Pengeluaran" (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-ALTER TABLE public."adnan_Pengeluaran" ADD COLUMN IF NOT EXISTS kode_pengeluaran TEXT;
-ALTER TABLE public."adnan_Pengeluaran" ADD COLUMN IF NOT EXISTS tanggal_pengeluaran DATE DEFAULT CURRENT_DATE;
-ALTER TABLE public."adnan_Pengeluaran" ADD COLUMN IF NOT EXISTS kategori TEXT;
-ALTER TABLE public."adnan_Pengeluaran" ADD COLUMN IF NOT EXISTS nama_pengeluaran TEXT;
-ALTER TABLE public."adnan_Pengeluaran" ADD COLUMN IF NOT EXISTS deskripsi TEXT;
-ALTER TABLE public."adnan_Pengeluaran" ADD COLUMN IF NOT EXISTS nominal NUMERIC(15,2) DEFAULT 0;
-ALTER TABLE public."adnan_Pengeluaran" ADD COLUMN IF NOT EXISTS metode_bayar TEXT DEFAULT 'Tunai';
-ALTER TABLE public."adnan_Pengeluaran" ADD COLUMN IF NOT EXISTS nama_bank TEXT;
-ALTER TABLE public."adnan_Pengeluaran" ADD COLUMN IF NOT EXISTS penerima TEXT;
-ALTER TABLE public."adnan_Pengeluaran" ADD COLUMN IF NOT EXISTS bukti_url TEXT;
-ALTER TABLE public."adnan_Pengeluaran" ADD COLUMN IF NOT EXISTS dicatat_oleh TEXT DEFAULT 'Admin';
-
 -- 7. Tabel Pengumuman & Dokumen PDF (adnan_Pengumuman)
 CREATE TABLE IF NOT EXISTS public."adnan_Pengumuman" (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -185,15 +198,6 @@ CREATE TABLE IF NOT EXISTS public."adnan_Pengumuman" (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-ALTER TABLE public."adnan_Pengumuman" ADD COLUMN IF NOT EXISTS judul TEXT;
-ALTER TABLE public."adnan_Pengumuman" ADD COLUMN IF NOT EXISTS kategori TEXT DEFAULT 'Pengumuman Umum';
-ALTER TABLE public."adnan_Pengumuman" ADD COLUMN IF NOT EXISTS isi TEXT;
-ALTER TABLE public."adnan_Pengumuman" ADD COLUMN IF NOT EXISTS isi_pengumuman TEXT;
-ALTER TABLE public."adnan_Pengumuman" ADD COLUMN IF NOT EXISTS tanggal_pengumuman DATE DEFAULT CURRENT_DATE;
-ALTER TABLE public."adnan_Pengumuman" ADD COLUMN IF NOT EXISTS file_pdf_url TEXT;
-ALTER TABLE public."adnan_Pengumuman" ADD COLUMN IF NOT EXISTS file_pdf_nama TEXT;
-ALTER TABLE public."adnan_Pengumuman" ADD COLUMN IF NOT EXISTS dibuat_oleh TEXT DEFAULT 'Admin';
-
 -- 8. Tabel Galeri Foto Kegiatan (adnan_Galeri)
 CREATE TABLE IF NOT EXISTS public."adnan_Galeri" (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -207,14 +211,6 @@ CREATE TABLE IF NOT EXISTS public."adnan_Galeri" (
     diunggah_oleh TEXT DEFAULT 'Admin',
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
-
-ALTER TABLE public."adnan_Galeri" ADD COLUMN IF NOT EXISTS judul TEXT;
-ALTER TABLE public."adnan_Galeri" ADD COLUMN IF NOT EXISTS judul_kegiatan TEXT;
-ALTER TABLE public."adnan_Galeri" ADD COLUMN IF NOT EXISTS tanggal_kegiatan DATE DEFAULT CURRENT_DATE;
-ALTER TABLE public."adnan_Galeri" ADD COLUMN IF NOT EXISTS lokasi TEXT;
-ALTER TABLE public."adnan_Galeri" ADD COLUMN IF NOT EXISTS deskripsi TEXT;
-ALTER TABLE public."adnan_Galeri" ADD COLUMN IF NOT EXISTS foto_url TEXT;
-ALTER TABLE public."adnan_Galeri" ADD COLUMN IF NOT EXISTS diunggah_oleh TEXT DEFAULT 'Admin';
 
 -- 9. Berikan hak akses (GRANT) untuk seluruh tabel di schema public
 GRANT USAGE ON SCHEMA public TO anon, authenticated;

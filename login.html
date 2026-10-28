@@ -95,7 +95,7 @@
     .app-container {
       background: var(--card-bg);
       width: 100%;
-      max-width: 1120px;
+      max-width: 1160px;
       border-radius: var(--radius-lg);
       box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
       overflow: hidden;
@@ -104,7 +104,7 @@
       min-height: 82vh;
     }
 
-    /* Header Bar */
+    /* Header Bar dengan Foto Peserta (Lampiran 1) */
     .app-header {
       background: linear-gradient(135deg, #0f766e, #115e59);
       color: #ffffff;
@@ -123,27 +123,37 @@
     }
 
     .user-avatar {
-      width: 48px;
-      height: 48px;
+      width: 54px;
+      height: 54px;
       border-radius: 14px;
       background: rgba(255, 255, 255, 0.18);
-      border: 1.5px solid rgba(255, 255, 255, 0.35);
+      border: 2px solid rgba(255, 255, 255, 0.45);
       display: flex;
       align-items: center;
       justify-content: center;
       font-size: 1.2rem;
       font-weight: 700;
       flex-shrink: 0;
+      overflow: hidden;
+      cursor: pointer;
+      position: relative;
+    }
+
+    .user-avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
     }
 
     .header-user-text h2 {
-      font-size: 1.18rem;
+      font-size: 1.22rem;
       font-weight: 700;
       margin-bottom: 2px;
     }
 
     .header-user-text p {
-      font-size: 0.84rem;
+      font-size: 0.85rem;
       color: rgba(255, 255, 255, 0.88);
     }
 
@@ -209,7 +219,7 @@
     }
 
     /* =====================================================================
-       TOP MAIN NAVIGATION TABS (PROPORSIONAL DI KOMPUTER & MOBILE)
+       TOP MAIN NAVIGATION TABS (PROPORSIONAL OTOMATIS 6 ATAU 7 TAB)
        ===================================================================== */
     .main-nav-wrapper {
       background: #f1f5f9;
@@ -218,13 +228,13 @@
     }
 
     .main-tab-nav {
-      display: grid;
-      grid-template-columns: repeat(7, minmax(0, 1fr));
+      display: flex;
       gap: 8px;
       width: 100%;
     }
 
     .main-tab-btn {
+      flex: 1 1 0%;
       appearance: none;
       background: #ffffff;
       border: 1.5px solid var(--border-light);
@@ -255,11 +265,6 @@
       border-bottom: 3px solid var(--primary);
       font-weight: 700;
       box-shadow: 0 -3px 10px rgba(15, 118, 110, 0.07);
-    }
-
-    .main-tab-btn:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
     }
 
     /* =====================================================================
@@ -326,27 +331,42 @@
     }
 
     /* =====================================================================
-       GALLERY MENU UTAMA (KARTU VISUAL INTERAKTIF)
+       STATS BAR (LAMPIRAN 2: PEMASUKAN ARISAN VS PEMASUKAN LAIN INTERAKTIF)
        ===================================================================== */
     .stats-bar {
       display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 14px;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 13px;
       margin-bottom: 24px;
     }
 
     .stat-card {
       background: var(--surface);
-      border: 1px solid var(--border-light);
+      border: 1.5px solid var(--border-light);
       border-radius: var(--radius-md);
-      padding: 16px;
+      padding: 15px;
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      justify-content: space-between;
+      gap: 5px;
+      transition: all 0.2s ease;
+    }
+
+    .stat-card.clickable-stat {
+      cursor: pointer;
+      background: #ffffff;
+      border-color: #99f6e4;
+      box-shadow: 0 4px 12px rgba(15, 118, 110, 0.06);
+    }
+
+    .stat-card.clickable-stat:hover {
+      transform: translateY(-3px);
+      border-color: var(--primary);
+      box-shadow: 0 10px 22px rgba(15, 118, 110, 0.14);
     }
 
     .stat-card .stat-title {
-      font-size: 0.78rem;
+      font-size: 0.75rem;
       text-transform: uppercase;
       letter-spacing: 0.4px;
       color: var(--text-muted);
@@ -354,17 +374,69 @@
     }
 
     .stat-card .stat-value {
-      font-size: 1.25rem;
+      font-size: 1.18rem;
       font-weight: 800;
       color: var(--text-main);
     }
 
     .stat-card .stat-sub {
-      font-size: 0.8rem;
+      font-size: 0.78rem;
       color: var(--primary);
       font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 4px;
     }
 
+    /* Filter Pills Transparansi Per Jenis Pembayaran */
+    .transparency-Breakdown-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(185px, 1fr));
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+
+    .jenis-filter-card {
+      background: var(--surface);
+      border: 1.5px solid var(--border-light);
+      border-radius: 10px;
+      padding: 11px 13px;
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.2s;
+    }
+
+    .jenis-filter-card:hover {
+      border-color: var(--primary);
+    }
+
+    .jenis-filter-card.active {
+      background: var(--primary-light);
+      border-color: var(--primary);
+      box-shadow: 0 2px 8px rgba(15, 118, 110, 0.12);
+    }
+
+    .jenis-filter-card .jf-title {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--text-secondary);
+      margin-bottom: 3px;
+    }
+
+    .jenis-filter-card .jf-amount {
+      font-size: 1rem;
+      font-weight: 800;
+      color: var(--primary);
+    }
+
+    .jenis-filter-card .jf-count {
+      font-size: 0.74rem;
+      color: var(--text-muted);
+    }
+
+    /* =====================================================================
+       GALLERY MENU UTAMA
+       ===================================================================== */
     .gallery-menu-grid {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -382,8 +454,6 @@
       gap: 14px;
       cursor: pointer;
       transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
-      position: relative;
-      overflow: hidden;
     }
 
     .gallery-menu-card:hover {
@@ -455,7 +525,7 @@
     }
 
     /* =====================================================================
-       BODY, PANEL, FORM & TABEL DATA
+       BODY, PANEL, FORM & CAMERA CAPTURE BOX
        ===================================================================== */
     .app-body {
       padding: 26px;
@@ -562,9 +632,12 @@
       transition: border-color 0.2s, box-shadow 0.2s;
     }
 
-    .form-group input[readonly] {
+    .form-group input[readonly],
+    .form-group select:disabled,
+    .form-group input:disabled {
       background: #f1f5f9;
-      color: #475569;
+      color: #64748b;
+      cursor: not-allowed;
     }
 
     .form-group textarea {
@@ -579,18 +652,76 @@
       box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.14);
     }
 
-    /* Upload Preview Box */
+    /* Foto Peserta Camera & Upload Widget */
+    .photo-capture-container {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      background: var(--surface);
+      border: 1.5px dashed var(--border);
+      border-radius: 14px;
+      padding: 18px;
+      flex-wrap: wrap;
+    }
+
+    .bio-photo-frame {
+      width: 110px;
+      height: 110px;
+      border-radius: 16px;
+      background: #e2e8f0;
+      border: 2px solid var(--primary-border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      flex-shrink: 0;
+      font-size: 2.2rem;
+      color: var(--primary);
+      font-weight: 700;
+    }
+
+    .bio-photo-frame img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .photo-capture-controls {
+      flex: 1;
+      min-width: 240px;
+    }
+
+    .photo-capture-buttons {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+
+    .camera-live-box {
+      width: 100%;
+      margin-top: 14px;
+      background: #0f172a;
+      border-radius: 12px;
+      padding: 14px;
+      text-align: center;
+      color: #ffffff;
+    }
+
+    .camera-live-box video {
+      width: 100%;
+      max-width: 380px;
+      border-radius: 10px;
+      background: #000000;
+    }
+
+    /* Upload Zone */
     .upload-zone {
       border: 2px dashed var(--border);
       border-radius: var(--radius-sm);
       padding: 16px;
       text-align: center;
       background: var(--surface);
-      transition: border-color 0.2s;
-    }
-
-    .upload-zone:hover {
-      border-color: var(--primary);
     }
 
     .preview-media-box {
@@ -638,10 +769,6 @@
       letter-spacing: 0.3px;
     }
 
-    table.data-table tr:last-child td {
-      border-bottom: none;
-    }
-
     /* Galeri Foto Kegiatan Grid */
     .photo-gallery-grid {
       display: grid;
@@ -671,25 +798,6 @@
       padding: 14px 16px;
     }
 
-    .photo-card-body h5 {
-      font-size: 0.98rem;
-      margin-bottom: 4px;
-      color: var(--text-main);
-    }
-
-    .photo-card-body .meta {
-      font-size: 0.78rem;
-      color: var(--primary);
-      font-weight: 600;
-      margin-bottom: 6px;
-    }
-
-    .photo-card-body p {
-      font-size: 0.84rem;
-      color: var(--text-muted);
-      line-height: 1.4;
-    }
-
     /* Daftar Pengumuman Card */
     .announcement-list {
       display: flex;
@@ -712,19 +820,6 @@
       gap: 10px;
       margin-bottom: 8px;
       flex-wrap: wrap;
-    }
-
-    .announcement-card h5 {
-      font-size: 1.02rem;
-      color: var(--text-main);
-    }
-
-    .announcement-card p {
-      font-size: 0.9rem;
-      color: var(--text-secondary);
-      line-height: 1.5;
-      white-space: pre-line;
-      margin-bottom: 10px;
     }
 
     /* Ringkasan Biodata Card */
@@ -820,7 +915,7 @@
       min-width: 160px;
     }
 
-    /* Modal Preview Bukti / Foto / PDF */
+    /* Modal Preview & Modal Transparansi */
     .modal-overlay {
       position: fixed;
       inset: 0;
@@ -828,14 +923,14 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 20px;
+      padding: 16px;
       z-index: 9999;
     }
 
     .modal-box {
       background: #ffffff;
       width: 100%;
-      max-width: 780px;
+      max-width: 920px;
       max-height: 90vh;
       border-radius: 16px;
       overflow: hidden;
@@ -844,17 +939,21 @@
     }
 
     .modal-header {
-      padding: 14px 20px;
+      padding: 15px 22px;
       background: var(--surface);
       border-bottom: 1px solid var(--border-light);
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: 12px;
     }
 
     .modal-body {
       padding: 20px;
       overflow-y: auto;
+    }
+
+    .modal-body.center-media {
       text-align: center;
     }
 
@@ -925,18 +1024,17 @@
     /* =====================================================================
        RESPONSIVE DESIGN: TABLET & MOBILE PHONE
        ===================================================================== */
-    @media (max-width: 960px) {
-      .main-tab-nav {
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-      }
-      .gallery-menu-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-      }
+    @media (max-width: 980px) {
       .stats-bar {
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
+      .gallery-menu-grid,
       .photo-gallery-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .main-tab-nav {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
       }
     }
 
@@ -957,12 +1055,12 @@
         border-top: 1px solid rgba(255, 255, 255, 0.18);
       }
 
-      /* Navigasi Tab Utama di Mobile Phone: Grid 2 Kolom Proporsional & Enak Dilihat */
       .main-nav-wrapper {
         padding: 10px 12px;
       }
 
       .main-tab-nav {
+        display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 8px;
       }
@@ -970,7 +1068,7 @@
       .main-tab-btn {
         border-radius: 10px;
         border: 1.5px solid var(--border-light);
-        padding: 10px 10px;
+        padding: 10px;
         min-height: 46px;
         font-size: 0.83rem;
         justify-content: flex-start;
@@ -1000,12 +1098,8 @@
       }
 
       .stats-bar {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-columns: 1fr;
         gap: 10px;
-      }
-
-      .stat-card .stat-value {
-        font-size: 1.05rem;
       }
 
       .form-group input,
@@ -1096,10 +1190,10 @@
        VIEW 2: APLIKASI UTAMA (GALLERY MENU & ENTRY BIODATA)
        =================================================================== -->
   <div class="app-container hidden" id="memberAppView">
-    <!-- Header Info Peserta / Admin -->
+    <!-- Header Info Peserta / Admin (Lampiran 1: Menampilkan Foto Peserta / User ID) -->
     <header class="app-header">
       <div class="header-user-info">
-        <div class="user-avatar" id="headerAvatar">KA</div>
+        <div class="user-avatar" id="headerAvatar" title="Klik untuk melihat/mengubah Foto Peserta">KA</div>
         <div class="header-user-text">
           <h2 id="welcomeUserText">Selamat Datang!</h2>
           <p id="userDetailText">User ID: -</p>
@@ -1120,7 +1214,8 @@
       </span>
     </div>
 
-    <!-- Navigasi Tab Utama Proporsional -->
+    <!-- Navigasi Tab Utama Proporsional
+         Tab Pengeluaran ditempatkan di posisi terakhir sebelum Biodata Saya & hanya muncul untuk Admin -->
     <div class="main-nav-wrapper" id="mainNavWrapper">
       <nav class="main-tab-nav" aria-label="Menu Utama Arisan Keluarga Adnan">
         <button type="button" class="main-tab-btn active" data-main-view="viewGalleryHome" id="navBtnHome">
@@ -1129,17 +1224,18 @@
         <button type="button" class="main-tab-btn" data-main-view="viewPembayaran" id="navBtnPembayaran">
           <span>💳</span> <span>1. Pembayaran</span>
         </button>
-        <button type="button" class="main-tab-btn" data-main-view="viewPengeluaran" id="navBtnPengeluaran">
-          <span>📊</span> <span>2. Pengeluaran</span>
-        </button>
         <button type="button" class="main-tab-btn" data-main-view="viewPengumuman" id="navBtnPengumuman">
-          <span>📢</span> <span>3. Pengumuman</span>
+          <span>📢</span> <span>2. Pengumuman</span>
         </button>
         <button type="button" class="main-tab-btn" data-main-view="viewGaleri" id="navBtnGaleri">
-          <span>📸</span> <span>4. Galeri Foto</span>
+          <span>📸</span> <span>3. Galeri Foto</span>
         </button>
         <button type="button" class="main-tab-btn" data-main-view="viewPeriode" id="navBtnPeriode">
-          <span>🏆</span> <span>5. Periode Arisan</span>
+          <span>🏆</span> <span>4. Periode Arisan</span>
+        </button>
+        <!-- TAB PENGELUARAN: Di posisi terakhir sebelum Biodata Saya & Hanya Muncul jika User Admin -->
+        <button type="button" class="main-tab-btn hidden" data-main-view="viewPengeluaran" id="navBtnPengeluaran">
+          <span>📊</span> <span>5. Pengeluaran</span>
         </button>
         <button type="button" class="main-tab-btn" data-main-view="viewBiodata" id="navBtnBiodata">
           <span>👤</span> <span>Biodata Saya</span>
@@ -1154,33 +1250,42 @@
       <div id="globalAppAlert" class="alert" style="margin-top: 0; margin-bottom: 18px;"></div>
 
       <!-- ===============================================================
-           LAYAR UTAMA: MENU GALLERY (TAMPIL SETELAH BIODATA TEREGISTER)
+           LAYAR UTAMA: MENU GALLERY
            =============================================================== -->
       <section class="main-section-panel active" id="viewGalleryHome">
         <div class="section-header">
           <div>
             <h3>Layar Utama Menu Arisan Keluarga Adnan</h3>
-            <p>Pilih menu layanan arisan, keuangan, pengumuman, dan dokumentasi keluarga di bawah ini.</p>
+            <p>Klik kartu pemasukan di bawah untuk melihat transparansi per jenis pembayaran, atau pilih menu layanan.</p>
           </div>
         </div>
 
-        <!-- Ringkasan Statistik Kas & Periode -->
+        <!-- Ringkasan Statistik Kas & Transparansi (Lampiran 2: Dibedakan Pemasukan Uang Arisan vs Pemasukan Lain) -->
         <div class="stats-bar">
           <div class="stat-card">
             <span class="stat-title">Periode Aktif</span>
             <span class="stat-value" id="statPeriodeAktif">Periode #1</span>
             <span class="stat-sub" id="statTanggalPeriode">Memuat jadwal...</span>
           </div>
-          <div class="stat-card">
-            <span class="stat-title">Total Pemasukan</span>
-            <span class="stat-value" id="statTotalMasuk">Rp 0</span>
-            <span class="stat-sub">Arisan, Zakat & Sumbangan</span>
+
+          <div class="stat-card clickable-stat" id="statCardPemasukanArisan" title="Klik untuk melihat rincian transparan Pemasukan Uang Arisan">
+            <span class="stat-title">Pemasukan Uang Arisan</span>
+            <span class="stat-value" id="statTotalMasukArisan">Rp 0</span>
+            <span class="stat-sub">🔍 Klik Rincian Setoran Arisan</span>
           </div>
+
+          <div class="stat-card clickable-stat" id="statCardPemasukanLain" title="Klik untuk melihat rincian transparan per Jenis Pembayaran (Zakat, Sumbangan, dll)">
+            <span class="stat-title">Pemasukan Lainnya</span>
+            <span class="stat-value" id="statTotalMasukLain">Rp 0</span>
+            <span class="stat-sub">🔍 Klik Rincian Per Jenis Bayar</span>
+          </div>
+
           <div class="stat-card">
             <span class="stat-title">Total Pengeluaran</span>
             <span class="stat-value" id="statTotalKeluar">Rp 0</span>
             <span class="stat-sub">Akuntansi & Pencairan</span>
           </div>
+
           <div class="stat-card">
             <span class="stat-title">Saldo Kas Keluarga</span>
             <span class="stat-value" id="statSaldoKas">Rp 0</span>
@@ -1188,7 +1293,7 @@
           </div>
         </div>
 
-        <!-- 6 KARTU MENU GALLERY -->
+        <!-- KARTU MENU GALLERY -->
         <div class="gallery-menu-grid">
           <!-- 1. PEMBAYARAN -->
           <div class="gallery-menu-card" data-open-view="viewPembayaran">
@@ -1206,30 +1311,14 @@
             </div>
           </div>
 
-          <!-- 2. PENGELUARAN (ADMIN) -->
-          <div class="gallery-menu-card" data-open-view="viewPengeluaran">
-            <div>
-              <div class="gallery-card-top">
-                <div class="gallery-icon-box icon-amber">📊</div>
-                <span class="gallery-badge admin-only">Menu 2 • Entry Khusus Admin</span>
-              </div>
-              <h3 style="margin-top: 14px;">2. Pengeluaran / Akuntansi</h3>
-              <p>Pencatatan pengeluaran kas keluarga, pencairan arisan, konsumsi & santunan (Entry khusus Admin, laporan transparan).</p>
-            </div>
-            <div class="gallery-card-footer">
-              <span>Buka Akuntansi Pengeluaran</span>
-              <span>&rarr;</span>
-            </div>
-          </div>
-
-          <!-- 3. PENGUMUMAN (PDF) -->
+          <!-- 2. PENGUMUMAN (PDF) -->
           <div class="gallery-menu-card" data-open-view="viewPengumuman">
             <div>
               <div class="gallery-card-top">
                 <div class="gallery-icon-box icon-blue">📢</div>
-                <span class="gallery-badge">Menu 3 • Dokumen PDF</span>
+                <span class="gallery-badge">Menu 2 • Dokumen PDF</span>
               </div>
-              <h3 style="margin-top: 14px;">3. Pengumuman</h3>
+              <h3 style="margin-top: 14px;">2. Pengumuman</h3>
               <p>Informasi resmi undangan arisan, berita keluarga, dan laporan keuangan yang dilengkapi lampiran dokumen PDF.</p>
             </div>
             <div class="gallery-card-footer">
@@ -1238,14 +1327,14 @@
             </div>
           </div>
 
-          <!-- 4. GALERI KEGIATAN -->
+          <!-- 3. GALERI KEGIATAN -->
           <div class="gallery-menu-card" data-open-view="viewGaleri">
             <div>
               <div class="gallery-card-top">
                 <div class="gallery-icon-box icon-purple">📸</div>
-                <span class="gallery-badge">Menu 4 • Dokumentasi</span>
+                <span class="gallery-badge">Menu 3 • Dokumentasi</span>
               </div>
-              <h3 style="margin-top: 14px;">4. Galeri Kegiatan</h3>
+              <h3 style="margin-top: 14px;">3. Galeri Kegiatan</h3>
               <p>Album foto dokumentasi pertemuan arisan, silaturahmi, dan acara kebersamaan Keluarga Besar Adnan.</p>
             </div>
             <div class="gallery-card-footer">
@@ -1254,14 +1343,14 @@
             </div>
           </div>
 
-          <!-- 5. SETTING PERIODE & PEMENANG ARISAN -->
+          <!-- 4. SETTING PERIODE & PEMENANG ARISAN -->
           <div class="gallery-menu-card" data-open-view="viewPeriode">
             <div>
               <div class="gallery-card-top">
                 <div class="gallery-icon-box icon-rose">🏆</div>
-                <span class="gallery-badge">Menu 5 • Periode & Undian</span>
+                <span class="gallery-badge">Menu 4 • Periode & Undian</span>
               </div>
-              <h3 style="margin-top: 14px;">5. Setting Periode & Pemenang</h3>
+              <h3 style="margin-top: 14px;">4. Setting Periode & Pemenang</h3>
               <p>Pengaturan jadwal periode arisan, besaran iuran per slot, tuan rumah, serta pencatatan & undian pemenang arisan.</p>
             </div>
             <div class="gallery-card-footer">
@@ -1270,15 +1359,31 @@
             </div>
           </div>
 
-          <!-- 6. BIODATA PESERTA -->
+          <!-- 5. PENGELUARAN (KHUSUS ADMIN - SEBELUM BIODATA SAYA) -->
+          <div class="gallery-menu-card hidden" data-open-view="viewPengeluaran" id="galleryCardPengeluaran">
+            <div>
+              <div class="gallery-card-top">
+                <div class="gallery-icon-box icon-amber">📊</div>
+                <span class="gallery-badge admin-only">Menu 5 • Khusus Admin</span>
+              </div>
+              <h3 style="margin-top: 14px;">5. Pengeluaran / Akuntansi</h3>
+              <p>Pencatatan pengeluaran kas keluarga, pencairan arisan, konsumsi & santunan (Khusus Admin).</p>
+            </div>
+            <div class="gallery-card-footer">
+              <span>Buka Akuntansi Pengeluaran</span>
+              <span>&rarr;</span>
+            </div>
+          </div>
+
+          <!-- BIODATA PESERTA -->
           <div class="gallery-menu-card" data-open-view="viewBiodata">
             <div>
               <div class="gallery-card-top">
                 <div class="gallery-icon-box icon-emerald">👤</div>
-                <span class="gallery-badge">Profil Anggota</span>
+                <span class="gallery-badge">Profil & Foto Peserta</span>
               </div>
-              <h3 style="margin-top: 14px;">Biodata Peserta Arisan</h3>
-              <p>Lihat ringkasan biodata kepesertaan Anda pada tabel <code>adnan_DataAnggota</code> atau perbarui informasi kontak & rekening.</p>
+              <h3 style="margin-top: 14px;">Biodata Saya</h3>
+              <p>Lihat ringkasan biodata kepesertaan Anda pada tabel <code>adnan_DataAnggota</code>, ambil foto kamera, atau perbarui data.</p>
             </div>
             <div class="gallery-card-footer">
               <span>Lihat / Edit Biodata</span>
@@ -1289,7 +1394,8 @@
       </section>
 
       <!-- ===============================================================
-           MENU 1: PEMBAYARAN (ARISAN, SUMBANGAN, ZAKAT, DLL + BUKTI BAYAR)
+           MENU 1: PEMBAYARAN
+           (Jenis Pembayaran sebelum Periode Arisan & Default Status Pending)
            =============================================================== -->
       <section class="main-section-panel" id="viewPembayaran">
         <div class="section-header">
@@ -1311,13 +1417,7 @@
                 <input type="text" id="payNama" required placeholder="Nama peserta pembayar" />
               </div>
 
-              <div class="form-group">
-                <label for="payPeriode">Periode Arisan</label>
-                <select id="payPeriode">
-                  <option value="">-- Pilih Periode Arisan --</option>
-                </select>
-              </div>
-
+              <!-- JENIS PEMBAYARAN DIPINDAHKAN SEBELUM PERIODE ARISAN -->
               <div class="form-group">
                 <label for="payJenis">Jenis Pembayaran <span class="required-star">*</span></label>
                 <select id="payJenis" required>
@@ -1328,6 +1428,14 @@
                   <option value="Dana Sosial / Duka">Dana Sosial / Santunan Duka</option>
                   <option value="Uang Konsumsi">Uang Konsumsi Pertemuan</option>
                   <option value="Lainnya">Lainnya</option>
+                </select>
+              </div>
+
+              <!-- PERIODE ARISAN: Enable hanya jika Jenis Pembayaran === 'Uang Arisan' -->
+              <div class="form-group">
+                <label for="payPeriode">Periode Arisan <small id="payPeriodeHint" style="color:var(--primary);">(Aktif untuk Uang Arisan)</small></label>
+                <select id="payPeriode">
+                  <option value="">-- Pilih Periode Arisan --</option>
                 </select>
               </div>
 
@@ -1360,7 +1468,13 @@
                 <input type="text" id="payNoRekening" placeholder="Contoh: 1234567890 a.n Ahmad" />
               </div>
 
-              <div class="form-group full-width">
+              <!-- DEFAULT STATUS: PENDING -->
+              <div class="form-group">
+                <label for="payStatus">Status Verifikasi Pembayaran</label>
+                <input type="text" id="payStatus" value="Pending" readonly />
+              </div>
+
+              <div class="form-group">
                 <label for="payKeterangan">Keterangan Pembayaran</label>
                 <input type="text" id="payKeterangan" placeholder="Contoh: Setoran Arisan 2 Slot / Zakat Bulan Ini" />
               </div>
@@ -1377,7 +1491,7 @@
             <div class="tab-footer-actions">
               <span></span>
               <button type="submit" class="btn-primary btn-auto" id="btnSubmitPembayaran">
-                💾 Simpan Pembayaran
+                💾 Simpan Pembayaran (Status: Pending)
               </button>
             </div>
           </form>
@@ -1408,126 +1522,12 @@
       </section>
 
       <!-- ===============================================================
-           MENU 2: PENGELUARAN / AKUNTANSI (ENTRY KHUSUS ADMIN)
-           =============================================================== -->
-      <section class="main-section-panel" id="viewPengeluaran">
-        <div class="section-header">
-          <div>
-            <h3>📊 2. Pengeluaran & Akuntansi Kas</h3>
-            <p>Pencatatan pengeluaran kas arisan, pencairan pemenang, santunan, dan operasional.</p>
-          </div>
-          <button type="button" class="btn-secondary btn-sm" data-open-view="viewGalleryHome">
-            &larr; Kembali ke Menu Gallery
-          </button>
-        </div>
-
-        <!-- Pemberitahuan jika bukan Admin -->
-        <div class="mandatory-banner hidden" id="nonAdminExpenseNotice" style="border-radius: 10px; margin-bottom: 18px;">
-          <span>🔒</span>
-          <span>
-            <strong>Akses Terbatas (View Only):</strong> Form Entry Pengeluaran / Akuntansi hanya dapat diisi oleh <strong>Admin</strong>. Anda tetap dapat melihat laporan transparansi pengeluaran di bawah ini.
-          </span>
-        </div>
-
-        <!-- Form Entry Pengeluaran (Hanya Tampil untuk Admin) -->
-        <div class="card-box" id="adminExpenseFormCard">
-          <h4>Form Entry Pengeluaran / Akuntansi (Khusus Admin)</h4>
-          <form id="formPengeluaran">
-            <div class="form-grid">
-              <div class="form-group">
-                <label for="expTanggal">Tanggal Pengeluaran <span class="required-star">*</span></label>
-                <input type="date" id="expTanggal" required />
-              </div>
-
-              <div class="form-group">
-                <label for="expKategori">Kategori Akuntansi <span class="required-star">*</span></label>
-                <select id="expKategori" required>
-                  <option value="Pencairan Arisan Pemenang">Pencairan Arisan Pemenang</option>
-                  <option value="Konsumsi & Tuan Rumah">Konsumsi & Subsidi Tuan Rumah</option>
-                  <option value="Santunan Sosial / Duka">Santunan Sosial / Duka / Sakit</option>
-                  <option value="Penyaluran Zakat & Sumbangan">Penyaluran Zakat & Sumbangan</option>
-                  <option value="Operasional & Administrasi">Operasional & Administrasi</option>
-                  <option value="Lainnya">Pengeluaran Lainnya</option>
-                </select>
-              </div>
-
-              <div class="form-group">
-                <label for="expNominal">Nominal Pengeluaran (Rp) <span class="required-star">*</span></label>
-                <input type="number" id="expNominal" min="1000" step="500" placeholder="Contoh: 500000" required />
-              </div>
-
-              <div class="form-group">
-                <label for="expPenerima">Nama Penerima / Tujuan Dana</label>
-                <input type="text" id="expPenerima" placeholder="Contoh: Bpk. H. Mansyur / Katering" />
-              </div>
-
-              <div class="form-group">
-                <label for="expMetode">Metode Pengeluaran <span class="required-star">*</span></label>
-                <select id="expMetode" required>
-                  <option value="Tunai">Tunai (Cash)</option>
-                  <option value="Transfer Bank">Transfer Bank</option>
-                </select>
-              </div>
-
-              <div class="form-group hidden" id="expBankGroup">
-                <label for="expNamaBank">Bank Pencairan / Transfer</label>
-                <select id="expNamaBank" class="bank-dropdown-select"></select>
-              </div>
-
-              <div class="form-group full-width">
-                <label for="expDeskripsi">Uraian / Deskripsi Pengeluaran <span class="required-star">*</span></label>
-                <textarea id="expDeskripsi" placeholder="Jelaskan rincian pengeluaran akuntansi" required></textarea>
-              </div>
-
-              <div class="form-group full-width">
-                <label for="expBuktiFile">Unggah Nota / Kwitansi Pengeluaran (Opsional)</label>
-                <div class="upload-zone">
-                  <input type="file" id="expBuktiFile" accept="image/*,application/pdf" />
-                  <div class="preview-media-box" id="expBuktiPreview"></div>
-                </div>
-              </div>
-            </div>
-
-            <div class="tab-footer-actions">
-              <span></span>
-              <button type="submit" class="btn-primary btn-auto" id="btnSubmitPengeluaran">
-                💾 Catat Pengeluaran (Admin)
-              </button>
-            </div>
-          </form>
-        </div>
-
-        <div class="card-box">
-          <h4>Buku Kas Pengeluaran / Akuntansi</h4>
-          <div class="table-responsive">
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>Tanggal</th>
-                  <th>Kode</th>
-                  <th>Kategori</th>
-                  <th>Uraian / Penerima</th>
-                  <th>Metode</th>
-                  <th>Nominal</th>
-                  <th>Nota/Bukti</th>
-                  <th>Dicatat Oleh</th>
-                </tr>
-              </thead>
-              <tbody id="tableBodyPengeluaran">
-                <tr><td colspan="8" style="text-align:center;">Memuat data pengeluaran...</td></tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </section>
-
-      <!-- ===============================================================
-           MENU 3: PENGUMUMAN (MENDUKUNG LAMPIRAN PDF)
+           MENU 2: PENGUMUMAN (MENDUKUNG LAMPIRAN PDF)
            =============================================================== -->
       <section class="main-section-panel" id="viewPengumuman">
         <div class="section-header">
           <div>
-            <h3>📢 3. Papan Pengumuman & Dokumen PDF</h3>
+            <h3>📢 2. Papan Pengumuman & Dokumen PDF</h3>
             <p>Pengumuman jadwal arisan, undangan silaturahmi, dan dokumen PDF keluarga.</p>
           </div>
           <button type="button" class="btn-secondary btn-sm" data-open-view="viewGalleryHome">
@@ -1586,12 +1586,12 @@
       </section>
 
       <!-- ===============================================================
-           MENU 4: GALERI FOTO KEGIATAN
+           MENU 3: GALERI FOTO KEGIATAN
            =============================================================== -->
       <section class="main-section-panel" id="viewGaleri">
         <div class="section-header">
           <div>
-            <h3>📸 4. Galeri Foto Kegiatan Keluarga Adnan</h3>
+            <h3>📸 3. Galeri Foto Kegiatan Keluarga Adnan</h3>
             <p>Dokumentasi foto pertemuan arisan, pengajian, dan silaturahmi keluarga besar.</p>
           </div>
           <button type="button" class="btn-secondary btn-sm" data-open-view="viewGalleryHome">
@@ -1650,12 +1650,12 @@
       </section>
 
       <!-- ===============================================================
-           MENU 5: SETTING PERIODE ARISAN & PEMENANG ARISAN
+           MENU 4: SETTING PERIODE ARISAN & PEMENANG ARISAN
            =============================================================== -->
       <section class="main-section-panel" id="viewPeriode">
         <div class="section-header">
           <div>
-            <h3>🏆 5. Setting Periode Arisan & Daftar Pemenang</h3>
+            <h3>🏆 4. Setting Periode Arisan & Daftar Pemenang</h3>
             <p>Kelola jadwal periode arisan serta penetapan/undian pemenang setiap periode.</p>
           </div>
           <button type="button" class="btn-secondary btn-sm" data-open-view="viewGalleryHome">
@@ -1663,7 +1663,6 @@
           </button>
         </div>
 
-        <!-- Sub-Tab Proporsional: Periode Arisan vs Pemenang Arisan -->
         <div class="sub-tab-nav two-cols">
           <button type="button" class="sub-tab-btn active" data-periode-subtab="subTabPeriodeList">
             <span class="tab-step-num">1</span>
@@ -1842,13 +1841,118 @@
       </section>
 
       <!-- ===============================================================
-           LAYAR BIODATA PESERTA (adnan_DataAnggota - 4 SUB-TAB PROPORSIONAL)
+           MENU 5: PENGELUARAN / AKUNTANSI (HANYA MUNCUL UNTUK USER ADMIN)
+           =============================================================== -->
+      <section class="main-section-panel" id="viewPengeluaran">
+        <div class="section-header">
+          <div>
+            <h3>📊 5. Pengeluaran & Akuntansi Kas (Khusus Admin)</h3>
+            <p>Pencatatan pengeluaran kas arisan, pencairan pemenang, santunan, dan operasional.</p>
+          </div>
+          <button type="button" class="btn-secondary btn-sm" data-open-view="viewGalleryHome">
+            &larr; Kembali ke Menu Gallery
+          </button>
+        </div>
+
+        <div class="card-box" id="adminExpenseFormCard">
+          <h4>Form Entry Pengeluaran / Akuntansi (Khusus Admin)</h4>
+          <form id="formPengeluaran">
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="expTanggal">Tanggal Pengeluaran <span class="required-star">*</span></label>
+                <input type="date" id="expTanggal" required />
+              </div>
+
+              <div class="form-group">
+                <label for="expKategori">Kategori Akuntansi <span class="required-star">*</span></label>
+                <select id="expKategori" required>
+                  <option value="Pencairan Arisan Pemenang">Pencairan Arisan Pemenang</option>
+                  <option value="Konsumsi & Tuan Rumah">Konsumsi & Subsidi Tuan Rumah</option>
+                  <option value="Santunan Sosial / Duka">Santunan Sosial / Duka / Sakit</option>
+                  <option value="Penyaluran Zakat & Sumbangan">Penyaluran Zakat & Sumbangan</option>
+                  <option value="Operasional & Administrasi">Operasional & Administrasi</option>
+                  <option value="Lainnya">Pengeluaran Lainnya</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label for="expNominal">Nominal Pengeluaran (Rp) <span class="required-star">*</span></label>
+                <input type="number" id="expNominal" min="1000" step="500" placeholder="Contoh: 500000" required />
+              </div>
+
+              <div class="form-group">
+                <label for="expPenerima">Nama Penerima / Tujuan Dana</label>
+                <input type="text" id="expPenerima" placeholder="Contoh: Bpk. H. Mansyur / Katering" />
+              </div>
+
+              <div class="form-group">
+                <label for="expMetode">Metode Pengeluaran <span class="required-star">*</span></label>
+                <select id="expMetode" required>
+                  <option value="Tunai">Tunai (Cash)</option>
+                  <option value="Transfer Bank">Transfer Bank</option>
+                </select>
+              </div>
+
+              <div class="form-group hidden" id="expBankGroup">
+                <label for="expNamaBank">Bank Pencairan / Transfer</label>
+                <select id="expNamaBank" class="bank-dropdown-select"></select>
+              </div>
+
+              <div class="form-group full-width">
+                <label for="expDeskripsi">Uraian / Deskripsi Pengeluaran <span class="required-star">*</span></label>
+                <textarea id="expDeskripsi" placeholder="Jelaskan rincian pengeluaran akuntansi" required></textarea>
+              </div>
+
+              <div class="form-group full-width">
+                <label for="expBuktiFile">Unggah Nota / Kwitansi Pengeluaran (Opsional)</label>
+                <div class="upload-zone">
+                  <input type="file" id="expBuktiFile" accept="image/*,application/pdf" />
+                  <div class="preview-media-box" id="expBuktiPreview"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="tab-footer-actions">
+              <span></span>
+              <button type="submit" class="btn-primary btn-auto" id="btnSubmitPengeluaran">
+                💾 Catat Pengeluaran (Admin)
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <div class="card-box">
+          <h4>Buku Kas Pengeluaran / Akuntansi</h4>
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Tanggal</th>
+                  <th>Kode</th>
+                  <th>Kategori</th>
+                  <th>Uraian / Penerima</th>
+                  <th>Metode</th>
+                  <th>Nominal</th>
+                  <th>Nota/Bukti</th>
+                  <th>Dicatat Oleh</th>
+                </tr>
+              </thead>
+              <tbody id="tableBodyPengeluaran">
+                <tr><td colspan="8" style="text-align:center;">Memuat data pengeluaran...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===============================================================
+           LAYAR BIODATA PESERTA (adnan_DataAnggota - DILENGKAPI FOTO KAMERA & FOLDER LOKAL)
            =============================================================== -->
       <section class="main-section-panel" id="viewBiodata">
         <div class="section-header">
           <div>
             <h3>👤 Biodata Peserta Arisan (Tabel: adnan_DataAnggota)</h3>
-            <p>Data kepesertaan arisan, kontak domisili, silsilah keluarga, dan rekening pencairan.</p>
+            <p>Data kepesertaan arisan, foto profil (Kamera / Upload), kontak domisili, dan rekening pencairan.</p>
           </div>
           <button type="button" class="btn-secondary btn-sm" data-open-view="viewGalleryHome" id="btnBackToGalleryFromBio">
             &larr; Kembali ke Menu Gallery
@@ -1859,7 +1963,7 @@
         <div class="sub-tab-nav">
           <button type="button" class="sub-tab-btn active" data-bio-tab="tabPribadi">
             <span class="tab-step-num">1</span>
-            <span>Data Pribadi</span>
+            <span>Data Pribadi & Foto</span>
           </button>
           <button type="button" class="sub-tab-btn" data-bio-tab="tabKontak">
             <span class="tab-step-num">2</span>
@@ -1878,10 +1982,52 @@
         <div id="biodataAlertBox" class="alert" style="margin-top: 0; margin-bottom: 18px;"></div>
 
         <form id="biodataForm">
-          <!-- SUB-TAB 1: DATA PRIBADI -->
+          <!-- SUB-TAB 1: DATA PRIBADI & FOTO PESERTA -->
           <div class="sub-tab-panel active" id="tabPribadi">
             <div class="card-box">
-              <h4>1. Identitas Pribadi Peserta Arisan</h4>
+              <h4>1. Foto & Identitas Pribadi Peserta Arisan</h4>
+
+              <!-- WIDGET PENGAMBILAN FOTO PESERTA (KAMERA ATAU UPLOAD FOLDER LOKAL) -->
+              <div class="form-group full-width" style="margin-bottom: 22px;">
+                <label>Foto Peserta Arisan (Tampil di Header & Biodata)</label>
+                <div class="photo-capture-container">
+                  <div class="bio-photo-frame" id="bioFotoPreviewBox">👤</div>
+                  <div class="photo-capture-controls">
+                    <div style="font-size: 0.88rem; color: var(--text-secondary); font-weight: 600;">
+                      Ambil Foto Langsung dari Kamera atau Pilih dari Folder Lokal
+                    </div>
+                    <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;">
+                      Foto ini akan disimpan pada kolom <code>foto_url</code> di tabel <code>adnan_DataAnggota</code> dan ditampilkan di pojok kiri atas aplikasi.
+                    </p>
+                    <div class="photo-capture-buttons">
+                      <button type="button" class="btn-primary btn-sm" id="btnOpenCamera">
+                        📷 Ambil Foto dari Kamera
+                      </button>
+                      <button type="button" class="btn-secondary btn-sm" id="btnTriggerLocalUpload">
+                        📁 Upload dari Folder Lokal
+                      </button>
+                      <input type="file" id="bioFotoFileInput" accept="image/*" class="hidden" />
+                    </div>
+                  </div>
+
+                  <!-- Kotak Kamera Live (Muncul saat klik Ambil Foto dari Kamera) -->
+                  <div class="camera-live-box hidden" id="cameraLiveBox">
+                    <video id="cameraVideoEl" autoplay playsinline muted></video>
+                    <div style="display:flex; justify-content:center; gap:10px; flex-wrap:wrap; margin-top:12px;">
+                      <button type="button" class="btn-primary btn-sm" id="btnCapturePhoto">
+                        📸 Jepret / Ambil Foto
+                      </button>
+                      <button type="button" class="btn-secondary btn-sm" id="btnSwitchCamera">
+                        🔄 Ganti Kamera
+                      </button>
+                      <button type="button" class="btn-secondary btn-sm" id="btnCloseCamera">
+                        ✕ Tutup Kamera
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <div class="form-grid">
                 <div class="form-group">
                   <label for="bioUserId">User ID Peserta <span class="required-star">*</span></label>
@@ -2031,11 +2177,12 @@
         <div class="sub-tab-panel" id="tabRingkasan">
           <div class="card-box">
             <h4>Ringkasan Biodata Peserta Terdaftar</h4>
+            <div id="bioSummaryPhotoTop" style="display:flex; align-items:center; gap:16px; margin-bottom:18px;"></div>
             <div class="summary-grid" id="biodataSummaryContainer"></div>
 
             <div class="tab-footer-actions">
               <button type="button" class="btn-secondary" id="editBiodataBtn">
-                ✏️ Perbarui / Edit Biodata
+                ✏️ Perbarui / Edit Biodata & Foto
               </button>
               <button type="button" class="btn-primary btn-auto" data-open-view="viewGalleryHome">
                 🏠 Masuk ke Menu Utama Gallery &rarr;
@@ -2047,14 +2194,54 @@
     </div>
   </div>
 
-  <!-- MODAL PREVIEW BUKTI PEMBAYARAN / FOTO GALERI / PDF PENGUMUMAN -->
+  <!-- ===================================================================
+       MODAL 1: TRANSPARANSI RINCIAN PEMASUKAN PER JENIS PEMBAYARAN (LAMPIRAN 2)
+       =================================================================== -->
+  <div class="modal-overlay hidden" id="transparencyModal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div>
+          <strong id="transparencyModalTitle" style="font-size:1.05rem;">📊 Transparansi Pemasukan Per Jenis Pembayaran</strong>
+          <div style="font-size:0.8rem; color:var(--text-muted);">Klik salah satu jenis pembayaran di bawah untuk memfilter rincian transaksi anggota</div>
+        </div>
+        <button type="button" class="btn-secondary btn-sm" id="closeTransparencyModalBtn">✕ Tutup</button>
+      </div>
+      <div class="modal-body">
+        <!-- Kartu Breakdown Per Jenis Pembayaran -->
+        <div class="transparency-Breakdown-grid" id="transparencyBreakdownGrid"></div>
+
+        <!-- Tabel Detail Transaksi Sesuai Filter Jenis Pembayaran -->
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Tanggal</th>
+                <th>Nama Pembayar</th>
+                <th>Jenis Pembayaran</th>
+                <th>Metode & Bank</th>
+                <th>Keterangan</th>
+                <th>Nominal</th>
+                <th>Bukti</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="transparencyTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================
+       MODAL 2: PREVIEW BUKTI PEMBAYARAN / FOTO GALERI / PDF PENGUMUMAN
+       =================================================================== -->
   <div class="modal-overlay hidden" id="mediaModal">
     <div class="modal-box">
       <div class="modal-header">
         <strong id="modalTitle">Pratinjau Dokumen / Bukti</strong>
         <button type="button" class="btn-secondary btn-sm" id="closeModalBtn">✕ Tutup</button>
       </div>
-      <div class="modal-body" id="modalBodyContent"></div>
+      <div class="modal-body center-media" id="modalBodyContent"></div>
     </div>
   </div>
 
