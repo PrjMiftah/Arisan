@@ -271,8 +271,17 @@ function getPaymentSplitValues(payRow) {
 
 function stripInternalMetaFromKeterangan(ket) {
   return String(ket || '')
-    .replace(/\s*\[SPLIT:\d+,\d+,\d+\]\s*/g, ' ')
-    .replace(/\s*\|\s*$/, '')
+    .replace(/\s*\[SPLIT:\d+,\d+,\d+\]\s*/g, '')
+    .split('|')
+    .map((part) => part.trim())
+    .filter((part) => {
+      if (!part) return false;
+      const lower = part.toLowerCase();
+      if (lower.startsWith('group:')) return false;
+      if (lower.startsWith('split arisan')) return false;
+      return true;
+    })
+    .join(' | ')
     .trim();
 }
 
@@ -1162,7 +1171,6 @@ function renderTransparencyBreakdown(activeFilter = 'ALL') {
           <td>${r.tanggal_bayar || '-'}</td>
           <td>
             <strong>${r.nama_pembayar || '-'}</strong>
-            ${r.nama_group ? `<br><span class="gallery-badge" style="font-size:0.7rem;">👨‍👩‍👧‍👦 ${r.nama_group}</span>` : ''}
             ${cleanKet ? `<br><small style="color:#64748b;">${cleanKet}</small>` : ''}
           </td>
           <td><strong>${r.jenis_bayar || '-'}</strong></td>
@@ -1210,19 +1218,20 @@ function isPaymentOwnedByCurrentUser(row) {
   const myNamaBio = String((currentBiodataRecord && currentBiodataRecord.nama_lengkap) || '').trim().toLowerCase();
   const myAnggotaId = String((currentBiodataRecord && currentBiodataRecord.id) || '').trim().toLowerCase();
 
-  const rowUid = String(row.user_id || '').trim().toLowerCase();
   const rowNama = String(row.nama_pembayar || '').trim().toLowerCase();
   const rowAnggotaId = String(row.anggota_id || '').trim().toLowerCase();
-  const rowPJ = String(row.penanggung_jawab || '').trim().toLowerCase();
-  const rowKet = String(row.keterangan || '').toLowerCase();
+  const rowUid = String(row.user_id || '').trim().toLowerCase();
 
-  if (myUid && rowUid && rowUid === myUid) return true;
+  // Tampilkan sesuai nama user yang login saja (tidak menampilkan nama anggota group lain)
+  if (rowNama) {
+    if (myNamaBio && rowNama === myNamaBio) return true;
+    if (myNamaUser && rowNama === myNamaUser) return true;
+    if (myUid && rowNama === myUid) return true;
+    return false;
+  }
+
   if (myAnggotaId && rowAnggotaId && rowAnggotaId === myAnggotaId) return true;
-  if (myNamaBio && rowNama && rowNama === myNamaBio) return true;
-  if (myNamaUser && rowNama && rowNama === myNamaUser) return true;
-  if (myUid && rowNama && rowNama === myUid) return true;
-  if (myNamaBio && rowPJ && rowPJ === myNamaBio) return true;
-  if (myNamaBio && rowKet.includes(`pj: ${myNamaBio}`)) return true;
+  if (myUid && rowUid && rowUid === myUid) return true;
   return false;
 }
 
@@ -1536,7 +1545,7 @@ function populateAdminPesertaDropdowns() {
       titleRiwayat.textContent = `Daftar Riwayat Pembayaran Saya (${myDisplayName || 'Peserta'})`;
     }
     if (subtitleRiwayat) {
-      subtitleRiwayat.textContent = 'Menampilkan khusus riwayat pembayaran milik akun / group Anda.';
+      subtitleRiwayat.textContent = 'Menampilkan khusus riwayat pembayaran milik akun Anda.';
     }
     return;
   }
@@ -1739,15 +1748,14 @@ function renderPembayaranTableRows() {
           <td><code>${r.kode_transaksi || 'TX-' + (idx + 1)}</code></td>
           <td>
             <strong>${r.nama_pembayar || '-'}</strong>
-            ${r.nama_group ? `<br><span class="gallery-badge" style="font-size:0.7rem;">👨‍👩‍👧‍👦 ${r.nama_group}</span>` : ''}
             ${cleanKet ? `<br><small style="color:#64748b;">${cleanKet}</small>` : ''}
           </td>
           <td>${r.jenis_bayar || 'Uang Arisan'}</td>
-          <td>${metodeText}</td>
           <td>${isArs ? `<span style="color:var(--primary); font-weight:700;">${formatRupiah(sp.uang_arisan)}</span>` : '<span style="color:#94a3b8;">-</span>'}</td>
           <td>${isArs ? `<span style="color:#b45309; font-weight:700;">${formatRupiah(sp.uang_kas)}</span>` : '<span style="color:#94a3b8;">-</span>'}</td>
           <td>${isArs ? `<span style="color:#0284c7; font-weight:700;">${formatRupiah(sp.uang_konsumsi)}</span>` : '<span style="color:#94a3b8;">-</span>'}</td>
           <td><strong>${formatRupiah(r.nominal)}</strong></td>
+          <td>${metodeText}</td>
           <td>${buktiBtn}</td>
           <td>${statusCell}</td>
         </tr>
@@ -1994,8 +2002,6 @@ async function executeSavePembayaran(confirmedFromGroupModal = false) {
         const kode = `${groupBatchCode}-${i + 1}`;
         const splitMeta = `[SPLIT:${rates.uang_arisan},${rates.uang_kas},${rates.uang_konsumsi}]`;
         const fullKeterangan = [
-          `Group: ${activeDetectedGroupForPay.nama_group} (${isPJ ? 'Penanggung Jawab' : 'PJ: ' + activeDetectedGroupForPay.penanggung_jawab})`,
-          `Split Arisan ${formatRupiah(rates.uang_arisan)}, Kas ${formatRupiah(rates.uang_kas)}, Konsumsi ${formatRupiah(rates.uang_konsumsi)}`,
           ketInput,
           metode === 'Transfer Bank' && namaBank ? `Bank: ${namaBank}` : '',
           noRek ? `Rek: ${noRek}` : '',
@@ -2008,9 +2014,7 @@ async function executeSavePembayaran(confirmedFromGroupModal = false) {
           kode_transaksi: kode,
           anggota_id: (matchedAnggota && matchedAnggota.id) || null,
           arisan_id: selectedPeriodeId,
-          user_id:
-            (matchedAnggota && matchedAnggota.user_id) ||
-            (currentLoggedUser ? currentLoggedUser.user_id : null),
+          user_id: (matchedAnggota && matchedAnggota.user_id) || null,
           nama_pembayar: memberName,
           nama_group: activeDetectedGroupForPay.nama_group,
           penanggung_jawab: activeDetectedGroupForPay.penanggung_jawab,

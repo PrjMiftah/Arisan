@@ -229,7 +229,7 @@
 
     .main-tab-nav {
       display: flex;
-      gap: 8px;
+      gap: 6px;
       width: 100%;
     }
 
@@ -240,18 +240,19 @@
       border: 1.5px solid var(--border-light);
       border-bottom: 3px solid transparent;
       border-radius: 11px 11px 0 0;
-      padding: 11px 8px;
+      padding: 10px 10px;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 6px;
-      font-size: 0.84rem;
+      font-size: 0.83rem;
       font-weight: 600;
       color: var(--text-muted);
       transition: all 0.2s ease;
-      min-height: 48px;
+      min-height: 46px;
       text-align: center;
+      white-space: nowrap;
     }
 
     .main-tab-btn:hover:not(:disabled) {
@@ -1322,31 +1323,30 @@
       </span>
     </div>
 
-    <!-- Navigasi Tab Utama Proporsional
-         Tab Pengeluaran ditempatkan di posisi terakhir sebelum Biodata Saya & hanya muncul untuk Admin -->
+    <!-- Navigasi Tab Utama Proporsional (Tanpa nomor urut 1, 2, 3 dst agar hemat tempat & rapi) -->
     <div class="main-nav-wrapper" id="mainNavWrapper">
       <nav class="main-tab-nav" aria-label="Menu Utama Arisan Keluarga Adnan">
         <button type="button" class="main-tab-btn active" data-main-view="viewGalleryHome" id="navBtnHome">
           <span>🏠</span> <span>Menu Gallery</span>
         </button>
         <button type="button" class="main-tab-btn" data-main-view="viewPembayaran" id="navBtnPembayaran">
-          <span>💳</span> <span>1. Pembayaran</span>
+          <span>💳</span> <span>Pembayaran</span>
         </button>
         <button type="button" class="main-tab-btn" data-main-view="viewPengumuman" id="navBtnPengumuman">
-          <span>📢</span> <span>2. Pengumuman</span>
+          <span>📢</span> <span>Pengumuman</span>
         </button>
         <button type="button" class="main-tab-btn" data-main-view="viewGaleri" id="navBtnGaleri">
-          <span>📸</span> <span>3. Galeri Foto</span>
+          <span>📸</span> <span>Galeri Foto</span>
         </button>
         <button type="button" class="main-tab-btn" data-main-view="viewDaftarAnggota" id="navBtnDaftarAnggota">
-          <span>👥</span> <span>4. Anggota Arisan</span>
+          <span>👥</span> <span>Anggota Arisan</span>
         </button>
         <button type="button" class="main-tab-btn" data-main-view="viewPeriode" id="navBtnPeriode">
-          <span>⚙️</span> <span>5. Pengaturan</span>
+          <span>⚙️</span> <span>Pengaturan</span>
         </button>
         <!-- TAB PENGELUARAN: Di posisi terakhir sebelum Biodata Saya & Hanya Muncul jika User Admin -->
         <button type="button" class="main-tab-btn hidden" data-main-view="viewPengeluaran" id="navBtnPengeluaran">
-          <span>📊</span> <span>6. Pengeluaran</span>
+          <span>📊</span> <span>Pengeluaran</span>
         </button>
         <button type="button" class="main-tab-btn" data-main-view="viewBiodata" id="navBtnBiodata">
           <span>👤</span> <span>Biodata Saya</span>
@@ -1700,7 +1700,7 @@
                 <tr>
                   <th>Tanggal</th>
                   <th>Kode</th>
-                  <th>Nama Pembayar / Group</th>
+                  <th>Nama Pembayar</th>
                   <th>Jenis</th>
                   <th>Uang Arisan</th>
                   <th>Uang Kas</th>
@@ -2581,7 +2581,7 @@
             <thead>
               <tr>
                 <th>Tanggal</th>
-                <th>Nama Pembayar / Group</th>
+                <th>Nama Pembayar</th>
                 <th>Jenis</th>
                 <th>Metode & Bank</th>
                 <th>Uang Arisan</th>
