@@ -3,14 +3,13 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Arisan Keluarga Adnan - Login & Biodata Anggota</title>
+  <title>Arisan Keluarga Adnan - Sistem Informasi & Keuangan</title>
   <style>
     :root {
       --primary: #0f766e;
       --primary-hover: #115e59;
       --primary-light: #f0fdfa;
       --primary-border: #99f6e4;
-      --accent: #0284c7;
       --bg-start: #0f766e;
       --bg-end: #0f172a;
       --card-bg: #ffffff;
@@ -28,7 +27,7 @@
       --success: #15803d;
       --success-bg: #f0fdf4;
       --radius-lg: 18px;
-      --radius-md: 12px;
+      --radius-md: 14px;
       --radius-sm: 10px;
     }
 
@@ -45,7 +44,7 @@
       align-items: center;
       justify-content: center;
       background: linear-gradient(135deg, var(--bg-start), var(--bg-end));
-      padding: 24px 16px;
+      padding: 20px 14px;
       color: var(--text-main);
     }
 
@@ -56,7 +55,7 @@
       background: var(--card-bg);
       width: 100%;
       max-width: 430px;
-      padding: 36px 30px;
+      padding: 34px 28px;
       border-radius: var(--radius-lg);
       box-shadow: 0 22px 50px rgba(0, 0, 0, 0.32);
     }
@@ -74,12 +73,11 @@
       justify-content: center;
       font-size: 1.45rem;
       font-weight: 800;
-      letter-spacing: 0.5px;
     }
 
     .auth-card h1 {
       text-align: center;
-      font-size: 1.5rem;
+      font-size: 1.48rem;
       color: var(--text-main);
       margin-bottom: 4px;
     }
@@ -88,28 +86,29 @@
       text-align: center;
       color: var(--text-muted);
       font-size: 0.92rem;
-      margin-bottom: 24px;
+      margin-bottom: 22px;
     }
 
     /* =====================================================================
-       VIEW 2: LAYAR ENTRY DATA ANGGOTA (DESKTOP & MOBILE PROPORTIONAL)
+       VIEW 2: CONTAINER UTAMA APLIKASI (DESKTOP & MOBILE PROPORTIONAL)
        ===================================================================== */
     .app-container {
       background: var(--card-bg);
       width: 100%;
-      max-width: 960px;
+      max-width: 1120px;
       border-radius: var(--radius-lg);
       box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
       overflow: hidden;
       display: flex;
       flex-direction: column;
+      min-height: 82vh;
     }
 
-    /* Header Bar Anggota */
+    /* Header Bar */
     .app-header {
       background: linear-gradient(135deg, #0f766e, #115e59);
       color: #ffffff;
-      padding: 22px 28px;
+      padding: 20px 26px;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -132,32 +131,33 @@
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 1.25rem;
+      font-size: 1.2rem;
       font-weight: 700;
       flex-shrink: 0;
     }
 
     .header-user-text h2 {
-      font-size: 1.2rem;
+      font-size: 1.18rem;
       font-weight: 700;
       margin-bottom: 2px;
     }
 
     .header-user-text p {
-      font-size: 0.85rem;
-      color: rgba(255, 255, 255, 0.85);
+      font-size: 0.84rem;
+      color: rgba(255, 255, 255, 0.88);
     }
 
     .header-actions {
       display: flex;
       align-items: center;
       gap: 10px;
+      flex-wrap: wrap;
     }
 
     .status-pill {
       padding: 6px 13px;
       border-radius: 999px;
-      font-size: 0.8rem;
+      font-size: 0.78rem;
       font-weight: 700;
       display: inline-flex;
       align-items: center;
@@ -174,13 +174,18 @@
       color: #166534;
     }
 
+    .status-pill.admin-badge {
+      background: #dbeafe;
+      color: #1e40af;
+    }
+
     .btn-logout-header {
       padding: 8px 14px;
       background: rgba(255, 255, 255, 0.14);
       color: #ffffff;
       border: 1px solid rgba(255, 255, 255, 0.3);
       border-radius: 10px;
-      font-size: 0.85rem;
+      font-size: 0.84rem;
       font-weight: 600;
       cursor: pointer;
       transition: background 0.2s;
@@ -195,8 +200,8 @@
       background: var(--warning-bg);
       border-bottom: 1px solid var(--warning-border);
       color: var(--warning-text);
-      padding: 13px 28px;
-      font-size: 0.9rem;
+      padding: 13px 26px;
+      font-size: 0.89rem;
       display: flex;
       align-items: center;
       gap: 10px;
@@ -204,99 +209,267 @@
     }
 
     /* =====================================================================
-       SISTEM TAB PROPORSIONAL (DESKTOP & MOBILE PHONE)
+       TOP MAIN NAVIGATION TABS (PROPORSIONAL DI KOMPUTER & MOBILE)
        ===================================================================== */
-    .tabs-wrapper {
-      background: var(--surface);
-      padding: 14px 24px 0;
+    .main-nav-wrapper {
+      background: #f1f5f9;
+      padding: 12px 22px 0;
       border-bottom: 1px solid var(--border-light);
     }
 
-    .tab-nav {
+    .main-tab-nav {
       display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      gap: 10px;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: 8px;
       width: 100%;
     }
 
-    .tab-btn {
+    .main-tab-btn {
       appearance: none;
       background: #ffffff;
       border: 1.5px solid var(--border-light);
       border-bottom: 3px solid transparent;
-      border-radius: 12px 12px 0 0;
-      padding: 13px 12px;
+      border-radius: 11px 11px 0 0;
+      padding: 11px 8px;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 9px;
-      font-size: 0.92rem;
+      gap: 6px;
+      font-size: 0.84rem;
       font-weight: 600;
       color: var(--text-muted);
       transition: all 0.2s ease;
+      min-height: 48px;
       text-align: center;
-      min-height: 52px;
-      user-select: none;
     }
 
-    .tab-btn:hover:not(:disabled) {
+    .main-tab-btn:hover:not(:disabled) {
       color: var(--primary);
       background: #f8fafc;
-      border-color: #cbd5e1;
     }
 
-    .tab-btn.active {
+    .main-tab-btn.active {
       background: #ffffff;
       color: var(--primary);
-      border-color: var(--border-light);
       border-bottom: 3px solid var(--primary);
-      box-shadow: 0 -4px 12px rgba(15, 118, 110, 0.06);
       font-weight: 700;
+      box-shadow: 0 -3px 10px rgba(15, 118, 110, 0.07);
     }
 
-    .tab-btn:disabled {
-      opacity: 0.55;
+    .main-tab-btn:disabled {
+      opacity: 0.5;
       cursor: not-allowed;
     }
 
+    /* =====================================================================
+       SUB-TAB BAR (UNTUK ENTRY BIODATA & PERIODE ARISAN)
+       ===================================================================== */
+    .sub-tab-nav {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 22px;
+      background: var(--surface);
+      padding: 8px;
+      border-radius: 12px;
+      border: 1px solid var(--border-light);
+    }
+
+    .sub-tab-nav.two-cols {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .sub-tab-btn {
+      appearance: none;
+      background: transparent;
+      border: 1.5px solid transparent;
+      border-radius: 9px;
+      padding: 11px 12px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: var(--text-muted);
+      transition: all 0.2s ease;
+      min-height: 44px;
+    }
+
+    .sub-tab-btn.active {
+      background: #ffffff;
+      color: var(--primary);
+      border-color: var(--primary);
+      box-shadow: 0 2px 8px rgba(15, 118, 110, 0.1);
+      font-weight: 700;
+    }
+
     .tab-step-num {
-      width: 24px;
-      height: 24px;
+      width: 22px;
+      height: 22px;
       border-radius: 50%;
       background: #e2e8f0;
       color: #475569;
-      font-size: 0.78rem;
+      font-size: 0.75rem;
       font-weight: 700;
       display: inline-flex;
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
-      transition: all 0.2s ease;
     }
 
-    .tab-btn.active .tab-step-num {
+    .sub-tab-btn.active .tab-step-num {
       background: var(--primary);
       color: #ffffff;
     }
 
-    .tab-label {
-      white-space: nowrap;
+    /* =====================================================================
+       GALLERY MENU UTAMA (KARTU VISUAL INTERAKTIF)
+       ===================================================================== */
+    .stats-bar {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+      margin-bottom: 24px;
+    }
+
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius-md);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .stat-card .stat-title {
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      color: var(--text-muted);
+      font-weight: 700;
+    }
+
+    .stat-card .stat-value {
+      font-size: 1.25rem;
+      font-weight: 800;
+      color: var(--text-main);
+    }
+
+    .stat-card .stat-sub {
+      font-size: 0.8rem;
+      color: var(--primary);
+      font-weight: 600;
+    }
+
+    .gallery-menu-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .gallery-menu-card {
+      background: #ffffff;
+      border: 1.5px solid var(--border-light);
+      border-radius: 16px;
+      padding: 22px 20px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      gap: 14px;
+      cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+      position: relative;
       overflow: hidden;
-      text-overflow: ellipsis;
     }
 
-    /* Konten Body & Panel Tab */
+    .gallery-menu-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 14px 30px rgba(15, 23, 42, 0.1);
+      border-color: var(--primary);
+    }
+
+    .gallery-card-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .gallery-icon-box {
+      width: 54px;
+      height: 54px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.65rem;
+      flex-shrink: 0;
+    }
+
+    .icon-teal { background: #f0fdfa; border: 1px solid #99f6e4; }
+    .icon-amber { background: #fffbeb; border: 1px solid #fde68a; }
+    .icon-blue { background: #eff6ff; border: 1px solid #bfdbfe; }
+    .icon-purple { background: #faf5ff; border: 1px solid #e9d5ff; }
+    .icon-rose { background: #fff1f2; border: 1px solid #fecdd3; }
+    .icon-emerald { background: #ecfdf5; border: 1px solid #a7f3d0; }
+
+    .gallery-badge {
+      font-size: 0.74rem;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: #f1f5f9;
+      color: #475569;
+    }
+
+    .gallery-badge.admin-only {
+      background: #fef3c7;
+      color: #92400e;
+    }
+
+    .gallery-menu-card h3 {
+      font-size: 1.1rem;
+      color: var(--text-main);
+      margin-bottom: 5px;
+    }
+
+    .gallery-menu-card p {
+      font-size: 0.86rem;
+      color: var(--text-muted);
+      line-height: 1.45;
+    }
+
+    .gallery-card-footer {
+      padding-top: 12px;
+      border-top: 1px dashed var(--border-light);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--primary);
+    }
+
+    /* =====================================================================
+       BODY, PANEL, FORM & TABEL DATA
+       ===================================================================== */
     .app-body {
-      padding: 28px;
+      padding: 26px;
+      flex: 1;
     }
 
-    .tab-panel {
+    .main-section-panel,
+    .sub-tab-panel {
       display: none;
       animation: fadeIn 0.2s ease;
     }
 
-    .tab-panel.active {
+    .main-section-panel.active,
+    .sub-tab-panel.active {
       display: block;
     }
 
@@ -309,28 +482,49 @@
       margin-bottom: 20px;
       padding-bottom: 12px;
       border-bottom: 1px solid var(--border-light);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
     }
 
     .section-header h3 {
-      font-size: 1.15rem;
+      font-size: 1.18rem;
       color: var(--text-main);
-      margin-bottom: 4px;
+      margin-bottom: 3px;
     }
 
     .section-header p {
-      font-size: 0.88rem;
+      font-size: 0.87rem;
       color: var(--text-muted);
     }
 
-    /* Grid Form 2 Kolom Proporsional di Komputer */
+    .card-box {
+      background: #ffffff;
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius-md);
+      padding: 22px;
+      margin-bottom: 22px;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
+    }
+
+    .card-box h4 {
+      font-size: 1.02rem;
+      color: var(--text-main);
+      margin-bottom: 16px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border-light);
+    }
+
     .form-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 18px 20px;
+      gap: 16px 20px;
     }
 
     .form-group {
-      margin-bottom: 16px;
+      margin-bottom: 15px;
     }
 
     .form-grid .form-group {
@@ -343,7 +537,7 @@
 
     .form-group label {
       display: block;
-      font-size: 0.85rem;
+      font-size: 0.84rem;
       font-weight: 600;
       color: var(--text-secondary);
       margin-bottom: 6px;
@@ -358,10 +552,10 @@
     .form-group select,
     .form-group textarea {
       width: 100%;
-      padding: 12px 14px;
+      padding: 11px 14px;
       border: 1.5px solid var(--border);
       border-radius: var(--radius-sm);
-      font-size: 0.95rem;
+      font-size: 0.94rem;
       color: var(--text-main);
       background: #ffffff;
       outline: none;
@@ -371,11 +565,10 @@
     .form-group input[readonly] {
       background: #f1f5f9;
       color: #475569;
-      cursor: not-allowed;
     }
 
     .form-group textarea {
-      min-height: 88px;
+      min-height: 82px;
       resize: vertical;
     }
 
@@ -386,61 +579,155 @@
       box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.14);
     }
 
-    /* Tombol Navigasi Antar Tab & Submit */
-    .tab-footer-actions {
-      margin-top: 26px;
-      padding-top: 18px;
-      border-top: 1px solid var(--border-light);
+    /* Upload Preview Box */
+    .upload-zone {
+      border: 2px dashed var(--border);
+      border-radius: var(--radius-sm);
+      padding: 16px;
+      text-align: center;
+      background: var(--surface);
+      transition: border-color 0.2s;
+    }
+
+    .upload-zone:hover {
+      border-color: var(--primary);
+    }
+
+    .preview-media-box {
+      margin-top: 12px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .preview-media-box img {
+      max-height: 170px;
+      max-width: 100%;
+      border-radius: 10px;
+      border: 1px solid var(--border-light);
+      object-fit: contain;
+    }
+
+    /* Tabel Responsif */
+    .table-responsive {
+      width: 100%;
+      overflow-x: auto;
+      border: 1px solid var(--border-light);
+      border-radius: var(--radius-sm);
+    }
+
+    table.data-table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 640px;
+      font-size: 0.88rem;
+    }
+
+    table.data-table th,
+    table.data-table td {
+      padding: 12px 14px;
+      text-align: left;
+      border-bottom: 1px solid var(--border-light);
+    }
+
+    table.data-table th {
+      background: var(--surface);
+      color: var(--text-secondary);
+      font-weight: 700;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+
+    table.data-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    /* Galeri Foto Kegiatan Grid */
+    .photo-gallery-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .photo-card {
+      background: #ffffff;
+      border: 1px solid var(--border-light);
+      border-radius: 14px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+    }
+
+    .photo-card img {
+      width: 100%;
+      height: 200px;
+      object-fit: cover;
+      cursor: pointer;
+      background: #f1f5f9;
+    }
+
+    .photo-card-body {
+      padding: 14px 16px;
+    }
+
+    .photo-card-body h5 {
+      font-size: 0.98rem;
+      margin-bottom: 4px;
+      color: var(--text-main);
+    }
+
+    .photo-card-body .meta {
+      font-size: 0.78rem;
+      color: var(--primary);
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+
+    .photo-card-body p {
+      font-size: 0.84rem;
+      color: var(--text-muted);
+      line-height: 1.4;
+    }
+
+    /* Daftar Pengumuman Card */
+    .announcement-list {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .announcement-card {
+      background: var(--surface);
+      border: 1px solid var(--border-light);
+      border-left: 4px solid var(--primary);
+      border-radius: var(--radius-sm);
+      padding: 16px 18px;
+    }
+
+    .announcement-card .ann-head {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 12px;
+      gap: 10px;
+      margin-bottom: 8px;
+      flex-wrap: wrap;
     }
 
-    .btn-primary {
-      width: 100%;
-      padding: 13px 20px;
-      background: var(--primary);
-      color: #ffffff;
-      border: none;
-      border-radius: var(--radius-sm);
-      font-size: 0.98rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: background 0.2s, transform 0.1s;
+    .announcement-card h5 {
+      font-size: 1.02rem;
+      color: var(--text-main);
     }
 
-    .btn-primary:hover {
-      background: var(--primary-hover);
-    }
-
-    .btn-primary:disabled {
-      background: #94a3b8;
-      cursor: not-allowed;
-    }
-
-    .btn-secondary {
-      padding: 12px 20px;
-      background: #f1f5f9;
+    .announcement-card p {
+      font-size: 0.9rem;
       color: var(--text-secondary);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-sm);
-      font-size: 0.95rem;
-      font-weight: 600;
-      cursor: pointer;
-      transition: background 0.2s;
+      line-height: 1.5;
+      white-space: pre-line;
+      margin-bottom: 10px;
     }
 
-    .btn-secondary:hover {
-      background: #e2e8f0;
-    }
-
-    .btn-auto {
-      width: auto;
-      min-width: 165px;
-    }
-
-    /* Ringkasan Biodata Card (Tab 4) */
+    /* Ringkasan Biodata Card */
     .summary-grid {
       display: grid;
       grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -455,30 +742,142 @@
     }
 
     .summary-item .label {
-      font-size: 0.78rem;
+      font-size: 0.76rem;
       text-transform: uppercase;
-      letter-spacing: 0.4px;
       color: var(--text-muted);
       font-weight: 600;
       margin-bottom: 4px;
     }
 
     .summary-item .value {
-      font-size: 0.98rem;
+      font-size: 0.96rem;
       font-weight: 600;
       color: var(--text-main);
-      word-break: break-word;
     }
 
-    /* Alert Box */
+    /* Buttons */
+    .tab-footer-actions {
+      margin-top: 22px;
+      padding-top: 16px;
+      border-top: 1px solid var(--border-light);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .btn-primary {
+      width: 100%;
+      padding: 12px 20px;
+      background: var(--primary);
+      color: #ffffff;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .btn-primary:hover {
+      background: var(--primary-hover);
+    }
+
+    .btn-primary:disabled {
+      background: #94a3b8;
+      cursor: not-allowed;
+    }
+
+    .btn-secondary {
+      padding: 11px 18px;
+      background: #f1f5f9;
+      color: var(--text-secondary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .btn-secondary:hover {
+      background: #e2e8f0;
+    }
+
+    .btn-sm {
+      padding: 6px 12px;
+      font-size: 0.8rem;
+      border-radius: 7px;
+      width: auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      text-decoration: none;
+    }
+
+    .btn-auto {
+      width: auto;
+      min-width: 160px;
+    }
+
+    /* Modal Preview Bukti / Foto / PDF */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.75);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      z-index: 9999;
+    }
+
+    .modal-box {
+      background: #ffffff;
+      width: 100%;
+      max-width: 780px;
+      max-height: 90vh;
+      border-radius: 16px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .modal-header {
+      padding: 14px 20px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border-light);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .modal-body {
+      padding: 20px;
+      overflow-y: auto;
+      text-align: center;
+    }
+
+    .modal-body img {
+      max-width: 100%;
+      max-height: 72vh;
+      border-radius: 8px;
+    }
+
+    .modal-body iframe {
+      width: 100%;
+      height: 70vh;
+      border: none;
+    }
+
+    /* Alert */
     .alert {
-      margin-top: 16px;
+      margin-top: 14px;
       padding: 12px 15px;
       border-radius: var(--radius-sm);
-      font-size: 0.88rem;
+      font-size: 0.87rem;
       line-height: 1.45;
       display: none;
-      word-break: break-word;
     }
 
     .alert.error {
@@ -495,24 +894,14 @@
       border: 1px solid #bbf7d0;
     }
 
-    .alert code {
-      background: rgba(0, 0, 0, 0.06);
-      padding: 2px 5px;
-      border-radius: 4px;
-      font-family: Consolas, monospace;
-      font-size: 0.82rem;
-    }
-
-    /* Footer Register User di bawah Login */
     .register-footer {
-      margin-top: 22px;
+      margin-top: 20px;
       padding: 14px 12px 4px;
       border-top: 1px solid var(--border-light);
       text-align: center;
-      font-size: 0.92rem;
+      font-size: 0.9rem;
       color: #475569;
       border-radius: 8px;
-      transition: background-color 0.3s;
     }
 
     .register-footer.highlight-prompt {
@@ -529,10 +918,6 @@
       cursor: pointer;
     }
 
-    .register-footer a:hover {
-      text-decoration: underline;
-    }
-
     .hidden {
       display: none !important;
     }
@@ -540,19 +925,29 @@
     /* =====================================================================
        RESPONSIVE DESIGN: TABLET & MOBILE PHONE
        ===================================================================== */
+    @media (max-width: 960px) {
+      .main-tab-nav {
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+      }
+      .gallery-menu-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .stats-bar {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .photo-gallery-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
     @media (max-width: 768px) {
       body {
-        padding: 12px 10px;
+        padding: 10px 8px;
         align-items: flex-start;
       }
 
-      .auth-card {
-        margin: auto 0;
-        padding: 28px 22px;
-      }
-
       .app-header {
-        padding: 18px 18px;
+        padding: 16px;
       }
 
       .header-actions {
@@ -562,49 +957,57 @@
         border-top: 1px solid rgba(255, 255, 255, 0.18);
       }
 
-      .mandatory-banner {
-        padding: 12px 18px;
-        font-size: 0.85rem;
+      /* Navigasi Tab Utama di Mobile Phone: Grid 2 Kolom Proporsional & Enak Dilihat */
+      .main-nav-wrapper {
+        padding: 10px 12px;
       }
 
-      /* Posisi Tab di Mobile Phone: Grid 2x2 Proporsional & Nyaman Disentuh */
-      .tabs-wrapper {
-        padding: 12px 14px;
-      }
-
-      .tab-nav {
+      .main-tab-nav {
         grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 8px;
       }
 
-      .tab-btn {
+      .main-tab-btn {
         border-radius: 10px;
         border: 1.5px solid var(--border-light);
-        padding: 11px 10px;
-        min-height: 48px;
-        font-size: 0.84rem;
+        padding: 10px 10px;
+        min-height: 46px;
+        font-size: 0.83rem;
         justify-content: flex-start;
       }
 
-      .tab-btn.active {
+      .main-tab-btn.active {
         background: var(--primary-light);
         color: var(--primary);
         border: 1.5px solid var(--primary);
-        box-shadow: 0 2px 8px rgba(15, 118, 110, 0.12);
+      }
+
+      .sub-tab-nav {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
       }
 
       .app-body {
-        padding: 20px 16px;
+        padding: 18px 14px;
       }
 
-      /* Form menjadi 1 kolom di HP agar input lega dan jelas */
+      .gallery-menu-grid,
+      .photo-gallery-grid,
       .form-grid,
       .summary-grid {
         grid-template-columns: 1fr;
-        gap: 15px;
+        gap: 14px;
       }
 
-      /* Ukuran font 16px di HP mencegah auto-zoom di iOS/Android */
+      .stats-bar {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .stat-card .stat-value {
+        font-size: 1.05rem;
+      }
+
       .form-group input,
       .form-group select,
       .form-group textarea {
@@ -632,7 +1035,7 @@
   <div class="auth-card" id="authView">
     <div class="brand-badge">KA</div>
     <h1 id="formTitle">Login Arisan</h1>
-    <p class="subtitle" id="formSubtitle">Keluarga Adnan</p>
+    <p class="subtitle" id="formSubtitle">Keluarga Besar Adnan</p>
 
     <!-- FORM LOGIN -->
     <form id="loginForm">
@@ -663,45 +1066,23 @@
     <form id="registerForm" class="hidden">
       <div class="form-group">
         <label for="regNama">Nama Lengkap <span class="required-star">*</span></label>
-        <input
-          type="text"
-          id="regNama"
-          placeholder="Masukkan nama lengkap"
-          required
-        />
+        <input type="text" id="regNama" placeholder="Masukkan nama lengkap" required />
       </div>
       <div class="form-group">
         <label for="regUsername">User ID / Username <span class="required-star">*</span></label>
-        <input
-          type="text"
-          id="regUsername"
-          placeholder="Buat User ID untuk login"
-          autocomplete="username"
-          required
-        />
+        <input type="text" id="regUsername" placeholder="Buat User ID untuk login" required />
       </div>
       <div class="form-group">
-        <label for="regNoHp">No. WhatsApp / Deskripsi (Opsional)</label>
-        <input
-          type="tel"
-          id="regNoHp"
-          placeholder="Contoh: 08123456789"
-        />
+        <label for="regNoHp">No. WhatsApp / HP (Opsional)</label>
+        <input type="tel" id="regNoHp" placeholder="Contoh: 08123456789" />
       </div>
       <div class="form-group">
         <label for="regPassword">Password <span class="required-star">*</span></label>
-        <input
-          type="password"
-          id="regPassword"
-          placeholder="Buat password"
-          autocomplete="new-password"
-          required
-        />
+        <input type="password" id="regPassword" placeholder="Buat password" required />
       </div>
       <button type="submit" class="btn-primary" id="regBtn">Register User</button>
     </form>
 
-    <!-- KOTAK PESAN VALIDASI LOGIN/REGISTER -->
     <div id="alertBox" class="alert"></div>
 
     <!-- TULISAN REGISTER USER DI BAGIAN BAWAH -->
@@ -712,10 +1093,10 @@
   </div>
 
   <!-- ===================================================================
-       VIEW 2: LAYAR ENTRY DATA BIODATA ANGGOTA (Tabel: adnan_DataAnggota)
+       VIEW 2: APLIKASI UTAMA (GALLERY MENU & ENTRY BIODATA)
        =================================================================== -->
   <div class="app-container hidden" id="memberAppView">
-    <!-- Header Info Peserta -->
+    <!-- Header Info Peserta / Admin -->
     <header class="app-header">
       <div class="header-user-info">
         <div class="user-avatar" id="headerAvatar">KA</div>
@@ -725,217 +1106,957 @@
         </div>
       </div>
       <div class="header-actions">
-        <span id="biodataStatusPill" class="status-pill incomplete">
-          Wajib Isi Biodata
-        </span>
-        <button type="button" class="btn-logout-header" id="logoutBtn">
-          Keluar
-        </button>
+        <span id="roleBadgePill" class="status-pill admin-badge hidden">👑 Admin</span>
+        <span id="biodataStatusPill" class="status-pill incomplete">Wajib Isi Biodata</span>
+        <button type="button" class="btn-logout-header" id="logoutBtn">Keluar</button>
       </div>
     </header>
 
-    <!-- Banner Peringatan Wajib Mengisi Biodata jika belum ada di adnan_DataAnggota -->
-    <div class="mandatory-banner" id="mandatoryBanner">
+    <!-- Banner Wajib Mengisi Biodata jika belum terdaftar di adnan_DataAnggota -->
+    <div class="mandatory-banner hidden" id="mandatoryBanner">
       <span>⚠️</span>
-      <span id="mandatoryBannerText">
-        <strong>Biodata Belum Terdaftar:</strong> Anda wajib melengkapi dan menyimpan Biodata Peserta Arisan pada tabel <code>adnan_DataAnggota</code> di bawah ini.
+      <span>
+        <strong>Biodata Peserta Belum Terdaftar:</strong> Anda wajib melengkapi dan menyimpan Biodata Peserta Arisan pada tabel <code>adnan_DataAnggota</code> sebelum membuka Menu Utama Gallery.
       </span>
     </div>
 
-    <!-- Navigasi Tab Proporsional (Komputer: 4 Kolom Sejajar | Mobile: Grid 2x2 Proporsional) -->
-    <div class="tabs-wrapper">
-      <nav class="tab-nav" aria-label="Tab Biodata Peserta Arisan">
-        <button type="button" class="tab-btn active" data-tab="tabPribadi">
-          <span class="tab-step-num">1</span>
-          <span class="tab-label">Data Pribadi</span>
+    <!-- Navigasi Tab Utama Proporsional -->
+    <div class="main-nav-wrapper" id="mainNavWrapper">
+      <nav class="main-tab-nav" aria-label="Menu Utama Arisan Keluarga Adnan">
+        <button type="button" class="main-tab-btn active" data-main-view="viewGalleryHome" id="navBtnHome">
+          <span>🏠</span> <span>Menu Gallery</span>
         </button>
-        <button type="button" class="tab-btn" data-tab="tabKontak">
-          <span class="tab-step-num">2</span>
-          <span class="tab-label">Kontak & Alamat</span>
+        <button type="button" class="main-tab-btn" data-main-view="viewPembayaran" id="navBtnPembayaran">
+          <span>💳</span> <span>1. Pembayaran</span>
         </button>
-        <button type="button" class="tab-btn" data-tab="tabKeluarga">
-          <span class="tab-step-num">3</span>
-          <span class="tab-label">Keluarga & Arisan</span>
+        <button type="button" class="main-tab-btn" data-main-view="viewPengeluaran" id="navBtnPengeluaran">
+          <span>📊</span> <span>2. Pengeluaran</span>
         </button>
-        <button type="button" class="tab-btn" data-tab="tabRingkasan" id="tabBtnRingkasan">
-          <span class="tab-step-num">✓</span>
-          <span class="tab-label">Data Terdaftar</span>
+        <button type="button" class="main-tab-btn" data-main-view="viewPengumuman" id="navBtnPengumuman">
+          <span>📢</span> <span>3. Pengumuman</span>
+        </button>
+        <button type="button" class="main-tab-btn" data-main-view="viewGaleri" id="navBtnGaleri">
+          <span>📸</span> <span>4. Galeri Foto</span>
+        </button>
+        <button type="button" class="main-tab-btn" data-main-view="viewPeriode" id="navBtnPeriode">
+          <span>🏆</span> <span>5. Periode Arisan</span>
+        </button>
+        <button type="button" class="main-tab-btn" data-main-view="viewBiodata" id="navBtnBiodata">
+          <span>👤</span> <span>Biodata Saya</span>
         </button>
       </nav>
     </div>
 
-    <!-- Isi Form Entry Data Biodata (adnan_DataAnggota) -->
+    <!-- =================================================================
+         ISI KONTEN APLIKASI
+         ================================================================= -->
     <div class="app-body">
-      <div id="biodataAlertBox" class="alert" style="margin-top: 0; margin-bottom: 18px;"></div>
+      <div id="globalAppAlert" class="alert" style="margin-top: 0; margin-bottom: 18px;"></div>
 
-      <form id="biodataForm">
-        <!-- TAB 1: DATA PRIBADI -->
-        <section class="tab-panel active" id="tabPribadi">
-          <div class="section-header">
-            <h3>1. Identitas Pribadi Peserta Arisan</h3>
-            <p>Lengkapi data diri utama peserta arisan Keluarga Adnan.</p>
-          </div>
-
-          <div class="form-grid">
-            <div class="form-group">
-              <label for="bioUserId">User ID Peserta <span class="required-star">*</span></label>
-              <input type="text" id="bioUserId" readonly required />
-            </div>
-
-            <div class="form-group">
-              <label for="bioNamaLengkap">Nama Lengkap <span class="required-star">*</span></label>
-              <input type="text" id="bioNamaLengkap" placeholder="Masukkan nama lengkap" required />
-            </div>
-
-            <div class="form-group">
-              <label for="bioNamaPanggilan">Nama Panggilan</label>
-              <input type="text" id="bioNamaPanggilan" placeholder="Contoh: Bang Adnan / Kak Siti" />
-            </div>
-
-            <div class="form-group">
-              <label for="bioJenisKelamin">Jenis Kelamin <span class="required-star">*</span></label>
-              <select id="bioJenisKelamin" required>
-                <option value="">-- Pilih Jenis Kelamin --</option>
-                <option value="Laki-laki">Laki-laki</option>
-                <option value="Perempuan">Perempuan</option>
-              </select>
-            </div>
-
-            <div class="form-group">
-              <label for="bioTempatLahir">Tempat Lahir</label>
-              <input type="text" id="bioTempatLahir" placeholder="Contoh: Jakarta" />
-            </div>
-
-            <div class="form-group">
-              <label for="bioTanggalLahir">Tanggal Lahir</label>
-              <input type="date" id="bioTanggalLahir" />
-            </div>
-
-            <div class="form-group full-width">
-              <label for="bioPekerjaan">Pekerjaan / Aktivitas</label>
-              <input type="text" id="bioPekerjaan" placeholder="Contoh: Wiraswasta / Karyawan / Ibu Rumah Tangga" />
-            </div>
-          </div>
-
-          <div class="tab-footer-actions">
-            <span></span>
-            <button type="button" class="btn-primary btn-auto" data-next-tab="tabKontak">
-              Selanjutnya: Kontak & Alamat &rarr;
-            </button>
-          </div>
-        </section>
-
-        <!-- TAB 2: KONTAK & ALAMAT -->
-        <section class="tab-panel" id="tabKontak">
-          <div class="section-header">
-            <h3>2. Kontak & Alamat Domisili</h3>
-            <p>Data nomor WhatsApp dan alamat untuk koordinasi kegiatan arisan.</p>
-          </div>
-
-          <div class="form-grid">
-            <div class="form-group">
-              <label for="bioNoHp">Nomor WhatsApp / HP Aktif <span class="required-star">*</span></label>
-              <input type="tel" id="bioNoHp" placeholder="Contoh: 081234567890" required />
-            </div>
-
-            <div class="form-group">
-              <label for="bioEmail">Alamat Email</label>
-              <input type="email" id="bioEmail" placeholder="Contoh: nama@email.com" />
-            </div>
-
-            <div class="form-group full-width">
-              <label for="bioAlamat">Alamat Lengkap Domisili <span class="required-star">*</span></label>
-              <textarea id="bioAlamat" placeholder="Masukkan alamat lengkap tempat tinggal saat ini" required></textarea>
-            </div>
-
-            <div class="form-group full-width">
-              <label for="bioKota">Kota / Kabupaten Domisili</label>
-              <input type="text" id="bioKota" placeholder="Contoh: Jakarta Selatan / Bekasi / Bandung" />
-            </div>
-          </div>
-
-          <div class="tab-footer-actions">
-            <button type="button" class="btn-secondary" data-prev-tab="tabPribadi">
-              &larr; Kembali ke Data Pribadi
-            </button>
-            <button type="button" class="btn-primary btn-auto" data-next-tab="tabKeluarga">
-              Selanjutnya: Keluarga & Arisan &rarr;
-            </button>
-          </div>
-        </section>
-
-        <!-- TAB 3: KELUARGA & REKENING ARISAN -->
-        <section class="tab-panel" id="tabKeluarga">
-          <div class="section-header">
-            <h3>3. Data Keluarga & Kepesertaan Arisan</h3>
-            <p>Informasi silsilah keluarga dan rekening pencairan arisan.</p>
-          </div>
-
-          <div class="form-grid">
-            <div class="form-group">
-              <label for="bioNamaPasangan">Nama Suami / Istri</label>
-              <input type="text" id="bioNamaPasangan" placeholder="Masukkan nama pasangan (jika ada)" />
-            </div>
-
-            <div class="form-group">
-              <label for="bioJumlahAnak">Jumlah Anak</label>
-              <input type="number" id="bioJumlahAnak" min="0" value="0" />
-            </div>
-
-            <div class="form-group">
-              <label for="bioSilsilah">Cabang / Silsilah Keluarga Adnan</label>
-              <input type="text" id="bioSilsilah" placeholder="Contoh: Putra/Putri ke-... / Cucu dari..." />
-            </div>
-
-            <div class="form-group">
-              <label for="bioJumlahArisan">Jumlah Nomor / Slot Arisan <span class="required-star">*</span></label>
-              <input type="number" id="bioJumlahArisan" min="1" value="1" required />
-            </div>
-
-            <div class="form-group">
-              <label for="bioNamaBank">Nama Bank / E-Wallet Pencairan</label>
-              <input type="text" id="bioNamaBank" placeholder="Contoh: BCA / Mandiri / BRI / BSI" />
-            </div>
-
-            <div class="form-group">
-              <label for="bioNoRekening">Nomor Rekening</label>
-              <input type="text" id="bioNoRekening" placeholder="Masukkan nomor rekening" />
-            </div>
-
-            <div class="form-group full-width">
-              <label for="bioAtasNama">Atas Nama Rekening</label>
-              <input type="text" id="bioAtasNama" placeholder="Nama pemilik rekening bank" />
-            </div>
-          </div>
-
-          <div class="tab-footer-actions">
-            <button type="button" class="btn-secondary" data-prev-tab="tabKontak">
-              &larr; Kembali ke Kontak & Alamat
-            </button>
-            <button type="submit" class="btn-primary btn-auto" id="saveBiodataBtn">
-              💾 Simpan Biodata Peserta
-            </button>
-          </div>
-        </section>
-      </form>
-
-      <!-- TAB 4: RINGKASAN DATA ANGGOTA TERDAFTAR -->
-      <section class="tab-panel" id="tabRingkasan">
+      <!-- ===============================================================
+           LAYAR UTAMA: MENU GALLERY (TAMPIL SETELAH BIODATA TEREGISTER)
+           =============================================================== -->
+      <section class="main-section-panel active" id="viewGalleryHome">
         <div class="section-header">
-          <h3>Biodata Peserta Arisan Terdaftar (adnan_DataAnggota)</h3>
-          <p>Berikut adalah data biodata Anda yang telah tersimpan di database Arisan Keluarga Adnan.</p>
+          <div>
+            <h3>Layar Utama Menu Arisan Keluarga Adnan</h3>
+            <p>Pilih menu layanan arisan, keuangan, pengumuman, dan dokumentasi keluarga di bawah ini.</p>
+          </div>
         </div>
 
-        <div class="summary-grid" id="biodataSummaryContainer">
-          <!-- Diisi otomatis melalui js/app.js -->
+        <!-- Ringkasan Statistik Kas & Periode -->
+        <div class="stats-bar">
+          <div class="stat-card">
+            <span class="stat-title">Periode Aktif</span>
+            <span class="stat-value" id="statPeriodeAktif">Periode #1</span>
+            <span class="stat-sub" id="statTanggalPeriode">Memuat jadwal...</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-title">Total Pemasukan</span>
+            <span class="stat-value" id="statTotalMasuk">Rp 0</span>
+            <span class="stat-sub">Arisan, Zakat & Sumbangan</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-title">Total Pengeluaran</span>
+            <span class="stat-value" id="statTotalKeluar">Rp 0</span>
+            <span class="stat-sub">Akuntansi & Pencairan</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-title">Saldo Kas Keluarga</span>
+            <span class="stat-value" id="statSaldoKas">Rp 0</span>
+            <span class="stat-sub" id="statPemenangTerakhir">Pemenang: -</span>
+          </div>
         </div>
 
-        <div class="tab-footer-actions">
-          <button type="button" class="btn-secondary" id="editBiodataBtn">
-            ✏️ Perbarui / Edit Biodata
-          </button>
+        <!-- 6 KARTU MENU GALLERY -->
+        <div class="gallery-menu-grid">
+          <!-- 1. PEMBAYARAN -->
+          <div class="gallery-menu-card" data-open-view="viewPembayaran">
+            <div>
+              <div class="gallery-card-top">
+                <div class="gallery-icon-box icon-teal">💳</div>
+                <span class="gallery-badge">Menu 1</span>
+              </div>
+              <h3 style="margin-top: 14px;">1. Pembayaran</h3>
+              <p>Entry pembayaran Arisan, Sumbangan, Zakat, Infaq, dll. Mendukung Tunai & Transfer Bank lengkap dengan unggah bukti bayar.</p>
+            </div>
+            <div class="gallery-card-footer">
+              <span>Buka Menu Pembayaran</span>
+              <span>&rarr;</span>
+            </div>
+          </div>
+
+          <!-- 2. PENGELUARAN (ADMIN) -->
+          <div class="gallery-menu-card" data-open-view="viewPengeluaran">
+            <div>
+              <div class="gallery-card-top">
+                <div class="gallery-icon-box icon-amber">📊</div>
+                <span class="gallery-badge admin-only">Menu 2 • Entry Khusus Admin</span>
+              </div>
+              <h3 style="margin-top: 14px;">2. Pengeluaran / Akuntansi</h3>
+              <p>Pencatatan pengeluaran kas keluarga, pencairan arisan, konsumsi & santunan (Entry khusus Admin, laporan transparan).</p>
+            </div>
+            <div class="gallery-card-footer">
+              <span>Buka Akuntansi Pengeluaran</span>
+              <span>&rarr;</span>
+            </div>
+          </div>
+
+          <!-- 3. PENGUMUMAN (PDF) -->
+          <div class="gallery-menu-card" data-open-view="viewPengumuman">
+            <div>
+              <div class="gallery-card-top">
+                <div class="gallery-icon-box icon-blue">📢</div>
+                <span class="gallery-badge">Menu 3 • Dokumen PDF</span>
+              </div>
+              <h3 style="margin-top: 14px;">3. Pengumuman</h3>
+              <p>Informasi resmi undangan arisan, berita keluarga, dan laporan keuangan yang dilengkapi lampiran dokumen PDF.</p>
+            </div>
+            <div class="gallery-card-footer">
+              <span>Lihat & Buat Pengumuman</span>
+              <span>&rarr;</span>
+            </div>
+          </div>
+
+          <!-- 4. GALERI KEGIATAN -->
+          <div class="gallery-menu-card" data-open-view="viewGaleri">
+            <div>
+              <div class="gallery-card-top">
+                <div class="gallery-icon-box icon-purple">📸</div>
+                <span class="gallery-badge">Menu 4 • Dokumentasi</span>
+              </div>
+              <h3 style="margin-top: 14px;">4. Galeri Kegiatan</h3>
+              <p>Album foto dokumentasi pertemuan arisan, silaturahmi, dan acara kebersamaan Keluarga Besar Adnan.</p>
+            </div>
+            <div class="gallery-card-footer">
+              <span>Buka Galeri Foto</span>
+              <span>&rarr;</span>
+            </div>
+          </div>
+
+          <!-- 5. SETTING PERIODE & PEMENANG ARISAN -->
+          <div class="gallery-menu-card" data-open-view="viewPeriode">
+            <div>
+              <div class="gallery-card-top">
+                <div class="gallery-icon-box icon-rose">🏆</div>
+                <span class="gallery-badge">Menu 5 • Periode & Undian</span>
+              </div>
+              <h3 style="margin-top: 14px;">5. Setting Periode & Pemenang</h3>
+              <p>Pengaturan jadwal periode arisan, besaran iuran per slot, tuan rumah, serta pencatatan & undian pemenang arisan.</p>
+            </div>
+            <div class="gallery-card-footer">
+              <span>Kelola Periode & Pemenang</span>
+              <span>&rarr;</span>
+            </div>
+          </div>
+
+          <!-- 6. BIODATA PESERTA -->
+          <div class="gallery-menu-card" data-open-view="viewBiodata">
+            <div>
+              <div class="gallery-card-top">
+                <div class="gallery-icon-box icon-emerald">👤</div>
+                <span class="gallery-badge">Profil Anggota</span>
+              </div>
+              <h3 style="margin-top: 14px;">Biodata Peserta Arisan</h3>
+              <p>Lihat ringkasan biodata kepesertaan Anda pada tabel <code>adnan_DataAnggota</code> atau perbarui informasi kontak & rekening.</p>
+            </div>
+            <div class="gallery-card-footer">
+              <span>Lihat / Edit Biodata</span>
+              <span>&rarr;</span>
+            </div>
+          </div>
         </div>
       </section>
+
+      <!-- ===============================================================
+           MENU 1: PEMBAYARAN (ARISAN, SUMBANGAN, ZAKAT, DLL + BUKTI BAYAR)
+           =============================================================== -->
+      <section class="main-section-panel" id="viewPembayaran">
+        <div class="section-header">
+          <div>
+            <h3>💳 1. Entry & Riwayat Pembayaran</h3>
+            <p>Pembayaran Arisan, Sumbangan, Zakat, Infaq & Dana Sosial (Tunai maupun Transfer Bank).</p>
+          </div>
+          <button type="button" class="btn-secondary btn-sm" data-open-view="viewGalleryHome">
+            &larr; Kembali ke Menu Gallery
+          </button>
+        </div>
+
+        <div class="card-box">
+          <h4>Form Entry Pembayaran Baru</h4>
+          <form id="formPembayaran">
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="payNama">Nama Pembayar / Peserta <span class="required-star">*</span></label>
+                <input type="text" id="payNama" required placeholder="Nama peserta pembayar" />
+              </div>
+
+              <div class="form-group">
+                <label for="payPeriode">Periode Arisan</label>
+                <select id="payPeriode">
+                  <option value="">-- Pilih Periode Arisan --</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label for="payJenis">Jenis Pembayaran <span class="required-star">*</span></label>
+                <select id="payJenis" required>
+                  <option value="Uang Arisan">Uang Arisan</option>
+                  <option value="Sumbangan Keluarga">Sumbangan Keluarga</option>
+                  <option value="Zakat">Zakat (Maal / Fitrah / Profesi)</option>
+                  <option value="Infaq & Sedekah">Infaq & Sedekah</option>
+                  <option value="Dana Sosial / Duka">Dana Sosial / Santunan Duka</option>
+                  <option value="Uang Konsumsi">Uang Konsumsi Pertemuan</option>
+                  <option value="Lainnya">Lainnya</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label for="payNominal">Nominal Pembayaran (Rp) <span class="required-star">*</span></label>
+                <input type="number" id="payNominal" min="1000" step="500" placeholder="Contoh: 100000" required />
+              </div>
+
+              <div class="form-group">
+                <label for="payTanggal">Tanggal Pembayaran <span class="required-star">*</span></label>
+                <input type="date" id="payTanggal" required />
+              </div>
+
+              <div class="form-group">
+                <label for="payMetode">Metode Pembayaran <span class="required-star">*</span></label>
+                <select id="payMetode" required>
+                  <option value="Transfer Bank">Transfer Bank</option>
+                  <option value="Tunai">Tunai (Cash)</option>
+                </select>
+              </div>
+
+              <!-- Dropdown Bank Lengkap (Muncul saat pilih Transfer Bank) -->
+              <div class="form-group" id="payBankGroup">
+                <label for="payNamaBank">Pilih Bank Tujuan / Pengirim <span class="required-star">*</span></label>
+                <select id="payNamaBank" class="bank-dropdown-select">
+                  <!-- Diisi otomatis daftar bank lengkap se-Indonesia melalui js/app.js -->
+                </select>
+              </div>
+
+              <div class="form-group" id="payRekeningGroup">
+                <label for="payNoRekening">No. Rekening / Atas Nama Pengirim</label>
+                <input type="text" id="payNoRekening" placeholder="Contoh: 1234567890 a.n Ahmad" />
+              </div>
+
+              <div class="form-group full-width">
+                <label for="payKeterangan">Keterangan Pembayaran</label>
+                <input type="text" id="payKeterangan" placeholder="Contoh: Setoran Arisan 2 Slot / Zakat Bulan Ini" />
+              </div>
+
+              <div class="form-group full-width">
+                <label for="payBuktiFile">Unggah Bukti Pembayaran / Struk Transfer (Gambar / PDF)</label>
+                <div class="upload-zone">
+                  <input type="file" id="payBuktiFile" accept="image/*,application/pdf" />
+                  <div class="preview-media-box" id="payBuktiPreview"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="tab-footer-actions">
+              <span></span>
+              <button type="submit" class="btn-primary btn-auto" id="btnSubmitPembayaran">
+                💾 Simpan Pembayaran
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <div class="card-box">
+          <h4>Daftar Riwayat Pembayaran Peserta</h4>
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Tanggal</th>
+                  <th>Kode</th>
+                  <th>Nama Pembayar</th>
+                  <th>Jenis</th>
+                  <th>Metode & Bank</th>
+                  <th>Nominal</th>
+                  <th>Bukti</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="tableBodyPembayaran">
+                <tr><td colspan="8" style="text-align:center;">Memuat data pembayaran...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===============================================================
+           MENU 2: PENGELUARAN / AKUNTANSI (ENTRY KHUSUS ADMIN)
+           =============================================================== -->
+      <section class="main-section-panel" id="viewPengeluaran">
+        <div class="section-header">
+          <div>
+            <h3>📊 2. Pengeluaran & Akuntansi Kas</h3>
+            <p>Pencatatan pengeluaran kas arisan, pencairan pemenang, santunan, dan operasional.</p>
+          </div>
+          <button type="button" class="btn-secondary btn-sm" data-open-view="viewGalleryHome">
+            &larr; Kembali ke Menu Gallery
+          </button>
+        </div>
+
+        <!-- Pemberitahuan jika bukan Admin -->
+        <div class="mandatory-banner hidden" id="nonAdminExpenseNotice" style="border-radius: 10px; margin-bottom: 18px;">
+          <span>🔒</span>
+          <span>
+            <strong>Akses Terbatas (View Only):</strong> Form Entry Pengeluaran / Akuntansi hanya dapat diisi oleh <strong>Admin</strong>. Anda tetap dapat melihat laporan transparansi pengeluaran di bawah ini.
+          </span>
+        </div>
+
+        <!-- Form Entry Pengeluaran (Hanya Tampil untuk Admin) -->
+        <div class="card-box" id="adminExpenseFormCard">
+          <h4>Form Entry Pengeluaran / Akuntansi (Khusus Admin)</h4>
+          <form id="formPengeluaran">
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="expTanggal">Tanggal Pengeluaran <span class="required-star">*</span></label>
+                <input type="date" id="expTanggal" required />
+              </div>
+
+              <div class="form-group">
+                <label for="expKategori">Kategori Akuntansi <span class="required-star">*</span></label>
+                <select id="expKategori" required>
+                  <option value="Pencairan Arisan Pemenang">Pencairan Arisan Pemenang</option>
+                  <option value="Konsumsi & Tuan Rumah">Konsumsi & Subsidi Tuan Rumah</option>
+                  <option value="Santunan Sosial / Duka">Santunan Sosial / Duka / Sakit</option>
+                  <option value="Penyaluran Zakat & Sumbangan">Penyaluran Zakat & Sumbangan</option>
+                  <option value="Operasional & Administrasi">Operasional & Administrasi</option>
+                  <option value="Lainnya">Pengeluaran Lainnya</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label for="expNominal">Nominal Pengeluaran (Rp) <span class="required-star">*</span></label>
+                <input type="number" id="expNominal" min="1000" step="500" placeholder="Contoh: 500000" required />
+              </div>
+
+              <div class="form-group">
+                <label for="expPenerima">Nama Penerima / Tujuan Dana</label>
+                <input type="text" id="expPenerima" placeholder="Contoh: Bpk. H. Mansyur / Katering" />
+              </div>
+
+              <div class="form-group">
+                <label for="expMetode">Metode Pengeluaran <span class="required-star">*</span></label>
+                <select id="expMetode" required>
+                  <option value="Tunai">Tunai (Cash)</option>
+                  <option value="Transfer Bank">Transfer Bank</option>
+                </select>
+              </div>
+
+              <div class="form-group hidden" id="expBankGroup">
+                <label for="expNamaBank">Bank Pencairan / Transfer</label>
+                <select id="expNamaBank" class="bank-dropdown-select"></select>
+              </div>
+
+              <div class="form-group full-width">
+                <label for="expDeskripsi">Uraian / Deskripsi Pengeluaran <span class="required-star">*</span></label>
+                <textarea id="expDeskripsi" placeholder="Jelaskan rincian pengeluaran akuntansi" required></textarea>
+              </div>
+
+              <div class="form-group full-width">
+                <label for="expBuktiFile">Unggah Nota / Kwitansi Pengeluaran (Opsional)</label>
+                <div class="upload-zone">
+                  <input type="file" id="expBuktiFile" accept="image/*,application/pdf" />
+                  <div class="preview-media-box" id="expBuktiPreview"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="tab-footer-actions">
+              <span></span>
+              <button type="submit" class="btn-primary btn-auto" id="btnSubmitPengeluaran">
+                💾 Catat Pengeluaran (Admin)
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <div class="card-box">
+          <h4>Buku Kas Pengeluaran / Akuntansi</h4>
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Tanggal</th>
+                  <th>Kode</th>
+                  <th>Kategori</th>
+                  <th>Uraian / Penerima</th>
+                  <th>Metode</th>
+                  <th>Nominal</th>
+                  <th>Nota/Bukti</th>
+                  <th>Dicatat Oleh</th>
+                </tr>
+              </thead>
+              <tbody id="tableBodyPengeluaran">
+                <tr><td colspan="8" style="text-align:center;">Memuat data pengeluaran...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===============================================================
+           MENU 3: PENGUMUMAN (MENDUKUNG LAMPIRAN PDF)
+           =============================================================== -->
+      <section class="main-section-panel" id="viewPengumuman">
+        <div class="section-header">
+          <div>
+            <h3>📢 3. Papan Pengumuman & Dokumen PDF</h3>
+            <p>Pengumuman jadwal arisan, undangan silaturahmi, dan dokumen PDF keluarga.</p>
+          </div>
+          <button type="button" class="btn-secondary btn-sm" data-open-view="viewGalleryHome">
+            &larr; Kembali ke Menu Gallery
+          </button>
+        </div>
+
+        <div class="card-box" id="formPengumumanCard">
+          <h4>Buat Pengumuman Baru / Unggah Dokumen PDF</h4>
+          <form id="formPengumuman">
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="annJudul">Judul Pengumuman <span class="required-star">*</span></label>
+                <input type="text" id="annJudul" placeholder="Contoh: Undangan Arisan Periode Ke-2" required />
+              </div>
+
+              <div class="form-group">
+                <label for="annKategori">Kategori</label>
+                <select id="annKategori">
+                  <option value="Undangan Arisan">Undangan Arisan</option>
+                  <option value="Laporan Keuangan">Laporan Keuangan (PDF)</option>
+                  <option value="Berita Keluarga">Berita & Kabar Keluarga</option>
+                  <option value="Pengumuman Umum">Pengumuman Umum</option>
+                </select>
+              </div>
+
+              <div class="form-group full-width">
+                <label for="annIsi">Isi Pengumuman <span class="required-star">*</span></label>
+                <textarea id="annIsi" placeholder="Tuliskan isi pengumuman lengkap di sini..." required></textarea>
+              </div>
+
+              <div class="form-group full-width">
+                <label for="annPdfFile">Lampiran Dokumen PDF (Opsional, format <code>.pdf</code>)</label>
+                <div class="upload-zone">
+                  <input type="file" id="annPdfFile" accept="application/pdf,.pdf" />
+                  <div id="annPdfInfo" style="margin-top:8px; font-size:0.84rem; color:var(--primary); font-weight:600;"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="tab-footer-actions">
+              <span></span>
+              <button type="submit" class="btn-primary btn-auto" id="btnSubmitPengumuman">
+                📢 Terbitkan Pengumuman
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <div class="card-box">
+          <h4>Daftar Pengumuman Keluarga Adnan</h4>
+          <div class="announcement-list" id="announcementListContainer">
+            <p style="text-align:center; color:var(--text-muted);">Memuat pengumuman...</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===============================================================
+           MENU 4: GALERI FOTO KEGIATAN
+           =============================================================== -->
+      <section class="main-section-panel" id="viewGaleri">
+        <div class="section-header">
+          <div>
+            <h3>📸 4. Galeri Foto Kegiatan Keluarga Adnan</h3>
+            <p>Dokumentasi foto pertemuan arisan, pengajian, dan silaturahmi keluarga besar.</p>
+          </div>
+          <button type="button" class="btn-secondary btn-sm" data-open-view="viewGalleryHome">
+            &larr; Kembali ke Menu Gallery
+          </button>
+        </div>
+
+        <div class="card-box">
+          <h4>Unggah Foto Kegiatan Baru</h4>
+          <form id="formGaleri">
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="galJudul">Judul Kegiatan <span class="required-star">*</span></label>
+                <input type="text" id="galJudul" placeholder="Contoh: Silaturahmi & Arisan Periode 1" required />
+              </div>
+
+              <div class="form-group">
+                <label for="galTanggal">Tanggal Kegiatan</label>
+                <input type="date" id="galTanggal" />
+              </div>
+
+              <div class="form-group full-width">
+                <label for="galLokasi">Lokasi / Tempat Kegiatan</label>
+                <input type="text" id="galLokasi" placeholder="Contoh: Kediaman Bpk. H. Mansyur Adnan, Kebayoran" />
+              </div>
+
+              <div class="form-group full-width">
+                <label for="galDeskripsi">Keterangan Foto</label>
+                <textarea id="galDeskripsi" placeholder="Ceritakan momen kegiatan keluarga ini..."></textarea>
+              </div>
+
+              <div class="form-group full-width">
+                <label for="galFotoFile">Pilih Foto Kegiatan <span class="required-star">*</span></label>
+                <div class="upload-zone">
+                  <input type="file" id="galFotoFile" accept="image/*" required />
+                  <div class="preview-media-box" id="galFotoPreview"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="tab-footer-actions">
+              <span></span>
+              <button type="submit" class="btn-primary btn-auto" id="btnSubmitGaleri">
+                📸 Unggah ke Galeri Kegiatan
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <div class="card-box">
+          <h4>Album Foto Kegiatan</h4>
+          <div class="photo-gallery-grid" id="photoGalleryContainer">
+            <p style="text-align:center; color:var(--text-muted);">Memuat galeri foto...</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===============================================================
+           MENU 5: SETTING PERIODE ARISAN & PEMENANG ARISAN
+           =============================================================== -->
+      <section class="main-section-panel" id="viewPeriode">
+        <div class="section-header">
+          <div>
+            <h3>🏆 5. Setting Periode Arisan & Daftar Pemenang</h3>
+            <p>Kelola jadwal periode arisan serta penetapan/undian pemenang setiap periode.</p>
+          </div>
+          <button type="button" class="btn-secondary btn-sm" data-open-view="viewGalleryHome">
+            &larr; Kembali ke Menu Gallery
+          </button>
+        </div>
+
+        <!-- Sub-Tab Proporsional: Periode Arisan vs Pemenang Arisan -->
+        <div class="sub-tab-nav two-cols">
+          <button type="button" class="sub-tab-btn active" data-periode-subtab="subTabPeriodeList">
+            <span class="tab-step-num">1</span>
+            <span>Setting Periode Arisan</span>
+          </button>
+          <button type="button" class="sub-tab-btn" data-periode-subtab="subTabPemenangList">
+            <span class="tab-step-num">2</span>
+            <span>Daftar & Penetapan Pemenang Arisan</span>
+          </button>
+        </div>
+
+        <!-- SUB-TAB 1: SETTING PERIODE ARISAN -->
+        <div class="sub-tab-panel active" id="subTabPeriodeList">
+          <div class="card-box">
+            <h4>Tambah / Setting Periode Arisan Baru</h4>
+            <form id="formPeriodeArisan">
+              <div class="form-grid">
+                <div class="form-group">
+                  <label for="perNomor">Periode Ke- <span class="required-star">*</span></label>
+                  <input type="number" id="perNomor" min="1" value="1" required />
+                </div>
+
+                <div class="form-group">
+                  <label for="perBulanTahun">Bulan & Tahun Periode <span class="required-star">*</span></label>
+                  <input type="text" id="perBulanTahun" placeholder="Contoh: Desember 2026" required />
+                </div>
+
+                <div class="form-group">
+                  <label for="perTanggal">Tanggal Pertemuan Arisan <span class="required-star">*</span></label>
+                  <input type="date" id="perTanggal" required />
+                </div>
+
+                <div class="form-group">
+                  <label for="perIuran">Iuran per Slot (Rp) <span class="required-star">*</span></label>
+                  <input type="number" id="perIuran" min="10000" step="5000" value="100000" required />
+                </div>
+
+                <div class="form-group">
+                  <label for="perTempat">Tempat / Tuan Rumah Pertemuan <span class="required-star">*</span></label>
+                  <input type="text" id="perTempat" placeholder="Contoh: Kediaman Ibu Hj. Khadijah Adnan" required />
+                </div>
+
+                <div class="form-group">
+                  <label for="perStatus">Status Periode</label>
+                  <select id="perStatus">
+                    <option value="aktif">Aktif Berjalan</option>
+                    <option value="akan_datang">Akan Datang</option>
+                    <option value="selesai">Selesai</option>
+                  </select>
+                </div>
+
+                <div class="form-group full-width">
+                  <label for="perKeterangan">Keterangan Periode</label>
+                  <input type="text" id="perKeterangan" placeholder="Catatan agenda pertemuan arisan" />
+                </div>
+              </div>
+
+              <div class="tab-footer-actions">
+                <span></span>
+                <button type="submit" class="btn-primary btn-auto" id="btnSubmitPeriode">
+                  💾 Simpan Setting Periode
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <div class="card-box">
+            <h4>Daftar Jadwal Periode Arisan</h4>
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Periode</th>
+                    <th>Bulan/Tahun</th>
+                    <th>Tanggal</th>
+                    <th>Tempat / Tuan Rumah</th>
+                    <th>Iuran / Slot</th>
+                    <th>Pemenang</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="tableBodyPeriode">
+                  <tr><td colspan="7" style="text-align:center;">Memuat data periode arisan...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- SUB-TAB 2: PEMENANG ARISAN -->
+        <div class="sub-tab-panel" id="subTabPemenangList">
+          <div class="card-box">
+            <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:14px;">
+              <h4 style="margin-bottom:0; border:none; padding:0;">Penetapan / Undian Pemenang Arisan</h4>
+              <button type="button" class="btn-secondary btn-sm" id="btnKocokUndian">
+                🎲 Kocok Nama Peserta Otomatis
+              </button>
+            </div>
+
+            <form id="formPemenangArisan">
+              <div class="form-grid">
+                <div class="form-group">
+                  <label for="winPeriode">Pilih Periode Arisan <span class="required-star">*</span></label>
+                  <select id="winPeriode" required>
+                    <option value="">-- Pilih Periode --</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label for="winAnggota">Pilih Peserta Pemenang (adnan_DataAnggota) <span class="required-star">*</span></label>
+                  <select id="winAnggota" required>
+                    <option value="">-- Pilih Anggota Pemenang --</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label for="winNominal">Total Dana Arisan Diterima (Rp) <span class="required-star">*</span></label>
+                  <input type="number" id="winNominal" min="0" step="10000" value="1000000" required />
+                </div>
+
+                <div class="form-group">
+                  <label for="winTanggal">Tanggal Penetapan / Pencairan <span class="required-star">*</span></label>
+                  <input type="date" id="winTanggal" required />
+                </div>
+
+                <div class="form-group">
+                  <label for="winMetode">Metode Pencairan</label>
+                  <select id="winMetode">
+                    <option value="Transfer Bank">Transfer Bank</option>
+                    <option value="Tunai">Tunai (Cash)</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label for="winBank">Bank Penerima Pencairan</label>
+                  <select id="winBank" class="bank-dropdown-select"></select>
+                </div>
+
+                <div class="form-group full-width">
+                  <label for="winKeterangan">Catatan / Keterangan Pemenang</label>
+                  <input type="text" id="winKeterangan" placeholder="Contoh: Pemenang Undian Periode Ke-1" />
+                </div>
+              </div>
+
+              <div class="tab-footer-actions">
+                <span></span>
+                <button type="submit" class="btn-primary btn-auto" id="btnSubmitPemenang">
+                  🏆 Tetapkan Pemenang Arisan
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <div class="card-box">
+            <h4>Daftar Riwayat Pemenang Arisan</h4>
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Periode Ke</th>
+                    <th>Bulan/Tahun</th>
+                    <th>Nama Pemenang</th>
+                    <th>Tanggal Undi</th>
+                    <th>Total Diterima</th>
+                    <th>Metode / Bank</th>
+                    <th>Keterangan</th>
+                  </tr>
+                </thead>
+                <tbody id="tableBodyPemenang">
+                  <tr><td colspan="7" style="text-align:center;">Memuat daftar pemenang arisan...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===============================================================
+           LAYAR BIODATA PESERTA (adnan_DataAnggota - 4 SUB-TAB PROPORSIONAL)
+           =============================================================== -->
+      <section class="main-section-panel" id="viewBiodata">
+        <div class="section-header">
+          <div>
+            <h3>👤 Biodata Peserta Arisan (Tabel: adnan_DataAnggota)</h3>
+            <p>Data kepesertaan arisan, kontak domisili, silsilah keluarga, dan rekening pencairan.</p>
+          </div>
+          <button type="button" class="btn-secondary btn-sm" data-open-view="viewGalleryHome" id="btnBackToGalleryFromBio">
+            &larr; Kembali ke Menu Gallery
+          </button>
+        </div>
+
+        <!-- 4 Sub-Tab Biodata Proporsional -->
+        <div class="sub-tab-nav">
+          <button type="button" class="sub-tab-btn active" data-bio-tab="tabPribadi">
+            <span class="tab-step-num">1</span>
+            <span>Data Pribadi</span>
+          </button>
+          <button type="button" class="sub-tab-btn" data-bio-tab="tabKontak">
+            <span class="tab-step-num">2</span>
+            <span>Kontak & Alamat</span>
+          </button>
+          <button type="button" class="sub-tab-btn" data-bio-tab="tabKeluarga">
+            <span class="tab-step-num">3</span>
+            <span>Keluarga & Arisan</span>
+          </button>
+          <button type="button" class="sub-tab-btn" data-bio-tab="tabRingkasan" id="tabBtnRingkasan">
+            <span class="tab-step-num">✓</span>
+            <span>Data Terdaftar</span>
+          </button>
+        </div>
+
+        <div id="biodataAlertBox" class="alert" style="margin-top: 0; margin-bottom: 18px;"></div>
+
+        <form id="biodataForm">
+          <!-- SUB-TAB 1: DATA PRIBADI -->
+          <div class="sub-tab-panel active" id="tabPribadi">
+            <div class="card-box">
+              <h4>1. Identitas Pribadi Peserta Arisan</h4>
+              <div class="form-grid">
+                <div class="form-group">
+                  <label for="bioUserId">User ID Peserta <span class="required-star">*</span></label>
+                  <input type="text" id="bioUserId" readonly required />
+                </div>
+
+                <div class="form-group">
+                  <label for="bioNamaLengkap">Nama Lengkap <span class="required-star">*</span></label>
+                  <input type="text" id="bioNamaLengkap" placeholder="Masukkan nama lengkap" required />
+                </div>
+
+                <div class="form-group">
+                  <label for="bioNamaPanggilan">Nama Panggilan</label>
+                  <input type="text" id="bioNamaPanggilan" placeholder="Contoh: Bang Adnan / Kak Siti" />
+                </div>
+
+                <div class="form-group">
+                  <label for="bioJenisKelamin">Jenis Kelamin <span class="required-star">*</span></label>
+                  <select id="bioJenisKelamin" required>
+                    <option value="">-- Pilih Jenis Kelamin --</option>
+                    <option value="Laki-laki">Laki-laki</option>
+                    <option value="Perempuan">Perempuan</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label for="bioTempatLahir">Tempat Lahir</label>
+                  <input type="text" id="bioTempatLahir" placeholder="Contoh: Jakarta" />
+                </div>
+
+                <div class="form-group">
+                  <label for="bioTanggalLahir">Tanggal Lahir</label>
+                  <input type="date" id="bioTanggalLahir" />
+                </div>
+
+                <div class="form-group full-width">
+                  <label for="bioPekerjaan">Pekerjaan / Aktivitas</label>
+                  <input type="text" id="bioPekerjaan" placeholder="Contoh: Wiraswasta / Karyawan / Ibu Rumah Tangga" />
+                </div>
+              </div>
+
+              <div class="tab-footer-actions">
+                <span></span>
+                <button type="button" class="btn-primary btn-auto" data-next-bio-tab="tabKontak">
+                  Selanjutnya: Kontak & Alamat &rarr;
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- SUB-TAB 2: KONTAK & ALAMAT -->
+          <div class="sub-tab-panel" id="tabKontak">
+            <div class="card-box">
+              <h4>2. Kontak & Alamat Domisili</h4>
+              <div class="form-grid">
+                <div class="form-group">
+                  <label for="bioNoHp">Nomor WhatsApp / HP Aktif <span class="required-star">*</span></label>
+                  <input type="tel" id="bioNoHp" placeholder="Contoh: 081234567890" required />
+                </div>
+
+                <div class="form-group">
+                  <label for="bioEmail">Alamat Email</label>
+                  <input type="email" id="bioEmail" placeholder="Contoh: nama@email.com" />
+                </div>
+
+                <div class="form-group full-width">
+                  <label for="bioAlamat">Alamat Lengkap Domisili <span class="required-star">*</span></label>
+                  <textarea id="bioAlamat" placeholder="Masukkan alamat lengkap tempat tinggal saat ini" required></textarea>
+                </div>
+
+                <div class="form-group full-width">
+                  <label for="bioKota">Kota / Kabupaten Domisili</label>
+                  <input type="text" id="bioKota" placeholder="Contoh: Jakarta Selatan / Tangerang" />
+                </div>
+              </div>
+
+              <div class="tab-footer-actions">
+                <button type="button" class="btn-secondary" data-prev-bio-tab="tabPribadi">
+                  &larr; Kembali ke Data Pribadi
+                </button>
+                <button type="button" class="btn-primary btn-auto" data-next-bio-tab="tabKeluarga">
+                  Selanjutnya: Keluarga & Arisan &rarr;
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- SUB-TAB 3: KELUARGA & REKENING ARISAN -->
+          <div class="sub-tab-panel" id="tabKeluarga">
+            <div class="card-box">
+              <h4>3. Data Keluarga, Silsilah & Rekening Pencairan</h4>
+              <div class="form-grid">
+                <div class="form-group">
+                  <label for="bioNamaAyah">Nama Ayah / Orang Tua (Jalur Keluarga) <span class="required-star">*</span></label>
+                  <input type="text" id="bioNamaAyah" placeholder="Contoh: H. Abdul Mukti Adnan" required />
+                </div>
+
+                <div class="form-group">
+                  <label for="bioSilsilah">Cabang / Garis Sanad Keluarga Adnan</label>
+                  <input type="text" id="bioSilsilah" placeholder="Contoh: Bani Adnan - Cabang Anak ke-1" />
+                </div>
+
+                <div class="form-group">
+                  <label for="bioNamaPasangan">Nama Suami / Istri</label>
+                  <input type="text" id="bioNamaPasangan" placeholder="Masukkan nama pasangan (jika ada)" />
+                </div>
+
+                <div class="form-group">
+                  <label for="bioJumlahAnak">Jumlah Anak</label>
+                  <input type="number" id="bioJumlahAnak" min="0" value="0" />
+                </div>
+
+                <div class="form-group">
+                  <label for="bioJumlahArisan">Jumlah Nomor / Slot Arisan <span class="required-star">*</span></label>
+                  <input type="number" id="bioJumlahArisan" min="1" value="1" required />
+                </div>
+
+                <div class="form-group">
+                  <label for="bioNamaBank">Nama Bank Pencairan Arisan</label>
+                  <select id="bioNamaBank" class="bank-dropdown-select"></select>
+                </div>
+
+                <div class="form-group">
+                  <label for="bioNoRekening">Nomor Rekening</label>
+                  <input type="text" id="bioNoRekening" placeholder="Masukkan nomor rekening bank" />
+                </div>
+
+                <div class="form-group">
+                  <label for="bioAtasNama">Atas Nama Rekening</label>
+                  <input type="text" id="bioAtasNama" placeholder="Nama pemilik rekening bank" />
+                </div>
+              </div>
+
+              <div class="tab-footer-actions">
+                <button type="button" class="btn-secondary" data-prev-bio-tab="tabKontak">
+                  &larr; Kembali ke Kontak & Alamat
+                </button>
+                <button type="submit" class="btn-primary btn-auto" id="saveBiodataBtn">
+                  💾 Simpan Biodata & Buka Menu Utama
+                </button>
+              </div>
+            </div>
+          </div>
+        </form>
+
+        <!-- SUB-TAB 4: RINGKASAN DATA ANGGOTA TERDAFTAR -->
+        <div class="sub-tab-panel" id="tabRingkasan">
+          <div class="card-box">
+            <h4>Ringkasan Biodata Peserta Terdaftar</h4>
+            <div class="summary-grid" id="biodataSummaryContainer"></div>
+
+            <div class="tab-footer-actions">
+              <button type="button" class="btn-secondary" id="editBiodataBtn">
+                ✏️ Perbarui / Edit Biodata
+              </button>
+              <button type="button" class="btn-primary btn-auto" data-open-view="viewGalleryHome">
+                🏠 Masuk ke Menu Utama Gallery &rarr;
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- MODAL PREVIEW BUKTI PEMBAYARAN / FOTO GALERI / PDF PENGUMUMAN -->
+  <div class="modal-overlay hidden" id="mediaModal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <strong id="modalTitle">Pratinjau Dokumen / Bukti</strong>
+        <button type="button" class="btn-secondary btn-sm" id="closeModalBtn">✕ Tutup</button>
+      </div>
+      <div class="modal-body" id="modalBodyContent"></div>
     </div>
   </div>
 
