@@ -13,10 +13,18 @@ const TABLES = {
   GALERI: 'adnan_Galeri',
   ARISAN: 'adnan_Arisan',
   PERIODE: 'adnan_PeriodeArisan',
-  PEMENANG: 'adnan_PemenangArisan'
+  PEMENANG: 'adnan_PemenangArisan',
+  GROUP: 'adnan_GroupArisan'
 };
 
 const SESSION_KEY = 'adnan_logged_in_user';
+const GROUP_STORAGE_KEY = 'adnan_groups_backup_v1';
+
+// Konstanta Default Split Iuran Arisan per Orang (Total Rp 170.000)
+const DEFAULT_SPLIT_ARISAN = 100000;
+const DEFAULT_SPLIT_KAS = 40000;
+const DEFAULT_SPLIT_KONSUMSI = 30000;
+const DEFAULT_TOTAL_IURAN = DEFAULT_SPLIT_ARISAN + DEFAULT_SPLIT_KAS + DEFAULT_SPLIT_KONSUMSI;
 
 const supabaseHeaders = {
   'apikey': SUPABASE_ANON_KEY,
@@ -136,6 +144,11 @@ let cachedAnggotaList = [];
 let cachedPeriodeList = [];
 let cachedPemenangList = [];
 let cachedPembayaranList = [];
+let cachedGroupList = [];
+
+// State untuk Group Arisan pada Form Pembayaran & Modal Konfirmasi
+let activeDetectedGroupForPay = null;
+let checkedGroupMembersMap = {};
 
 // File DataURL sementara untuk upload bukti/foto/PDF
 let uploadedBioFotoDataUrl = null;
@@ -148,6 +161,120 @@ let uploadedGalFotoDataUrl = null;
 // Kamera Live Stream State
 let activeCameraStream = null;
 let currentCameraFacingMode = 'user';
+
+// ============================================================================
+// HELPER EKSTRAKSI SPLIT IURAN ARISAN (Rp 100.000 Arisan, Rp 40.000 Kas, Rp 30.000 Konsumsi)
+// ============================================================================
+function getArisanSplitValues(periodeRow) {
+  if (!periodeRow) {
+    return {
+      uang_arisan: DEFAULT_SPLIT_ARISAN,
+      uang_kas: DEFAULT_SPLIT_KAS,
+      uang_konsumsi: DEFAULT_SPLIT_KONSUMSI,
+      total: DEFAULT_TOTAL_IURAN
+    };
+  }
+  const ket = String(periodeRow.keterangan || '');
+  const metaMatch = ket.match(/\[SPLIT:(\d+),(\d+),(\d+)\]/);
+
+  const uang_arisan =
+    periodeRow.uang_arisan != null
+      ? Number(periodeRow.uang_arisan)
+      : metaMatch
+      ? Number(metaMatch[1])
+      : DEFAULT_SPLIT_ARISAN;
+  const uang_kas =
+    periodeRow.uang_kas != null
+      ? Number(periodeRow.uang_kas)
+      : metaMatch
+      ? Number(metaMatch[2])
+      : DEFAULT_SPLIT_KAS;
+  const uang_konsumsi =
+    periodeRow.uang_konsumsi != null
+      ? Number(periodeRow.uang_konsumsi)
+      : metaMatch
+      ? Number(metaMatch[3])
+      : DEFAULT_SPLIT_KONSUMSI;
+
+  const total = uang_arisan + uang_kas + uang_konsumsi;
+  return { uang_arisan, uang_kas, uang_konsumsi, total };
+}
+
+function getPaymentSplitValues(payRow) {
+  const nominal = Number((payRow && payRow.nominal) || 0);
+  const jenis = String((payRow && payRow.jenis_bayar) || '');
+  const isArisan = jenis.toLowerCase().includes('arisan');
+
+  if (!isArisan) {
+    return {
+      uang_arisan: 0,
+      uang_kas: 0,
+      uang_konsumsi: 0,
+      total: nominal
+    };
+  }
+
+  const ket = String((payRow && payRow.keterangan) || '');
+  const metaMatch = ket.match(/\[SPLIT:(\d+),(\d+),(\d+)\]/);
+
+  if (payRow && payRow.uang_arisan != null && (Number(payRow.uang_arisan) > 0 || Number(payRow.uang_kas) > 0 || Number(payRow.uang_konsumsi) > 0)) {
+    const ua = Number(payRow.uang_arisan || 0);
+    const uk = Number(payRow.uang_kas || 0);
+    const uko = Number(payRow.uang_konsumsi || 0);
+    return {
+      uang_arisan: ua,
+      uang_kas: uk,
+      uang_konsumsi: uko,
+      total: nominal || ua + uk + uko
+    };
+  }
+
+  if (metaMatch) {
+    const ua = Number(metaMatch[1] || 0);
+    const uk = Number(metaMatch[2] || 0);
+    const uko = Number(metaMatch[3] || 0);
+    return {
+      uang_arisan: ua,
+      uang_kas: uk,
+      uang_konsumsi: uko,
+      total: nominal || ua + uk + uko
+    };
+  }
+
+  // Fallback untuk transaksi arisan lama yang belum memiliki kolom split eksplisit
+  if (nominal > 0 && nominal % DEFAULT_TOTAL_IURAN === 0) {
+    const mult = nominal / DEFAULT_TOTAL_IURAN;
+    return {
+      uang_arisan: mult * DEFAULT_SPLIT_ARISAN,
+      uang_kas: mult * DEFAULT_SPLIT_KAS,
+      uang_konsumsi: mult * DEFAULT_SPLIT_KONSUMSI,
+      total: nominal
+    };
+  }
+
+  if (nominal >= DEFAULT_TOTAL_IURAN) {
+    return {
+      uang_arisan: nominal - (DEFAULT_SPLIT_KAS + DEFAULT_SPLIT_KONSUMSI),
+      uang_kas: DEFAULT_SPLIT_KAS,
+      uang_konsumsi: DEFAULT_SPLIT_KONSUMSI,
+      total: nominal
+    };
+  }
+
+  return {
+    uang_arisan: nominal,
+    uang_kas: 0,
+    uang_konsumsi: 0,
+    total: nominal
+  };
+}
+
+function stripInternalMetaFromKeterangan(ket) {
+  return String(ket || '')
+    .replace(/\s*\[SPLIT:\d+,\d+,\d+\]\s*/g, ' ')
+    .replace(/\s*\|\s*$/, '')
+    .trim();
+}
 
 // ============================================================================
 // INISIALISASI DROPDOWN BANK LENGKAP
@@ -843,12 +970,15 @@ async function loadAllDashboardModules() {
   await Promise.all([
     fetchAllAnggota(),
     loadPeriodeAndPemenangData(),
+    loadGroupArisanData(),
     loadPembayaranData(),
     loadPengeluaranData(),
     loadPengumumanData(),
     loadGaleriData()
   ]);
   populateAdminPesertaDropdowns();
+  populateGroupAnggotaDropdowns();
+  syncPayGroupSplitUI();
   renderPembayaranTableRows();
   renderMemberGallery();
   updateQuickStatsBar();
@@ -879,7 +1009,7 @@ function updateQuickStatsBar() {
     elTglPeriode.textContent = `${activePeriode.tanggal_arisan || '-'} • ${activePeriode.tempat_arisan || ''}`;
   } else {
     elPeriode.textContent = 'Belum Disetting';
-    elTglPeriode.textContent = 'Klik Menu 4 untuk setting';
+    elTglPeriode.textContent = 'Klik Menu 5 (Pengaturan) untuk setting';
   }
 
   const lastWinner =
@@ -909,9 +1039,12 @@ function renderTransparencyBreakdown(activeFilter = 'ALL') {
   const titleEl = document.getElementById('transparencyModalTitle');
   if (!gridEl || !tbodyEl) return;
 
-  // Hitung rekap per jenis_bayar dari cachedPembayaranList
+  // Hitung rekap per jenis_bayar & split arisan dari cachedPembayaranList
   const summaryMap = {};
-  let sumArisan = 0;
+  let sumArisanTotal = 0;
+  let sumSplitArisan = 0;
+  let sumSplitKas = 0;
+  let sumSplitKonsumsi = 0;
   let countArisan = 0;
   let sumNonArisan = 0;
   let countNonArisan = 0;
@@ -926,7 +1059,11 @@ function renderTransparencyBreakdown(activeFilter = 'ALL') {
     summaryMap[jenis].count += 1;
 
     if (isJenisArisan(jenis)) {
-      sumArisan += nom;
+      const sp = getPaymentSplitValues(row);
+      sumArisanTotal += nom;
+      sumSplitArisan += sp.uang_arisan;
+      sumSplitKas += sp.uang_kas;
+      sumSplitKonsumsi += sp.uang_konsumsi;
       countArisan += 1;
     } else {
       sumNonArisan += nom;
@@ -937,15 +1074,15 @@ function renderTransparencyBreakdown(activeFilter = 'ALL') {
   const filterCards = [
     {
       key: 'Uang Arisan',
-      title: '💰 Pemasukan Uang Arisan',
-      amount: sumArisan,
-      count: countArisan
+      title: '💰 Total Iuran Arisan (Split)',
+      amount: sumArisanTotal,
+      count: `${countArisan} Tx • Arisan: ${formatRupiah(sumSplitArisan)} | Kas: ${formatRupiah(sumSplitKas)} | Konsumsi: ${formatRupiah(sumSplitKonsumsi)}`
     },
     {
       key: 'NON_ARISAN',
       title: '🤝 Semua Pemasukan Lainnya',
       amount: sumNonArisan,
-      count: countNonArisan
+      count: `${countNonArisan} Transaksi`
     },
     ...Object.keys(summaryMap)
       .filter((k) => k !== 'Uang Arisan')
@@ -953,13 +1090,13 @@ function renderTransparencyBreakdown(activeFilter = 'ALL') {
         key: k,
         title: `📌 ${k}`,
         amount: summaryMap[k].total,
-        count: summaryMap[k].count
+        count: `${summaryMap[k].count} Transaksi`
       })),
     {
       key: 'ALL',
       title: '📊 Total Seluruh Pemasukan',
-      amount: sumArisan + sumNonArisan,
-      count: (cachedPembayaranList || []).length
+      amount: sumArisanTotal + sumNonArisan,
+      count: `${(cachedPembayaranList || []).length} Transaksi`
     }
   ];
 
@@ -969,7 +1106,7 @@ function renderTransparencyBreakdown(activeFilter = 'ALL') {
       <div class="jenis-filter-card ${activeFilter === c.key ? 'active' : ''}" onclick="renderTransparencyBreakdown('${c.key}')">
         <div class="jf-title">${c.title}</div>
         <div class="jf-amount">${formatRupiah(c.amount)}</div>
-        <div class="jf-count">${c.count} Transaksi</div>
+        <div class="jf-count">${c.count}</div>
       </div>
     `
     )
@@ -994,7 +1131,7 @@ function renderTransparencyBreakdown(activeFilter = 'ALL') {
   }
 
   if (filteredRows.length === 0) {
-    tbodyEl.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--text-muted);">Belum ada data pembayaran pada kategori ini.</td></tr>`;
+    tbodyEl.innerHTML = `<tr><td colspan="10" style="text-align:center; color:var(--text-muted);">Belum ada data pembayaran pada kategori ini.</td></tr>`;
     return;
   }
 
@@ -1016,13 +1153,23 @@ function renderTransparencyBreakdown(activeFilter = 'ALL') {
         ? `<button type="button" class="btn-secondary btn-sm" onclick="openMediaByKey('${mediaKey}')">🖼️ Lihat Bukti</button>`
         : `<span style="color:#94a3b8; font-size:0.8rem;">-</span>`;
 
+      const sp = getPaymentSplitValues(r);
+      const isArs = isJenisArisan(r.jenis_bayar);
+      const cleanKet = stripInternalMetaFromKeterangan(r.keterangan);
+
       return `
         <tr>
           <td>${r.tanggal_bayar || '-'}</td>
-          <td><strong>${r.nama_pembayar || '-'}</strong></td>
+          <td>
+            <strong>${r.nama_pembayar || '-'}</strong>
+            ${r.nama_group ? `<br><span class="gallery-badge" style="font-size:0.7rem;">👨‍👩‍👧‍👦 ${r.nama_group}</span>` : ''}
+            ${cleanKet ? `<br><small style="color:#64748b;">${cleanKet}</small>` : ''}
+          </td>
           <td><strong>${r.jenis_bayar || '-'}</strong></td>
           <td>${metodeText}</td>
-          <td>${r.keterangan || '-'}</td>
+          <td>${isArs ? `<span style="color:var(--primary); font-weight:700;">${formatRupiah(sp.uang_arisan)}</span>` : '-'}</td>
+          <td>${isArs ? `<span style="color:#b45309; font-weight:700;">${formatRupiah(sp.uang_kas)}</span>` : '-'}</td>
+          <td>${isArs ? `<span style="color:#0284c7; font-weight:700;">${formatRupiah(sp.uang_konsumsi)}</span>` : '-'}</td>
           <td><strong>${formatRupiah(r.nominal)}</strong></td>
           <td>${buktiBtn}</td>
           <td><span class="status-pill ${isPending ? 'incomplete' : 'complete'}">${r.status || 'Pending'}</span></td>
@@ -1052,7 +1199,7 @@ if (closeTransparencyModalBtn) {
 }
 
 // ============================================================================
-// MODUL 1: PEMBAYARAN (FILTER PER USER VS ROLE ADMIN & PREVIEW BUKTI)
+// MODUL 1: PEMBAYARAN, DETEKSI GROUP ARISAN & SPLIT (ARISAN / KAS / KONSUMSI)
 // ============================================================================
 let activeAdminFilterPeserta = 'ALL';
 
@@ -1066,13 +1213,228 @@ function isPaymentOwnedByCurrentUser(row) {
   const rowUid = String(row.user_id || '').trim().toLowerCase();
   const rowNama = String(row.nama_pembayar || '').trim().toLowerCase();
   const rowAnggotaId = String(row.anggota_id || '').trim().toLowerCase();
+  const rowPJ = String(row.penanggung_jawab || '').trim().toLowerCase();
+  const rowKet = String(row.keterangan || '').toLowerCase();
 
   if (myUid && rowUid && rowUid === myUid) return true;
   if (myAnggotaId && rowAnggotaId && rowAnggotaId === myAnggotaId) return true;
   if (myNamaBio && rowNama && rowNama === myNamaBio) return true;
   if (myNamaUser && rowNama && rowNama === myNamaUser) return true;
   if (myUid && rowNama && rowNama === myUid) return true;
+  if (myNamaBio && rowPJ && rowPJ === myNamaBio) return true;
+  if (myNamaBio && rowKet.includes(`pj: ${myNamaBio}`)) return true;
   return false;
+}
+
+function getActivePeriodeSplitRates() {
+  const payPeriode = document.getElementById('payPeriode');
+  const selectedId = payPeriode ? payPeriode.value : '';
+  const foundPeriode =
+    (selectedId && cachedPeriodeList.find((p) => String(p.id) === String(selectedId))) ||
+    cachedPeriodeList.find((p) => p.status === 'aktif') ||
+    cachedPeriodeList[0] ||
+    null;
+  return getArisanSplitValues(foundPeriode);
+}
+
+function extractGroupMembersArray(groupRow) {
+  if (!groupRow) return [];
+  if (Array.isArray(groupRow.anggota_list) && groupRow.anggota_list.length > 0) {
+    return groupRow.anggota_list.filter(Boolean).slice(0, 5);
+  }
+  const raw = [
+    groupRow.penanggung_jawab || groupRow.anggota_1,
+    groupRow.anggota_2,
+    groupRow.anggota_3,
+    groupRow.anggota_4,
+    groupRow.anggota_5
+  ]
+    .map((m) => String(m || '').trim())
+    .filter(Boolean);
+
+  const unique = [];
+  raw.forEach((name) => {
+    if (!unique.some((u) => u.toLowerCase() === name.toLowerCase())) {
+      unique.push(name);
+    }
+  });
+  return unique.slice(0, 5);
+}
+
+function findGroupForMemberName(memberName) {
+  const target = String(memberName || '').trim().toLowerCase();
+  if (!target) return null;
+
+  // Prioritaskan group di mana peserta adalah Penanggung Jawab
+  const asPJ = (cachedGroupList || []).find(
+    (g) => String(g.penanggung_jawab || '').trim().toLowerCase() === target
+  );
+  if (asPJ) return asPJ;
+
+  // Atau peserta terdaftar sebagai anggota di dalam group tersebut
+  return (
+    (cachedGroupList || []).find((g) => {
+      const members = extractGroupMembersArray(g);
+      return members.some((m) => m.toLowerCase() === target);
+    }) || null
+  );
+}
+
+function syncPayGroupSplitUI() {
+  const payJenis = document.getElementById('payJenis');
+  const payNama = document.getElementById('payNama');
+  const wrapper = document.getElementById('payGroupSplitWrapper');
+  const titleEl = document.getElementById('payGroupSplitTitle');
+  const subtitleEl = document.getElementById('payGroupSplitSubtitle');
+  const selectAllLabel = document.getElementById('paySelectAllGroupLabel');
+  const chkSelectAll = document.getElementById('chkSelectAllGroupPay');
+  const memberListContainer = document.getElementById('payGroupMemberListContainer');
+  const payNominal = document.getElementById('payNominal');
+  const payNominalHint = document.getElementById('payNominalHint');
+
+  if (!payJenis || !wrapper) return;
+
+  const isUangArisan = payJenis.value === 'Uang Arisan';
+  if (!isUangArisan) {
+    wrapper.classList.add('hidden');
+    activeDetectedGroupForPay = null;
+    if (payNominalHint) payNominalHint.textContent = '(Masukkan nominal pembayaran)';
+    return;
+  }
+
+  wrapper.classList.remove('hidden');
+  const payerName = String((payNama && payNama.value) || '').trim();
+  const matchedGroup = findGroupForMemberName(payerName);
+  const rates = getActivePeriodeSplitRates();
+
+  if (matchedGroup) {
+    const members = extractGroupMembersArray(matchedGroup);
+    const isSameGroup =
+      activeDetectedGroupForPay &&
+      String(activeDetectedGroupForPay.id || activeDetectedGroupForPay.nama_group) ===
+        String(matchedGroup.id || matchedGroup.nama_group);
+
+    activeDetectedGroupForPay = matchedGroup;
+    if (!isSameGroup || Object.keys(checkedGroupMembersMap).length === 0) {
+      checkedGroupMembersMap = {};
+      members.forEach((m) => {
+        checkedGroupMembersMap[m] = true;
+      });
+    }
+
+    if (titleEl) {
+      titleEl.innerHTML = `👨‍👩‍👧‍👦 Group Arisan Ditemukan: <span style="text-decoration:underline;">${matchedGroup.nama_group}</span> (${members.length} Orang)`;
+    }
+    if (subtitleEl) {
+      subtitleEl.innerHTML = `Penanggung Jawab: <strong>${matchedGroup.penanggung_jawab}</strong> • Pembayaran akan di-split ke anggota group untuk <strong>Uang Arisan (${formatRupiah(rates.uang_arisan)})</strong>, <strong>Uang Kas (${formatRupiah(rates.uang_kas)})</strong> & <strong>Konsumsi (${formatRupiah(rates.uang_konsumsi)})</strong>.`;
+    }
+    if (selectAllLabel) selectAllLabel.classList.remove('hidden');
+
+    const allChecked = members.every((m) => checkedGroupMembersMap[m] !== false);
+    if (chkSelectAll) chkSelectAll.checked = allChecked;
+
+    if (memberListContainer) {
+      memberListContainer.innerHTML = members
+        .map((m, idx) => {
+          const isPJ = m.toLowerCase() === String(matchedGroup.penanggung_jawab || '').trim().toLowerCase();
+          const checked = checkedGroupMembersMap[m] !== false;
+          return `
+            <label style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; background:${checked ? '#ffffff' : '#f1f5f9'}; border:1.5px solid ${checked ? 'var(--primary)' : '#cbd5e1'}; border-radius:8px; padding:8px 12px; cursor:pointer; margin:0;">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <input type="checkbox" class="chk-inline-group-member" data-member-name="${m}" ${checked ? 'checked' : ''} style="width:16px; height:16px; accent-color:var(--primary); cursor:pointer;" />
+                <span style="font-weight:700; font-size:0.86rem; color:var(--text-main);">
+                  ${idx + 1}. ${m}
+                </span>
+                <span class="gallery-badge" style="font-size:0.7rem; ${isPJ ? 'background:#fef3c7; color:#b45309;' : ''}">
+                  ${isPJ ? '👑 Penanggung Jawab' : '👤 Anggota Group'}
+                </span>
+              </div>
+              <div style="font-size:0.78rem; font-weight:700; color:var(--text-secondary);">
+                Arisan: <span style="color:var(--primary);">${formatRupiah(rates.uang_arisan)}</span> •
+                Kas: <span style="color:#b45309;">${formatRupiah(rates.uang_kas)}</span> •
+                Konsumsi: <span style="color:#0284c7;">${formatRupiah(rates.uang_konsumsi)}</span> =
+                <strong style="color:var(--primary);">${formatRupiah(rates.total)}</strong>
+              </div>
+            </label>
+          `;
+        })
+        .join('');
+
+      memberListContainer.querySelectorAll('.chk-inline-group-member').forEach((cb) => {
+        cb.addEventListener('change', () => {
+          const mName = cb.getAttribute('data-member-name');
+          checkedGroupMembersMap[mName] = cb.checked;
+          const selectedCount = members.filter((m) => checkedGroupMembersMap[m] !== false).length;
+          if (selectedCount === 0) {
+            checkedGroupMembersMap[mName] = true;
+            cb.checked = true;
+            showGlobalAlert('Minimal 1 anggota group harus dipilih untuk pembayaran arisan.', 'error');
+          }
+          syncPayGroupSplitUI();
+        });
+      });
+    }
+
+    const activeCount = members.filter((m) => checkedGroupMembersMap[m] !== false).length;
+    const sumArisan = activeCount * rates.uang_arisan;
+    const sumKas = activeCount * rates.uang_kas;
+    const sumKonsumsi = activeCount * rates.uang_konsumsi;
+    const sumTotal = activeCount * rates.total;
+
+    document.getElementById('splitPreviewArisan').textContent = formatRupiah(sumArisan);
+    document.getElementById('splitPreviewKas').textContent = formatRupiah(sumKas);
+    document.getElementById('splitPreviewKonsumsi').textContent = formatRupiah(sumKonsumsi);
+    document.getElementById('splitPreviewTotal').textContent = formatRupiah(sumTotal);
+
+    if (payNominal) payNominal.value = sumTotal;
+    if (payNominalHint) {
+      payNominalHint.textContent = `(${activeCount} Orang Group × ${formatRupiah(rates.total)})`;
+    }
+  } else {
+    activeDetectedGroupForPay = null;
+    checkedGroupMembersMap = {};
+
+    if (titleEl) {
+      titleEl.textContent = `📋 Rincian Split Iuran Arisan Per Orang (1 Peserta)`;
+    }
+    if (subtitleEl) {
+      subtitleEl.innerHTML = `Iuran Arisan otomatis di-split menjadi: <strong>Uang Arisan ${formatRupiah(rates.uang_arisan)}</strong> + <strong>Uang Kas ${formatRupiah(rates.uang_kas)}</strong> + <strong>Uang Konsumsi ${formatRupiah(rates.uang_konsumsi)}</strong> = <strong>${formatRupiah(rates.total)} / orang</strong>.`;
+    }
+    if (selectAllLabel) selectAllLabel.classList.add('hidden');
+    if (memberListContainer) {
+      memberListContainer.innerHTML = '';
+    }
+
+    document.getElementById('splitPreviewArisan').textContent = formatRupiah(rates.uang_arisan);
+    document.getElementById('splitPreviewKas').textContent = formatRupiah(rates.uang_kas);
+    document.getElementById('splitPreviewKonsumsi').textContent = formatRupiah(rates.uang_konsumsi);
+    document.getElementById('splitPreviewTotal').textContent = formatRupiah(rates.total);
+
+    if (payNominal) payNominal.value = rates.total;
+    if (payNominalHint) {
+      payNominalHint.textContent = `(1 Orang × ${formatRupiah(rates.total)})`;
+    }
+  }
+}
+
+const chkSelectAllGroupPayEl = document.getElementById('chkSelectAllGroupPay');
+if (chkSelectAllGroupPayEl) {
+  chkSelectAllGroupPayEl.addEventListener('change', () => {
+    if (!activeDetectedGroupForPay) return;
+    const members = extractGroupMembersArray(activeDetectedGroupForPay);
+    if (chkSelectAllGroupPayEl.checked) {
+      members.forEach((m) => {
+        checkedGroupMembersMap[m] = true;
+      });
+    } else {
+      // Jika tidak semua group, centang hanya Penanggung Jawab / pembayar utama
+      const pjName = activeDetectedGroupForPay.penanggung_jawab || members[0];
+      members.forEach((m) => {
+        checkedGroupMembersMap[m] = m === pjName;
+      });
+    }
+    syncPayGroupSplitUI();
+  });
 }
 
 function syncPayPeriodeByJenis() {
@@ -1090,16 +1452,32 @@ function syncPayPeriodeByJenis() {
       payPeriodeHint.style.color = '#64748b';
     }
   } else {
+    if (!payPeriode.value && cachedPeriodeList.length > 0) {
+      const activePer = cachedPeriodeList.find((p) => p.status === 'aktif') || cachedPeriodeList[0];
+      if (activePer) payPeriode.value = activePer.id;
+    }
     if (payPeriodeHint) {
       payPeriodeHint.textContent = '(Aktif untuk Uang Arisan)';
       payPeriodeHint.style.color = 'var(--primary)';
     }
   }
+  syncPayGroupSplitUI();
 }
 
 const payJenisSelect = document.getElementById('payJenis');
 if (payJenisSelect) {
   payJenisSelect.addEventListener('change', syncPayPeriodeByJenis);
+}
+
+const payPeriodeEl = document.getElementById('payPeriode');
+if (payPeriodeEl) {
+  payPeriodeEl.addEventListener('change', syncPayGroupSplitUI);
+}
+
+const payNamaInputEl = document.getElementById('payNama');
+if (payNamaInputEl) {
+  payNamaInputEl.addEventListener('input', syncPayGroupSplitUI);
+  payNamaInputEl.addEventListener('change', syncPayGroupSplitUI);
 }
 
 async function updatePaymentStatusByAdmin(paymentId, newStatus) {
@@ -1158,7 +1536,7 @@ function populateAdminPesertaDropdowns() {
       titleRiwayat.textContent = `Daftar Riwayat Pembayaran Saya (${myDisplayName || 'Peserta'})`;
     }
     if (subtitleRiwayat) {
-      subtitleRiwayat.textContent = 'Menampilkan khusus riwayat pembayaran milik akun Anda.';
+      subtitleRiwayat.textContent = 'Menampilkan khusus riwayat pembayaran milik akun / group Anda.';
     }
     return;
   }
@@ -1223,10 +1601,11 @@ function populateAdminPesertaDropdowns() {
   if (paySelectAdmin) {
     paySelectAdmin.innerHTML = [
       '<option value="">-- Pilih Berdasarkan Peserta (Mode Admin) --</option>',
-      ...sortedPeserta.map(
-        (p) =>
-          `<option value="${p.nama}" data-uid="${p.user_id || ''}" data-anggota-id="${p.anggota_id || ''}">${p.nama}${p.user_id ? ' (ID: ' + p.user_id + ')' : ''}</option>`
-      )
+      ...sortedPeserta.map((p) => {
+        const grp = findGroupForMemberName(p.nama);
+        const grpLabel = grp ? ` • [Group: ${grp.nama_group}]` : '';
+        return `<option value="${p.nama}" data-uid="${p.user_id || ''}" data-anggota-id="${p.anggota_id || ''}">${p.nama}${p.user_id ? ' (ID: ' + p.user_id + ')' : ''}${grpLabel}</option>`;
+      })
     ].join('');
   }
 
@@ -1256,7 +1635,10 @@ if (paySelectPesertaAdminEl) {
     const chosenName = paySelectPesertaAdminEl.value;
     if (chosenName) {
       const payNamaInput = document.getElementById('payNama');
-      if (payNamaInput) payNamaInput.value = chosenName;
+      if (payNamaInput) {
+        payNamaInput.value = chosenName;
+        syncPayGroupSplitUI();
+      }
     }
   });
 }
@@ -1284,7 +1666,7 @@ function renderPembayaranTableRows() {
 
   const adminFlag = isUserAdmin();
 
-  // Jika Login User Peserta -> HANYA tampilkan data milik User tersebut
+  // Jika Login User Peserta -> HANYA tampilkan data milik User tersebut (termasuk group-nya)
   // Jika Login Role Admin -> tampilkan semua atau sesuai pilihan dropdown Peserta
   const rowsToDisplay = (cachedPembayaranList || []).filter((r) => {
     if (!adminFlag) {
@@ -1305,7 +1687,7 @@ function renderPembayaranTableRows() {
     const emptyMsg = adminFlag
       ? 'Belum ada transaksi pembayaran untuk filter peserta yang dipilih.'
       : 'Belum ada riwayat pembayaran atas nama akun Anda.';
-    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--text-muted);">${emptyMsg}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="11" style="text-align:center; color:var(--text-muted);">${emptyMsg}</td></tr>`;
     return;
   }
 
@@ -1347,13 +1729,24 @@ function renderPembayaranTableRows() {
         </div>
       `;
 
+      const sp = getPaymentSplitValues(r);
+      const isArs = isJenisArisan(r.jenis_bayar);
+      const cleanKet = stripInternalMetaFromKeterangan(r.keterangan);
+
       return `
         <tr>
           <td>${r.tanggal_bayar || '-'}</td>
           <td><code>${r.kode_transaksi || 'TX-' + (idx + 1)}</code></td>
-          <td><strong>${r.nama_pembayar || '-'}</strong><br><small style="color:#64748b;">${r.keterangan || ''}</small></td>
+          <td>
+            <strong>${r.nama_pembayar || '-'}</strong>
+            ${r.nama_group ? `<br><span class="gallery-badge" style="font-size:0.7rem;">👨‍👩‍👧‍👦 ${r.nama_group}</span>` : ''}
+            ${cleanKet ? `<br><small style="color:#64748b;">${cleanKet}</small>` : ''}
+          </td>
           <td>${r.jenis_bayar || 'Uang Arisan'}</td>
           <td>${metodeText}</td>
+          <td>${isArs ? `<span style="color:var(--primary); font-weight:700;">${formatRupiah(sp.uang_arisan)}</span>` : '<span style="color:#94a3b8;">-</span>'}</td>
+          <td>${isArs ? `<span style="color:#b45309; font-weight:700;">${formatRupiah(sp.uang_kas)}</span>` : '<span style="color:#94a3b8;">-</span>'}</td>
+          <td>${isArs ? `<span style="color:#0284c7; font-weight:700;">${formatRupiah(sp.uang_konsumsi)}</span>` : '<span style="color:#94a3b8;">-</span>'}</td>
           <td><strong>${formatRupiah(r.nominal)}</strong></td>
           <td>${buktiBtn}</td>
           <td>${statusCell}</td>
@@ -1391,7 +1784,7 @@ async function loadPembayaranData() {
     populateAdminPesertaDropdowns();
     renderPembayaranTableRows();
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:#dc2626;">${err.message}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="11" style="text-align:center; color:#dc2626;">${err.message}</td></tr>`;
   }
 }
 
@@ -1436,40 +1829,234 @@ if (payBuktiFileInput) {
   });
 }
 
-// Submit Form Pembayaran (Default Status: Pending)
-const formPembayaran = document.getElementById('formPembayaran');
-if (formPembayaran) {
-  formPembayaran.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const btn = document.getElementById('btnSubmitPembayaran');
-    const jenisBayar = document.getElementById('payJenis').value;
-    const metode = document.getElementById('payMetode').value;
-    const namaBank = document.getElementById('payNamaBank').value;
+// ============================================================================
+// WINDOWS MODAL KONFIRMASI GROUP ARISAN SAAT KLIK SIMPAN PEMBAYARAN
+// ============================================================================
+function renderGroupModalContents() {
+  if (!activeDetectedGroupForPay) return;
+  const members = extractGroupMembersArray(activeDetectedGroupForPay);
+  const rates = getActivePeriodeSplitRates();
 
-    if (metode === 'Transfer Bank' && !namaBank) {
-      showGlobalAlert('Silakan pilih Bank Tujuan / Pengirim pada dropdown Bank.', 'error');
-      return;
+  const titleEl = document.getElementById('modalGroupNameTitle');
+  const pjEl = document.getElementById('modalGroupPJInfo');
+  const chkAll = document.getElementById('chkModalSelectAllGroup');
+  const tbody = document.getElementById('modalGroupMembersTableBody');
+
+  if (titleEl) {
+    titleEl.textContent = `${activeDetectedGroupForPay.nama_group} (${members.length} Anggota Terdaftar)`;
+  }
+  if (pjEl) {
+    pjEl.textContent = `Penanggung Jawab: ${activeDetectedGroupForPay.penanggung_jawab}`;
+  }
+
+  const allChecked = members.every((m) => checkedGroupMembersMap[m] !== false);
+  if (chkAll) chkAll.checked = allChecked;
+
+  if (tbody) {
+    tbody.innerHTML = members
+      .map((m, idx) => {
+        const isPJ =
+          m.toLowerCase() === String(activeDetectedGroupForPay.penanggung_jawab || '').trim().toLowerCase();
+        const checked = checkedGroupMembersMap[m] !== false;
+        return `
+          <tr style="background:${checked ? '#ffffff' : '#f8fafc'}; opacity:${checked ? '1' : '0.6'};">
+            <td style="text-align:center;">
+              <input type="checkbox" class="chk-modal-group-member" data-member-name="${m}" ${checked ? 'checked' : ''} style="width:17px; height:17px; accent-color:var(--primary); cursor:pointer;" />
+            </td>
+            <td><strong>${idx + 1}. ${m}</strong></td>
+            <td>
+              <span class="gallery-badge" style="font-size:0.72rem; ${isPJ ? 'background:#fef3c7; color:#b45309;' : ''}">
+                ${isPJ ? '👑 Penanggung Jawab' : '👤 Anggota Group'}
+              </span>
+            </td>
+            <td><strong style="color:var(--primary);">${checked ? formatRupiah(rates.uang_arisan) : 'Rp 0'}</strong></td>
+            <td><strong style="color:#b45309;">${checked ? formatRupiah(rates.uang_kas) : 'Rp 0'}</strong></td>
+            <td><strong style="color:#0284c7;">${checked ? formatRupiah(rates.uang_konsumsi) : 'Rp 0'}</strong></td>
+            <td><strong>${checked ? formatRupiah(rates.total) : 'Rp 0'}</strong></td>
+          </tr>
+        `;
+      })
+      .join('');
+
+    tbody.querySelectorAll('.chk-modal-group-member').forEach((cb) => {
+      cb.addEventListener('change', () => {
+        const mName = cb.getAttribute('data-member-name');
+        checkedGroupMembersMap[mName] = cb.checked;
+        const selectedCount = members.filter((m) => checkedGroupMembersMap[m] !== false).length;
+        if (selectedCount === 0) {
+          checkedGroupMembersMap[mName] = true;
+          cb.checked = true;
+          showGlobalAlert('Minimal 1 anggota group harus dipilih.', 'error');
+        }
+        syncPayGroupSplitUI();
+        renderGroupModalContents();
+      });
+    });
+  }
+
+  const activeCount = members.filter((m) => checkedGroupMembersMap[m] !== false).length;
+  document.getElementById('modalSumArisan').textContent = formatRupiah(activeCount * rates.uang_arisan);
+  document.getElementById('modalSumKas').textContent = formatRupiah(activeCount * rates.uang_kas);
+  document.getElementById('modalSumKonsumsi').textContent = formatRupiah(activeCount * rates.uang_konsumsi);
+  document.getElementById('modalSumGrandTotal').textContent = formatRupiah(activeCount * rates.total);
+}
+
+function openGroupConfirmModal() {
+  const modal = document.getElementById('groupConfirmModal');
+  if (!modal || !activeDetectedGroupForPay) return;
+  renderGroupModalContents();
+  modal.classList.remove('hidden');
+}
+
+function closeGroupConfirmModal() {
+  const modal = document.getElementById('groupConfirmModal');
+  if (modal) modal.classList.add('hidden');
+}
+
+const chkModalSelectAllGroupEl = document.getElementById('chkModalSelectAllGroup');
+if (chkModalSelectAllGroupEl) {
+  chkModalSelectAllGroupEl.addEventListener('change', () => {
+    if (!activeDetectedGroupForPay) return;
+    const members = extractGroupMembersArray(activeDetectedGroupForPay);
+    if (chkModalSelectAllGroupEl.checked) {
+      members.forEach((m) => {
+        checkedGroupMembersMap[m] = true;
+      });
+    } else {
+      const pjName = activeDetectedGroupForPay.penanggung_jawab || members[0];
+      members.forEach((m) => {
+        checkedGroupMembersMap[m] = m === pjName;
+      });
     }
+    syncPayGroupSplitUI();
+    renderGroupModalContents();
+  });
+}
 
-    btn.disabled = true;
-    btn.textContent = 'Menyimpan Pembayaran...';
+const closeGroupModalBtn = document.getElementById('closeGroupModalBtn');
+if (closeGroupModalBtn) closeGroupModalBtn.addEventListener('click', closeGroupConfirmModal);
 
-    try {
+const btnCancelGroupModal = document.getElementById('btnCancelGroupModal');
+if (btnCancelGroupModal) btnCancelGroupModal.addEventListener('click', closeGroupConfirmModal);
+
+const btnConfirmSaveGroupPay = document.getElementById('btnConfirmSaveGroupPay');
+if (btnConfirmSaveGroupPay) {
+  btnConfirmSaveGroupPay.addEventListener('click', async () => {
+    closeGroupConfirmModal();
+    await executeSavePembayaran(true);
+  });
+}
+
+async function executeSavePembayaran(confirmedFromGroupModal = false) {
+  const btn = document.getElementById('btnSubmitPembayaran');
+  const jenisBayar = document.getElementById('payJenis').value;
+  const metode = document.getElementById('payMetode').value;
+  const namaBank = document.getElementById('payNamaBank').value;
+
+  if (metode === 'Transfer Bank' && !namaBank) {
+    showGlobalAlert('Silakan pilih Bank Tujuan / Pengirim pada dropdown Bank.', 'error');
+    return;
+  }
+
+  // Apabila jenis pembayaran adalah Uang Arisan dan ditemukan Group Arisan,
+  // tampilkan terlebih dahulu Windows Konfirmasi Daftar Group Arisan (kecuali sudah dikonfirmasi dari modal)
+  if (jenisBayar === 'Uang Arisan' && activeDetectedGroupForPay && !confirmedFromGroupModal) {
+    openGroupConfirmModal();
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Menyimpan Pembayaran...';
+
+  try {
+    const selectedPeriodeId =
+      jenisBayar === 'Uang Arisan' ? document.getElementById('payPeriode').value || null : null;
+    const tanggalBayar = document.getElementById('payTanggal').value || todayISO();
+    const noRek = document.getElementById('payNoRekening').value.trim();
+    const ketInput = document.getElementById('payKeterangan').value.trim();
+    const rates = getActivePeriodeSplitRates();
+
+    if (jenisBayar === 'Uang Arisan' && activeDetectedGroupForPay) {
+      // Simpan pembayaran ter-split untuk masing-masing anggota group yang dicentang (termasuk Penanggung Jawab)
+      const allMembers = extractGroupMembersArray(activeDetectedGroupForPay);
+      const selectedMembers = allMembers.filter((m) => checkedGroupMembersMap[m] !== false);
+      const groupBatchCode = 'GRP-' + Math.floor(1000 + Math.random() * 9000);
+
+      for (let i = 0; i < selectedMembers.length; i++) {
+        const memberName = selectedMembers[i];
+        const isPJ =
+          memberName.toLowerCase() ===
+          String(activeDetectedGroupForPay.penanggung_jawab || '').trim().toLowerCase();
+        const matchedAnggota = (cachedAnggotaList || []).find(
+          (a) => String(a.nama_lengkap || '').trim().toLowerCase() === memberName.toLowerCase()
+        );
+
+        const kode = `${groupBatchCode}-${i + 1}`;
+        const splitMeta = `[SPLIT:${rates.uang_arisan},${rates.uang_kas},${rates.uang_konsumsi}]`;
+        const fullKeterangan = [
+          `Group: ${activeDetectedGroupForPay.nama_group} (${isPJ ? 'Penanggung Jawab' : 'PJ: ' + activeDetectedGroupForPay.penanggung_jawab})`,
+          `Split Arisan ${formatRupiah(rates.uang_arisan)}, Kas ${formatRupiah(rates.uang_kas)}, Konsumsi ${formatRupiah(rates.uang_konsumsi)}`,
+          ketInput,
+          metode === 'Transfer Bank' && namaBank ? `Bank: ${namaBank}` : '',
+          noRek ? `Rek: ${noRek}` : '',
+          splitMeta
+        ]
+          .filter(Boolean)
+          .join(' | ');
+
+        await adaptiveSupabaseWrite(TABLES.PEMBAYARAN, {
+          kode_transaksi: kode,
+          anggota_id: (matchedAnggota && matchedAnggota.id) || null,
+          arisan_id: selectedPeriodeId,
+          user_id:
+            (matchedAnggota && matchedAnggota.user_id) ||
+            (currentLoggedUser ? currentLoggedUser.user_id : null),
+          nama_pembayar: memberName,
+          nama_group: activeDetectedGroupForPay.nama_group,
+          penanggung_jawab: activeDetectedGroupForPay.penanggung_jawab,
+          tanggal_bayar: tanggalBayar,
+          jenis_bayar: jenisBayar,
+          uang_arisan: rates.uang_arisan,
+          uang_kas: rates.uang_kas,
+          uang_konsumsi: rates.uang_konsumsi,
+          nominal: rates.total,
+          metode_bayar: metode === 'Transfer Bank' ? 'Transfer' : 'Tunai',
+          nama_bank: metode === 'Transfer Bank' ? namaBank : null,
+          no_rekening_pengirim: metode === 'Transfer Bank' ? noRek : null,
+          bukti_bayar_url: uploadedPayBuktiDataUrl,
+          keterangan: fullKeterangan,
+          status: 'Pending'
+        });
+      }
+
+      showGlobalAlert(
+        `✅ Pembayaran Group <b>${activeDetectedGroupForPay.nama_group}</b> berhasil di-split kepada <b>${selectedMembers.length} anggota</b> (@${formatRupiah(rates.total)}: Arisan ${formatRupiah(rates.uang_arisan)}, Kas ${formatRupiah(rates.uang_kas)}, Konsumsi ${formatRupiah(rates.uang_konsumsi)}) dengan status <b>Pending</b>!`,
+        'success'
+      );
+    } else {
+      // Pembayaran Perorangan (Single Member)
       const kode = 'TX-ARS-' + Math.floor(1000 + Math.random() * 9000);
-      const selectedPeriodeId =
-        jenisBayar === 'Uang Arisan' ? document.getElementById('payPeriode').value || null : null;
-      const noRek = document.getElementById('payNoRekening').value.trim();
-      const ketInput = document.getElementById('payKeterangan').value.trim();
+      const inputNamaPembayar = document.getElementById('payNama').value.trim();
+      const inputNominal = Number(document.getElementById('payNominal').value || 0);
+
+      const isArs = jenisBayar === 'Uang Arisan';
+      const ua = isArs ? rates.uang_arisan : 0;
+      const uk = isArs ? rates.uang_kas : 0;
+      const uko = isArs ? rates.uang_konsumsi : 0;
+      const splitMeta = isArs ? `[SPLIT:${ua},${uk},${uko}]` : '';
+
       const fullKeterangan = [
+        isArs
+          ? `Split Arisan ${formatRupiah(ua)}, Kas ${formatRupiah(uk)}, Konsumsi ${formatRupiah(uko)}`
+          : '',
         ketInput,
         metode === 'Transfer Bank' && namaBank ? `Bank: ${namaBank}` : '',
-        noRek ? `Rek: ${noRek}` : ''
+        noRek ? `Rek: ${noRek}` : '',
+        splitMeta
       ]
         .filter(Boolean)
         .join(' | ');
 
-      const inputNamaPembayar = document.getElementById('payNama').value.trim();
-      // Cari apakah nama pembayar cocok dengan anggota di adnan_DataAnggota
       const matchedAnggota = (cachedAnggotaList || []).find(
         (a) => String(a.nama_lengkap || '').trim().toLowerCase() === inputNamaPembayar.toLowerCase()
       );
@@ -1490,9 +2077,12 @@ if (formPembayaran) {
         arisan_id: selectedPeriodeId,
         user_id: targetUserId,
         nama_pembayar: inputNamaPembayar,
-        tanggal_bayar: document.getElementById('payTanggal').value || todayISO(),
+        tanggal_bayar: tanggalBayar,
         jenis_bayar: jenisBayar,
-        nominal: Number(document.getElementById('payNominal').value || 0),
+        uang_arisan: ua,
+        uang_kas: uk,
+        uang_konsumsi: uko,
+        nominal: inputNominal,
         metode_bayar: metode === 'Transfer Bank' ? 'Transfer' : 'Tunai',
         nama_bank: metode === 'Transfer Bank' ? namaBank : null,
         no_rekening_pengirim: metode === 'Transfer Bank' ? noRek : null,
@@ -1501,25 +2091,35 @@ if (formPembayaran) {
         status: 'Pending'
       });
 
-      formPembayaran.reset();
-      document.getElementById('payTanggal').value = todayISO();
-      document.getElementById('payStatus').value = 'Pending';
-      if (!isUserAdmin() && currentBiodataRecord) {
-        document.getElementById('payNama').value = currentBiodataRecord.nama_lengkap || '';
-      }
-      syncPayPeriodeByJenis();
-      uploadedPayBuktiDataUrl = null;
-      document.getElementById('payBuktiPreview').innerHTML = '';
-
-      await loadPembayaranData();
-      updateQuickStatsBar();
       showGlobalAlert('✅ Data pembayaran berhasil disimpan dengan status <b>Pending</b>!', 'success');
-    } catch (err) {
-      showGlobalAlert(err.message, 'error');
-    } finally {
-      btn.disabled = false;
-      btn.textContent = '💾 Simpan Pembayaran (Status: Pending)';
     }
+
+    formPembayaran.reset();
+    document.getElementById('payTanggal').value = todayISO();
+    document.getElementById('payStatus').value = 'Pending';
+    if (!isUserAdmin() && currentBiodataRecord) {
+      document.getElementById('payNama').value = currentBiodataRecord.nama_lengkap || '';
+    }
+    syncPayPeriodeByJenis();
+    uploadedPayBuktiDataUrl = null;
+    document.getElementById('payBuktiPreview').innerHTML = '';
+
+    await loadPembayaranData();
+    updateQuickStatsBar();
+  } catch (err) {
+    showGlobalAlert(err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '💾 Simpan Pembayaran (Status: Pending)';
+  }
+}
+
+// Submit Form Pembayaran (Default Status: Pending)
+const formPembayaran = document.getElementById('formPembayaran');
+if (formPembayaran) {
+  formPembayaran.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    await executeSavePembayaran(false);
   });
 }
 
@@ -1869,8 +2469,29 @@ if (formGaleri) {
 }
 
 // ============================================================================
-// MODUL SETTING PERIODE ARISAN & PEMENANG ARISAN (FORM KHUSUS ADMIN)
+// MODUL 5: PENGATURAN (PERIODE & SPLIT IURAN, PEMENANG & GROUP ARISAN)
 // ============================================================================
+function syncPeriodeTotalIuranInput() {
+  const inpArisan = document.getElementById('perIuranArisan');
+  const inpKas = document.getElementById('perIuranKas');
+  const inpKonsumsi = document.getElementById('perIuranKonsumsi');
+  const inpTotal = document.getElementById('perIuran');
+  if (!inpArisan || !inpKas || !inpKonsumsi || !inpTotal) return;
+
+  const ua = Number(inpArisan.value || 0);
+  const uk = Number(inpKas.value || 0);
+  const uko = Number(inpKonsumsi.value || 0);
+  inpTotal.value = ua + uk + uko;
+}
+
+['perIuranArisan', 'perIuranKas', 'perIuranKonsumsi'].forEach((id) => {
+  const el = document.getElementById(id);
+  if (el) {
+    el.addEventListener('input', syncPeriodeTotalIuranInput);
+    el.addEventListener('change', syncPeriodeTotalIuranInput);
+  }
+});
+
 async function loadPeriodeAndPemenangData() {
   const tbodyPeriode = document.getElementById('tableBodyPeriode');
   const tbodyPemenang = document.getElementById('tableBodyPemenang');
@@ -1887,9 +2508,10 @@ async function loadPeriodeAndPemenangData() {
 
     const periodeOptions = [
       '<option value="">-- Pilih Periode Arisan --</option>',
-      ...cachedPeriodeList.map(
-        (p) => `<option value="${p.id}">Periode Ke-${p.periode_ke} (${p.bulan_tahun})</option>`
-      )
+      ...cachedPeriodeList.map((p) => {
+        const sp = getArisanSplitValues(p);
+        return `<option value="${p.id}">Periode Ke-${p.periode_ke} (${p.bulan_tahun}) - ${formatRupiah(sp.total)}/Orang</option>`;
+      })
     ].join('');
 
     if (payPeriodeSelect) payPeriodeSelect.innerHTML = periodeOptions;
@@ -1905,21 +2527,25 @@ async function loadPeriodeAndPemenangData() {
 
     if (tbodyPeriode) {
       if (cachedPeriodeList.length === 0) {
-        tbodyPeriode.innerHTML = `<tr><td colspan="7" style="text-align:center;">Belum ada jadwal periode arisan.</td></tr>`;
+        tbodyPeriode.innerHTML = `<tr><td colspan="10" style="text-align:center;">Belum ada jadwal periode arisan.</td></tr>`;
       } else {
         tbodyPeriode.innerHTML = cachedPeriodeList
-          .map(
-            (p) => `
+          .map((p) => {
+            const sp = getArisanSplitValues(p);
+            return `
             <tr>
               <td><strong>Periode Ke-${p.periode_ke}</strong></td>
               <td>${p.bulan_tahun || '-'}</td>
               <td>${p.tanggal_arisan || '-'}</td>
               <td>${p.tempat_arisan || '-'}</td>
-              <td>${formatRupiah(p.iuran_per_slot)}</td>
+              <td><span style="color:var(--primary); font-weight:700;">${formatRupiah(sp.uang_arisan)}</span></td>
+              <td><span style="color:#b45309; font-weight:700;">${formatRupiah(sp.uang_kas)}</span></td>
+              <td><span style="color:#0284c7; font-weight:700;">${formatRupiah(sp.uang_konsumsi)}</span></td>
+              <td><strong>${formatRupiah(sp.total)}</strong></td>
               <td>${p.pemenang_nama ? '🏆 <strong>' + p.pemenang_nama + '</strong>' : '<span style="color:#64748b;">Belum diundi</span>'}</td>
               <td><span class="status-pill ${p.status === 'aktif' ? 'complete' : 'incomplete'}">${p.status || 'aktif'}</span></td>
-            </tr>`
-          )
+            </tr>`;
+          })
           .join('');
       }
     }
@@ -1952,7 +2578,7 @@ async function loadPeriodeAndPemenangData() {
           tanggal_undi: p.tanggal_arisan,
           nominal_diterima: p.total_diterima || 0,
           metode_pencairan: 'Transfer / Tunai',
-          keterangan: p.keterangan || 'Tercatat di Periode Arisan'
+          keterangan: stripInternalMetaFromKeterangan(p.keterangan) || 'Tercatat di Periode Arisan'
         });
       }
     });
@@ -1973,7 +2599,7 @@ async function loadPeriodeAndPemenangData() {
               <td>${w.tanggal_undi || '-'}</td>
               <td><strong>${formatRupiah(w.nominal_diterima)}</strong></td>
               <td>${w.metode_pencairan || '-'} ${w.nama_bank ? '(' + w.nama_bank + ')' : ''}</td>
-              <td>${w.keterangan || '-'}</td>
+              <td>${stripInternalMetaFromKeterangan(w.keterangan) || '-'}</td>
             </tr>`
           )
           .join('');
@@ -2000,16 +2626,24 @@ if (formPeriodeArisan) {
       const periodeKe = Number(document.getElementById('perNomor').value || 1);
       const bulanTahun = document.getElementById('perBulanTahun').value.trim();
       const tanggalArisan = document.getElementById('perTanggal').value;
-      const iuran = Number(document.getElementById('perIuran').value || 100000);
+      const ua = Number(document.getElementById('perIuranArisan').value || DEFAULT_SPLIT_ARISAN);
+      const uk = Number(document.getElementById('perIuranKas').value || DEFAULT_SPLIT_KAS);
+      const uko = Number(document.getElementById('perIuranKonsumsi').value || DEFAULT_SPLIT_KONSUMSI);
+      const iuran = ua + uk + uko;
       const tempat = document.getElementById('perTempat').value.trim();
       const status = document.getElementById('perStatus').value;
-      const keterangan = document.getElementById('perKeterangan').value.trim();
+      const ketRaw = document.getElementById('perKeterangan').value.trim();
+      const splitMeta = `[SPLIT:${ua},${uk},${uko}]`;
+      const keterangan = [ketRaw, splitMeta].filter(Boolean).join(' ');
 
       await adaptiveSupabaseWrite(TABLES.ARISAN, {
         periode_ke: periodeKe,
         bulan_tahun: bulanTahun,
         tanggal_arisan: tanggalArisan,
         tempat_arisan: tempat,
+        uang_arisan: ua,
+        uang_kas: uk,
+        uang_konsumsi: uko,
         iuran_per_slot: iuran,
         status: status,
         keterangan: keterangan
@@ -2022,6 +2656,9 @@ if (formPeriodeArisan) {
           bulan_tahun: bulanTahun,
           tanggal_arisan: tanggalArisan,
           tempat_arisan: tempat,
+          uang_arisan: ua,
+          uang_kas: uk,
+          uang_konsumsi: uko,
           iuran_per_slot: iuran,
           status: status,
           keterangan: keterangan
@@ -2029,14 +2666,293 @@ if (formPeriodeArisan) {
       } catch (_) { }
 
       formPeriodeArisan.reset();
+      document.getElementById('perIuranArisan').value = DEFAULT_SPLIT_ARISAN;
+      document.getElementById('perIuranKas').value = DEFAULT_SPLIT_KAS;
+      document.getElementById('perIuranKonsumsi').value = DEFAULT_SPLIT_KONSUMSI;
+      document.getElementById('perIuran').value = DEFAULT_TOTAL_IURAN;
+
       await loadPeriodeAndPemenangData();
       updateQuickStatsBar();
-      showGlobalAlert(`✅ Setting Periode Ke-${periodeKe} (${bulanTahun}) berhasil disimpan!`, 'success');
+      showGlobalAlert(
+        `✅ Setting Periode Ke-${periodeKe} (${bulanTahun}) berhasil disimpan dengan Split Iuran: Arisan ${formatRupiah(ua)}, Kas ${formatRupiah(uk)}, Konsumsi ${formatRupiah(uko)} (Total ${formatRupiah(iuran)})!`,
+        'success'
+      );
     } catch (err) {
       showGlobalAlert(err.message, 'error');
     } finally {
       btn.disabled = false;
       btn.textContent = '💾 Simpan Setting Periode';
+    }
+  });
+}
+
+// ============================================================================
+// SUB-TAB 3 DI PENGATURAN: ENTRY GROUP ARISAN (MAKS 5 ORANG TERMASUK PJ)
+// ============================================================================
+function getLocalBackupGroups() {
+  try {
+    const raw = localStorage.getItem(GROUP_STORAGE_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (_) {
+    return [];
+  }
+}
+
+function saveLocalBackupGroups(groups) {
+  try {
+    localStorage.setItem(GROUP_STORAGE_KEY, JSON.stringify(groups || []));
+  } catch (_) {}
+}
+
+function populateGroupAnggotaDropdowns() {
+  const pjSelect = document.getElementById('grpPenanggungJawab');
+  const memberSelectIds = ['grpAnggota2', 'grpAnggota3', 'grpAnggota4', 'grpAnggota5'];
+
+  // Ambil daftar anggota dari adnan_DataAnggota (DaftarAnggota)
+  const validMembers = (cachedAnggotaList || []).filter((a) => {
+    const uid = String(a.user_id || '').trim().toLowerCase();
+    const nama = String(a.nama_lengkap || '').trim().toLowerCase();
+    if (uid === 'admin' && nama.includes('admin arisan')) return false;
+    return Boolean(nama);
+  });
+
+  if (pjSelect) {
+    const prevPJ = pjSelect.value;
+    pjSelect.innerHTML = [
+      '<option value="">-- Pilih Penanggung Jawab Group (dari DaftarAnggota) --</option>',
+      ...validMembers.map(
+        (a) =>
+          `<option value="${a.nama_lengkap}" data-id="${a.id}" data-uid="${a.user_id || ''}">${a.nama_lengkap}${a.no_hp ? ' (' + a.no_hp + ')' : ''}</option>`
+      )
+    ].join('');
+    if (prevPJ && Array.from(pjSelect.options).some((o) => o.value === prevPJ)) {
+      pjSelect.value = prevPJ;
+    }
+  }
+
+  memberSelectIds.forEach((selId, idx) => {
+    const sel = document.getElementById(selId);
+    if (!sel) return;
+    const prevVal = sel.value;
+    sel.innerHTML = [
+      `<option value="">-- Anggota #${idx + 2} (Kosong / Opsional) --</option>`,
+      ...validMembers.map(
+        (a) => `<option value="${a.nama_lengkap}">${a.nama_lengkap}</option>`
+      )
+    ].join('');
+    if (prevVal && Array.from(sel.options).some((o) => o.value === prevVal)) {
+      sel.value = prevVal;
+    }
+  });
+}
+
+async function loadGroupArisanData() {
+  let remoteGroups = [];
+  try {
+    const res = await fetch(`${SUPABASE_REST_URL}/${TABLES.GROUP}?select=*&order=created_at.desc`, {
+      method: 'GET',
+      headers: supabaseHeaders
+    });
+    if (res.ok) {
+      remoteGroups = await res.json();
+    }
+  } catch (_) {}
+
+  const localGroups = getLocalBackupGroups();
+  const mergedMap = new Map();
+
+  (remoteGroups || []).forEach((g) => {
+    const key = String(g.kode_group || g.nama_group || g.id).toLowerCase();
+    mergedMap.set(key, g);
+  });
+  (localGroups || []).forEach((g) => {
+    const key = String(g.kode_group || g.nama_group || g.id).toLowerCase();
+    if (!mergedMap.has(key)) {
+      mergedMap.set(key, g);
+    }
+  });
+
+  cachedGroupList = Array.from(mergedMap.values());
+  saveLocalBackupGroups(cachedGroupList);
+  renderGroupArisanTable();
+  syncPayGroupSplitUI();
+}
+
+function renderGroupArisanTable() {
+  const tbody = document.getElementById('tableBodyGroupArisan');
+  if (!tbody) return;
+
+  if (!cachedGroupList || cachedGroupList.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--text-muted);">Belum ada Group Arisan terdaftar. Silakan isi form Entry Group Arisan di atas.</td></tr>`;
+    return;
+  }
+
+  const rates = getActivePeriodeSplitRates();
+
+  tbody.innerHTML = cachedGroupList
+    .map((g, idx) => {
+      const members = extractGroupMembersArray(g);
+      const count = members.length;
+      const totalTagihan = count * rates.total;
+      const grpKey = g.id || g.kode_group || idx;
+
+      const memberBadges = members
+        .map((m, i) => {
+          const isPJ = m.toLowerCase() === String(g.penanggung_jawab || '').trim().toLowerCase();
+          return `<span class="gallery-badge" style="margin:2px; display:inline-block; ${isPJ ? 'background:#fef3c7; color:#b45309; border:1px solid #f59e0b;' : 'background:#f1f5f9; color:#334155;'}">
+            ${i + 1}. ${m}${isPJ ? ' (👑 PJ)' : ''}
+          </span>`;
+        })
+        .join(' ');
+
+      return `
+        <tr>
+          <td><code>${g.kode_group || 'GRP-' + (idx + 1)}</code></td>
+          <td>
+            <strong>${g.nama_group || '-'}</strong>
+            ${g.keterangan ? `<br><small style="color:#64748b;">${g.keterangan}</small>` : ''}
+          </td>
+          <td><strong>👑 ${g.penanggung_jawab || '-'}</strong></td>
+          <td>${memberBadges}</td>
+          <td><strong>${count} / 5 Orang</strong></td>
+          <td>
+            <strong style="color:var(--primary);">${formatRupiah(totalTagihan)}</strong>
+            <br><small style="color:#64748b;">Arisan ${formatRupiah(count * rates.uang_arisan)} | Kas ${formatRupiah(count * rates.uang_kas)} | Konsumsi ${formatRupiah(count * rates.uang_konsumsi)}</small>
+          </td>
+          <td>
+            <button type="button" class="btn-secondary btn-sm" style="color:#dc2626; border-color:#fecaca;" onclick="deleteGroupArisan('${grpKey}')">
+              🗑️ Hapus
+            </button>
+          </td>
+        </tr>
+      `;
+    })
+    .join('');
+}
+
+async function deleteGroupArisan(groupIdentifier) {
+  const target = (cachedGroupList || []).find(
+    (g, idx) =>
+      String(g.id) === String(groupIdentifier) ||
+      String(g.kode_group) === String(groupIdentifier) ||
+      String(idx) === String(groupIdentifier)
+  );
+  if (!target) return;
+
+  try {
+    if (target.id) {
+      await fetch(`${SUPABASE_REST_URL}/${TABLES.GROUP}?id=eq.${encodeURIComponent(target.id)}`, {
+        method: 'DELETE',
+        headers: supabaseHeaders
+      });
+    }
+  } catch (_) {}
+
+  cachedGroupList = cachedGroupList.filter((g) => g !== target);
+  saveLocalBackupGroups(cachedGroupList);
+  renderGroupArisanTable();
+  populateAdminPesertaDropdowns();
+  syncPayGroupSplitUI();
+  showGlobalAlert(`🗑️ Group Arisan <b>${target.nama_group}</b> berhasil dihapus.`, 'success');
+}
+
+window.deleteGroupArisan = deleteGroupArisan;
+
+const formGroupArisan = document.getElementById('formGroupArisan');
+if (formGroupArisan) {
+  formGroupArisan.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('btnSubmitGroupArisan');
+    const namaGroup = document.getElementById('grpNama').value.trim();
+    const pjName = document.getElementById('grpPenanggungJawab').value.trim();
+    const a2 = document.getElementById('grpAnggota2').value.trim();
+    const a3 = document.getElementById('grpAnggota3').value.trim();
+    const a4 = document.getElementById('grpAnggota4').value.trim();
+    const a5 = document.getElementById('grpAnggota5').value.trim();
+    const ket = document.getElementById('grpKeterangan').value.trim();
+
+    if (!namaGroup || !pjName) {
+      showGlobalAlert('Mohon isi Nama Group dan pilih Penanggung Jawab Group.', 'error');
+      return;
+    }
+
+    // Gabungkan Penanggung Jawab (Anggota #1) + Anggota #2 s/d #5 (maksimal 5 orang unik)
+    const rawMembers = [pjName, a2, a3, a4, a5].filter(Boolean);
+    const uniqueMembers = [];
+    for (const m of rawMembers) {
+      if (uniqueMembers.some((u) => u.toLowerCase() === m.toLowerCase())) {
+        showGlobalAlert(
+          `Nama anggota <b>${m}</b> dipilih lebih dari satu kali dalam group yang sama. Mohon pilih anggota yang berbeda.`,
+          'error'
+        );
+        return;
+      }
+      uniqueMembers.push(m);
+    }
+
+    if (uniqueMembers.length > 5) {
+      showGlobalAlert('Jumlah anggota group maksimal 5 orang termasuk Penanggung Jawab.', 'error');
+      return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'Menyimpan Group...';
+
+    try {
+      const kodeGroup = 'GRP-' + Math.floor(100 + Math.random() * 900);
+      const matchedPJ = (cachedAnggotaList || []).find(
+        (a) => String(a.nama_lengkap || '').trim().toLowerCase() === pjName.toLowerCase()
+      );
+
+      const groupPayload = {
+        kode_group: kodeGroup,
+        nama_group: namaGroup,
+        penanggung_jawab_id: (matchedPJ && matchedPJ.id) || null,
+        penanggung_jawab_user_id: (matchedPJ && matchedPJ.user_id) || null,
+        penanggung_jawab: pjName,
+        anggota_1: uniqueMembers[0] || pjName,
+        anggota_2: uniqueMembers[1] || null,
+        anggota_3: uniqueMembers[2] || null,
+        anggota_4: uniqueMembers[3] || null,
+        anggota_5: uniqueMembers[4] || null,
+        anggota_list: uniqueMembers,
+        jumlah_anggota: uniqueMembers.length,
+        keterangan: ket || null,
+        status_aktif: true
+      };
+
+      let savedRecord = null;
+      try {
+        savedRecord = await adaptiveSupabaseWrite(TABLES.GROUP, groupPayload);
+      } catch (_) {
+        // Fallback ke localStorage apabila tabel adnan_GroupArisan belum dieksekusi di SQL Editor
+        savedRecord = { ...groupPayload, id: 'local_' + Date.now() };
+      }
+
+      const finalGroup = savedRecord || { ...groupPayload, id: 'local_' + Date.now() };
+      cachedGroupList = [
+        finalGroup,
+        ...cachedGroupList.filter(
+          (g) => String(g.nama_group || '').toLowerCase() !== namaGroup.toLowerCase()
+        )
+      ];
+      saveLocalBackupGroups(cachedGroupList);
+
+      formGroupArisan.reset();
+      renderGroupArisanTable();
+      populateAdminPesertaDropdowns();
+      syncPayGroupSplitUI();
+
+      showGlobalAlert(
+        `✅ Group Arisan <b>${namaGroup}</b> (Penanggung Jawab: <b>${pjName}</b>, Total <b>${uniqueMembers.length} Orang</b>) berhasil disimpan!`,
+        'success'
+      );
+    } catch (err) {
+      showGlobalAlert(err.message, 'error');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = '💾 Simpan Group Arisan';
     }
   });
 }

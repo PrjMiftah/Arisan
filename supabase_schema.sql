@@ -84,13 +84,17 @@ ALTER TABLE public."adnan_DataAnggota" ADD COLUMN IF NOT EXISTS atas_nama_rekeni
 ALTER TABLE public."adnan_DataAnggota" ADD COLUMN IF NOT EXISTS jumlah_ikut_arisan INTEGER DEFAULT 1;
 
 -- 3. Tabel Setting Periode Arisan Utama (adnan_Arisan & adnan_PeriodeArisan)
+-- Split Iuran per Orang: Uang Arisan Rp 100.000, Uang Kas Rp 40.000, Uang Konsumsi Rp 30.000 (Total Rp 170.000)
 CREATE TABLE IF NOT EXISTS public."adnan_Arisan" (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     periode_ke INTEGER NOT NULL,
     bulan_tahun TEXT NOT NULL,
     tanggal_arisan DATE,
     tempat_arisan TEXT,
-    iuran_per_slot NUMERIC(15,2) DEFAULT 100000,
+    uang_arisan NUMERIC(15,2) DEFAULT 100000,
+    uang_kas NUMERIC(15,2) DEFAULT 40000,
+    uang_konsumsi NUMERIC(15,2) DEFAULT 30000,
+    iuran_per_slot NUMERIC(15,2) DEFAULT 170000,
     sumbangan_wajib NUMERIC(15,2) DEFAULT 0,
     pemenang_id UUID,
     pemenang_nama TEXT,
@@ -101,6 +105,10 @@ CREATE TABLE IF NOT EXISTS public."adnan_Arisan" (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+ALTER TABLE public."adnan_Arisan" ADD COLUMN IF NOT EXISTS uang_arisan NUMERIC(15,2) DEFAULT 100000;
+ALTER TABLE public."adnan_Arisan" ADD COLUMN IF NOT EXISTS uang_kas NUMERIC(15,2) DEFAULT 40000;
+ALTER TABLE public."adnan_Arisan" ADD COLUMN IF NOT EXISTS uang_konsumsi NUMERIC(15,2) DEFAULT 30000;
+
 CREATE TABLE IF NOT EXISTS public."adnan_PeriodeArisan" (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     nama_periode TEXT NOT NULL,
@@ -109,9 +117,33 @@ CREATE TABLE IF NOT EXISTS public."adnan_PeriodeArisan" (
     tanggal_mulai DATE,
     tanggal_arisan DATE,
     tempat_arisan TEXT,
-    iuran_per_slot NUMERIC(15,2) DEFAULT 100000,
+    uang_arisan NUMERIC(15,2) DEFAULT 100000,
+    uang_kas NUMERIC(15,2) DEFAULT 40000,
+    uang_konsumsi NUMERIC(15,2) DEFAULT 30000,
+    iuran_per_slot NUMERIC(15,2) DEFAULT 170000,
     status TEXT DEFAULT 'aktif',
     keterangan TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public."adnan_PeriodeArisan" ADD COLUMN IF NOT EXISTS uang_arisan NUMERIC(15,2) DEFAULT 100000;
+ALTER TABLE public."adnan_PeriodeArisan" ADD COLUMN IF NOT EXISTS uang_kas NUMERIC(15,2) DEFAULT 40000;
+ALTER TABLE public."adnan_PeriodeArisan" ADD COLUMN IF NOT EXISTS uang_konsumsi NUMERIC(15,2) DEFAULT 30000;
+
+-- 3B. Tabel Group Arisan (adnan_GroupArisan - Maksimal 5 Orang termasuk Penanggung Jawab)
+CREATE TABLE IF NOT EXISTS public."adnan_GroupArisan" (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    nama_group TEXT NOT NULL,
+    penanggung_jawab_id UUID,
+    penanggung_jawab_nama TEXT NOT NULL,
+    anggota_1_nama TEXT NOT NULL,
+    anggota_2_nama TEXT,
+    anggota_3_nama TEXT,
+    anggota_4_nama TEXT,
+    anggota_5_nama TEXT,
+    anggota_list JSONB,
+    jumlah_anggota INTEGER DEFAULT 1,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -136,7 +168,7 @@ CREATE TABLE IF NOT EXISTS public."adnan_PemenangArisan" (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- 5. Tabel Pembayaran: Default Status Pending (adnan_Pembayaran)
+-- 5. Tabel Pembayaran: Default Status Pending + Split Header Uang Arisan, Uang Kas & Konsumsi (adnan_Pembayaran)
 CREATE TABLE IF NOT EXISTS public."adnan_Pembayaran" (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     kode_transaksi TEXT,
@@ -144,8 +176,13 @@ CREATE TABLE IF NOT EXISTS public."adnan_Pembayaran" (
     arisan_id UUID,
     user_id TEXT,
     nama_pembayar TEXT NOT NULL,
+    nama_group TEXT,
+    penanggung_jawab TEXT,
     tanggal_bayar DATE DEFAULT CURRENT_DATE,
     jenis_bayar TEXT NOT NULL,
+    uang_arisan NUMERIC(15,2) DEFAULT 0,
+    uang_kas NUMERIC(15,2) DEFAULT 0,
+    uang_konsumsi NUMERIC(15,2) DEFAULT 0,
     nominal NUMERIC(15,2) NOT NULL DEFAULT 0,
     metode_bayar TEXT NOT NULL DEFAULT 'Transfer Bank',
     nama_bank TEXT,
@@ -160,6 +197,11 @@ CREATE TABLE IF NOT EXISTS public."adnan_Pembayaran" (
 
 ALTER TABLE public."adnan_Pembayaran" ALTER COLUMN status SET DEFAULT 'Pending';
 ALTER TABLE public."adnan_Pembayaran" ADD COLUMN IF NOT EXISTS user_id TEXT;
+ALTER TABLE public."adnan_Pembayaran" ADD COLUMN IF NOT EXISTS nama_group TEXT;
+ALTER TABLE public."adnan_Pembayaran" ADD COLUMN IF NOT EXISTS penanggung_jawab TEXT;
+ALTER TABLE public."adnan_Pembayaran" ADD COLUMN IF NOT EXISTS uang_arisan NUMERIC(15,2) DEFAULT 0;
+ALTER TABLE public."adnan_Pembayaran" ADD COLUMN IF NOT EXISTS uang_kas NUMERIC(15,2) DEFAULT 0;
+ALTER TABLE public."adnan_Pembayaran" ADD COLUMN IF NOT EXISTS uang_konsumsi NUMERIC(15,2) DEFAULT 0;
 ALTER TABLE public."adnan_Pembayaran" ADD COLUMN IF NOT EXISTS nama_bank TEXT;
 ALTER TABLE public."adnan_Pembayaran" ADD COLUMN IF NOT EXISTS no_rekening_pengirim TEXT;
 ALTER TABLE public."adnan_Pembayaran" ADD COLUMN IF NOT EXISTS bukti_bayar_url TEXT;
@@ -227,6 +269,7 @@ BEGIN
         'adnan_DataAnggota',
         'adnan_Arisan',
         'adnan_PeriodeArisan',
+        'adnan_GroupArisan',
         'adnan_PemenangArisan',
         'adnan_Pembayaran',
         'adnan_Pengeluaran',

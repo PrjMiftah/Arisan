@@ -285,6 +285,10 @@
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
+    .sub-tab-nav.three-cols {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
     .sub-tab-btn {
       appearance: none;
       background: transparent;
@@ -1334,11 +1338,11 @@
         <button type="button" class="main-tab-btn" data-main-view="viewGaleri" id="navBtnGaleri">
           <span>📸</span> <span>3. Galeri Foto</span>
         </button>
-        <button type="button" class="main-tab-btn" data-main-view="viewPeriode" id="navBtnPeriode">
-          <span>🏆</span> <span>4. Periode Arisan</span>
-        </button>
         <button type="button" class="main-tab-btn" data-main-view="viewDaftarAnggota" id="navBtnDaftarAnggota">
-          <span>👥</span> <span>5. Anggota Arisan</span>
+          <span>👥</span> <span>4. Anggota Arisan</span>
+        </button>
+        <button type="button" class="main-tab-btn" data-main-view="viewPeriode" id="navBtnPeriode">
+          <span>⚙️</span> <span>5. Pengaturan</span>
         </button>
         <!-- TAB PENGELUARAN: Di posisi terakhir sebelum Biodata Saya & Hanya Muncul jika User Admin -->
         <button type="button" class="main-tab-btn hidden" data-main-view="viewPengeluaran" id="navBtnPengeluaran">
@@ -1450,34 +1454,34 @@
             </div>
           </div>
 
-          <!-- 4. SETTING PERIODE & PEMENANG ARISAN -->
-          <div class="gallery-menu-card" data-open-view="viewPeriode">
-            <div>
-              <div class="gallery-card-top">
-                <div class="gallery-icon-box icon-rose">🏆</div>
-                <span class="gallery-badge">Menu 4 • Periode & Undian</span>
-              </div>
-              <h3 style="margin-top: 14px;">4. Setting Periode & Pemenang</h3>
-              <p>Jadwal periode arisan, besaran iuran per slot, tuan rumah, serta daftar pemenang arisan.</p>
-            </div>
-            <div class="gallery-card-footer">
-              <span>Lihat Periode & Pemenang</span>
-              <span>&rarr;</span>
-            </div>
-          </div>
-
-          <!-- 5. DAFTAR SELURUH ANGGOTA ARISAN (GALLERY NAMA & FOTO + CARI BY NAMA) -->
+          <!-- 4. DAFTAR SELURUH ANGGOTA ARISAN (GALLERY NAMA & FOTO + CARI BY NAMA) -->
           <div class="gallery-menu-card" data-open-view="viewDaftarAnggota">
             <div>
               <div class="gallery-card-top">
                 <div class="gallery-icon-box icon-teal">👥</div>
-                <span class="gallery-badge">Menu 5 • Galeri Anggota</span>
+                <span class="gallery-badge">Menu 4 • Galeri Anggota</span>
               </div>
-              <h3 style="margin-top: 14px;">5. Daftar Anggota Arisan</h3>
+              <h3 style="margin-top: 14px;">4. Daftar Anggota Arisan</h3>
               <p>Galeri seluruh peserta Arisan Keluarga Besar Adnan menampilkan Foto & Nama lengkap dengan fitur pencarian nama.</p>
             </div>
             <div class="gallery-card-footer">
               <span>Buka Galeri Anggota</span>
+              <span>&rarr;</span>
+            </div>
+          </div>
+
+          <!-- 5. PENGATURAN (PERIODE ARISAN, PEMENANG & ENTRY GROUP ARISAN) -->
+          <div class="gallery-menu-card" data-open-view="viewPeriode">
+            <div>
+              <div class="gallery-card-top">
+                <div class="gallery-icon-box icon-rose">⚙️</div>
+                <span class="gallery-badge">Menu 5 • Periode, Pemenang & Group</span>
+              </div>
+              <h3 style="margin-top: 14px;">5. Pengaturan</h3>
+              <p>Pengaturan Periode Arisan (Split Iuran Arisan Rp 100rb, Kas Rp 40rb, Konsumsi Rp 30rb), Pemenang Arisan, serta Entry Group Arisan (Maks 5 Orang).</p>
+            </div>
+            <div class="gallery-card-footer">
+              <span>Buka Menu Pengaturan</span>
               <span>&rarr;</span>
             </div>
           </div>
@@ -1572,8 +1576,49 @@
               </div>
 
               <div class="form-group">
-                <label for="payNominal">Nominal Pembayaran (Rp) <span class="required-star">*</span></label>
-                <input type="number" id="payNominal" min="1000" step="500" placeholder="Contoh: 100000" required />
+                <label for="payNominal">Total Nominal Pembayaran (Rp) <span class="required-star">*</span></label>
+                <input type="number" id="payNominal" min="1000" step="500" value="170000" placeholder="Contoh: 170000" required />
+              </div>
+
+              <!-- WINDOW / KOTAK DAFTAR GROUP ARISAN & SPLIT PERUNTUKAN (ARISAN 100RB, KAS 40RB, KONSUMSI 30RB) -->
+              <div class="form-group full-width" id="payGroupSplitWrapper" style="background:var(--primary-light); border:1.5px solid var(--primary-border); border-radius:12px; padding:16px;">
+                <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:10px; padding-bottom:10px; border-bottom:1px dashed var(--primary-border);">
+                  <div>
+                    <strong style="color:var(--primary); font-size:0.95rem;" id="payGroupTitleText">
+                      📋 Rincian Split Iuran Arisan (Uang Arisan Rp 100.000 • Kas Rp 40.000 • Konsumsi Rp 30.000)
+                    </strong>
+                    <div style="font-size:0.8rem; color:var(--text-secondary); margin-top:2px;" id="payGroupSubtitleText">
+                      Total Rp 170.000 per orang. Jika peserta tergabung dalam Group Arisan, centang anggota group yang dibayarkan.
+                    </div>
+                  </div>
+                  <label id="payGroupSelectAllLabel" class="hidden" style="display:inline-flex; align-items:center; gap:8px; background:#ffffff; border:1.5px solid var(--primary); padding:7px 13px; border-radius:8px; cursor:pointer; font-size:0.84rem; font-weight:700; color:var(--primary); margin:0;">
+                    <input type="checkbox" id="chkSelectAllGroupPay" checked style="width:17px; height:17px; accent-color:var(--primary);" />
+                    <span>Pilih Semua Anggota Group</span>
+                  </label>
+                </div>
+
+                <!-- Daftar Anggota Group dengan Checkbox -->
+                <div id="payGroupMemberListContainer" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(250px, 1fr)); gap:10px; margin-bottom:12px;"></div>
+
+                <!-- Ringkasan Split Peruntukan (Arisan, Kas, Konsumsi, Total) -->
+                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:10px; background:#ffffff; padding:12px; border-radius:10px; border:1px solid var(--border-light);">
+                  <div>
+                    <div style="font-size:0.74rem; color:var(--text-muted); font-weight:700; text-transform:uppercase;">Split Uang Arisan</div>
+                    <div style="font-size:0.98rem; font-weight:800; color:var(--primary);" id="splitPreviewArisan">Rp 100.000</div>
+                  </div>
+                  <div>
+                    <div style="font-size:0.74rem; color:var(--text-muted); font-weight:700; text-transform:uppercase;">Split Uang Kas</div>
+                    <div style="font-size:0.98rem; font-weight:800; color:#0284c7;" id="splitPreviewKas">Rp 40.000</div>
+                  </div>
+                  <div>
+                    <div style="font-size:0.74rem; color:var(--text-muted); font-weight:700; text-transform:uppercase;">Split Uang Konsumsi</div>
+                    <div style="font-size:0.98rem; font-weight:800; color:#d97706;" id="splitPreviewKonsumsi">Rp 30.000</div>
+                  </div>
+                  <div>
+                    <div style="font-size:0.74rem; color:var(--text-muted); font-weight:700; text-transform:uppercase;">Total Disesuaikan</div>
+                    <div style="font-size:1.04rem; font-weight:800; color:var(--text-main);" id="splitPreviewTotal">Rp 170.000 (1 Orang)</div>
+                  </div>
+                </div>
               </div>
 
               <div class="form-group">
@@ -1655,16 +1700,19 @@
                 <tr>
                   <th>Tanggal</th>
                   <th>Kode</th>
-                  <th>Nama Pembayar</th>
+                  <th>Nama Pembayar / Group</th>
                   <th>Jenis</th>
+                  <th>Uang Arisan</th>
+                  <th>Uang Kas</th>
+                  <th>Konsumsi</th>
+                  <th>Total Bayar</th>
                   <th>Metode & Bank</th>
-                  <th>Nominal</th>
                   <th>Bukti</th>
                   <th>Status</th>
                 </tr>
               </thead>
               <tbody id="tableBodyPembayaran">
-                <tr><td colspan="8" style="text-align:center;">Memuat data pembayaran...</td></tr>
+                <tr><td colspan="11" style="text-align:center;">Memuat data pembayaran...</td></tr>
               </tbody>
             </table>
           </div>
@@ -1800,34 +1848,38 @@
       </section>
 
       <!-- ===============================================================
-           MENU 4: SETTING PERIODE ARISAN & PEMENANG ARISAN
+           MENU 5: PENGATURAN (PERIODE ARISAN, PEMENANG & ENTRY GROUP ARISAN)
            =============================================================== -->
       <section class="main-section-panel" id="viewPeriode">
         <div class="section-header">
           <div>
-            <h3>🏆 4. Setting Periode Arisan & Daftar Pemenang</h3>
-            <p>Kelola jadwal periode arisan serta penetapan/undian pemenang setiap periode.</p>
+            <h3>⚙️ 5. Pengaturan (Periode Arisan, Pemenang & Group Arisan)</h3>
+            <p>Kelola setting periode & split iuran arisan, penetapan pemenang, serta pengaturan Group Arisan (maks. 5 anggota termasuk Penanggung Jawab).</p>
           </div>
           <button type="button" class="btn-secondary btn-sm" data-open-view="viewGalleryHome">
             &larr; Kembali ke Menu Gallery
           </button>
         </div>
 
-        <div class="sub-tab-nav two-cols">
+        <div class="sub-tab-nav three-cols">
           <button type="button" class="sub-tab-btn active" data-periode-subtab="subTabPeriodeList">
             <span class="tab-step-num">1</span>
-            <span>Setting Periode Arisan</span>
+            <span>Setting Periode & Iuran Arisan</span>
           </button>
           <button type="button" class="sub-tab-btn" data-periode-subtab="subTabPemenangList">
             <span class="tab-step-num">2</span>
-            <span>Daftar & Penetapan Pemenang Arisan</span>
+            <span>Daftar & Penetapan Pemenang</span>
+          </button>
+          <button type="button" class="sub-tab-btn" data-periode-subtab="subTabGroupArisan">
+            <span class="tab-step-num">3</span>
+            <span>Entry Group Arisan (Maks 5 Orang)</span>
           </button>
         </div>
 
         <!-- SUB-TAB 1: SETTING PERIODE ARISAN -->
         <div class="sub-tab-panel active" id="subTabPeriodeList">
           <div class="card-box hidden" id="formPeriodeCard">
-            <h4>Tambah / Setting Periode Arisan Baru <span class="gallery-badge admin-only" style="margin-left:8px;">👑 Khusus Admin</span></h4>
+            <h4>Tambah / Setting Periode & Split Iuran Arisan <span class="gallery-badge admin-only" style="margin-left:8px;">👑 Khusus Admin</span></h4>
             <form id="formPeriodeArisan">
               <div class="form-grid">
                 <div class="form-group">
@@ -1846,13 +1898,29 @@
                 </div>
 
                 <div class="form-group">
-                  <label for="perIuran">Iuran per Slot (Rp) <span class="required-star">*</span></label>
-                  <input type="number" id="perIuran" min="10000" step="5000" value="100000" required />
+                  <label for="perTempat">Tempat / Tuan Rumah Pertemuan <span class="required-star">*</span></label>
+                  <input type="text" id="perTempat" placeholder="Contoh: Kediaman Ibu Hj. Khadijah Adnan" required />
+                </div>
+
+                <!-- Rincian Split Iuran Arisan per Orang (Tabel adnan_Arisan) -->
+                <div class="form-group">
+                  <label for="perIuranArisan">Split 1: Uang Arisan / Orang (Rp) <span class="required-star">*</span></label>
+                  <input type="number" id="perIuranArisan" min="0" step="5000" value="100000" required />
                 </div>
 
                 <div class="form-group">
-                  <label for="perTempat">Tempat / Tuan Rumah Pertemuan <span class="required-star">*</span></label>
-                  <input type="text" id="perTempat" placeholder="Contoh: Kediaman Ibu Hj. Khadijah Adnan" required />
+                  <label for="perIuranKas">Split 2: Uang Kas / Orang (Rp) <span class="required-star">*</span></label>
+                  <input type="number" id="perIuranKas" min="0" step="5000" value="40000" required />
+                </div>
+
+                <div class="form-group">
+                  <label for="perIuranKonsumsi">Split 3: Uang Konsumsi / Orang (Rp) <span class="required-star">*</span></label>
+                  <input type="number" id="perIuranKonsumsi" min="0" step="5000" value="30000" required />
+                </div>
+
+                <div class="form-group">
+                  <label for="perIuran">Total Iuran per Orang (Rp) <span class="required-star">*</span></label>
+                  <input type="number" id="perIuran" min="10000" step="5000" value="170000" readonly required style="font-weight:800; color:var(--primary);" />
                 </div>
 
                 <div class="form-group">
@@ -1864,7 +1932,7 @@
                   </select>
                 </div>
 
-                <div class="form-group full-width">
+                <div class="form-group">
                   <label for="perKeterangan">Keterangan Periode</label>
                   <input type="text" id="perKeterangan" placeholder="Catatan agenda pertemuan arisan" />
                 </div>
@@ -1880,7 +1948,7 @@
           </div>
 
           <div class="card-box">
-            <h4>Daftar Jadwal Periode Arisan</h4>
+            <h4>Daftar Jadwal Periode & Rincian Split Iuran Arisan (Tabel: <code>adnan_Arisan</code>)</h4>
             <div class="table-responsive">
               <table class="data-table">
                 <thead>
@@ -1889,13 +1957,16 @@
                     <th>Bulan/Tahun</th>
                     <th>Tanggal</th>
                     <th>Tempat / Tuan Rumah</th>
-                    <th>Iuran / Slot</th>
+                    <th>Uang Arisan</th>
+                    <th>Uang Kas</th>
+                    <th>Konsumsi</th>
+                    <th>Total / Orang</th>
                     <th>Pemenang</th>
                     <th>Status</th>
                   </tr>
                 </thead>
                 <tbody id="tableBodyPeriode">
-                  <tr><td colspan="7" style="text-align:center;">Memuat data periode arisan...</td></tr>
+                  <tr><td colspan="10" style="text-align:center;">Memuat data periode arisan...</td></tr>
                 </tbody>
               </table>
             </div>
@@ -1991,15 +2062,105 @@
             </div>
           </div>
         </div>
+
+        <!-- SUB-TAB 3: ENTRY GROUP ARISAN (MAKSIMAL 5 ORANG TERMASUK PENANGGUNG JAWAB) -->
+        <div class="sub-tab-panel" id="subTabGroupArisan">
+          <div class="card-box" id="formGroupArisanCard">
+            <h4>
+              Entry Group Arisan (Maksimal 5 Orang Termasuk Penanggung Jawab)
+            </h4>
+            <p style="font-size:0.84rem; color:var(--text-secondary); margin-bottom:16px;">
+              Pilih <strong>Penanggung Jawab Group</strong> dari dropdown <code>adnan_DataAnggota</code> (otomatis menjadi Anggota #1), lalu pilih hingga <strong>4 anggota lainnya</strong> (maksimal total 5 orang per group). Saat menyimpan pembayaran arisan, tagihan akan otomatis di-split ke anggota group untuk <strong>Uang Arisan (Rp 100.000)</strong>, <strong>Uang Kas (Rp 40.000)</strong>, dan <strong>Konsumsi (Rp 30.000)</strong> per orang.
+            </p>
+
+            <form id="formGroupArisan">
+              <div class="form-grid">
+                <div class="form-group">
+                  <label for="grpNama">Nama Group Arisan <span class="required-star">*</span></label>
+                  <input type="text" id="grpNama" placeholder="Contoh: Group Keluarga H. Mansyur / Group A" required />
+                </div>
+
+                <div class="form-group">
+                  <label for="grpPenanggungJawab">Penanggung Jawab (Anggota #1 - dari DaftarAnggota) <span class="required-star">*</span></label>
+                  <select id="grpPenanggungJawab" class="group-member-dropdown" required>
+                    <option value="">-- Pilih Penanggung Jawab Group --</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label for="grpAnggota2">Anggota Group #2 (Opsional - dari DaftarAnggota)</label>
+                  <select id="grpAnggota2" class="group-member-dropdown">
+                    <option value="">-- Tidak Ada / Kosong --</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label for="grpAnggota3">Anggota Group #3 (Opsional - dari DaftarAnggota)</label>
+                  <select id="grpAnggota3" class="group-member-dropdown">
+                    <option value="">-- Tidak Ada / Kosong --</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label for="grpAnggota4">Anggota Group #4 (Opsional - dari DaftarAnggota)</label>
+                  <select id="grpAnggota4" class="group-member-dropdown">
+                    <option value="">-- Tidak Ada / Kosong --</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
+                  <label for="grpAnggota5">Anggota Group #5 (Opsional - dari DaftarAnggota)</label>
+                  <select id="grpAnggota5" class="group-member-dropdown">
+                    <option value="">-- Tidak Ada / Kosong --</option>
+                  </select>
+                </div>
+
+                <div class="form-group full-width">
+                  <label for="grpKeterangan">Keterangan Group Arisan</label>
+                  <input type="text" id="grpKeterangan" placeholder="Contoh: Pembayaran kolektif dikoordinir oleh Penanggung Jawab" />
+                </div>
+              </div>
+
+              <div class="tab-footer-actions">
+                <span></span>
+                <button type="submit" class="btn-primary btn-auto" id="btnSubmitGroupArisan">
+                  💾 Simpan Group Arisan
+                </button>
+              </div>
+            </form>
+          </div>
+
+          <div class="card-box">
+            <h4>Daftar Group Arisan Terdaftar</h4>
+            <div class="table-responsive">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>Kode Group</th>
+                    <th>Nama Group</th>
+                    <th>Penanggung Jawab (Anggota #1)</th>
+                    <th>Daftar Anggota Group (Maks 5 Orang)</th>
+                    <th>Jumlah Orang</th>
+                    <th>Total Tagihan Group (@Rp 170.000)</th>
+                    <th>Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="tableBodyGroupArisan">
+                  <tr><td colspan="7" style="text-align:center;">Memuat daftar group arisan...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
       </section>
 
       <!-- ===============================================================
-           MENU 5: DAFTAR SELURUH ANGGOTA ARISAN (GALLERY NAMA & FOTO + CARI BY NAMA)
+           MENU 4: DAFTAR SELURUH ANGGOTA ARISAN (GALLERY NAMA & FOTO + CARI BY NAMA)
            =============================================================== -->
       <section class="main-section-panel" id="viewDaftarAnggota">
         <div class="section-header">
           <div>
-            <h3>👥 5. Daftar Seluruh Anggota Arisan Keluarga Adnan</h3>
+            <h3>👥 4. Daftar Seluruh Anggota Arisan Keluarga Adnan</h3>
             <p>Galeri foto dan nama seluruh anggota peserta arisan yang terdaftar pada tabel <code>adnan_DataAnggota</code>.</p>
           </div>
           <button type="button" class="btn-secondary btn-sm" data-open-view="viewGalleryHome">
@@ -2420,11 +2581,13 @@
             <thead>
               <tr>
                 <th>Tanggal</th>
-                <th>Nama Pembayar</th>
-                <th>Jenis Pembayaran</th>
+                <th>Nama Pembayar / Group</th>
+                <th>Jenis</th>
                 <th>Metode & Bank</th>
-                <th>Keterangan</th>
-                <th>Nominal</th>
+                <th>Uang Arisan</th>
+                <th>Uang Kas</th>
+                <th>Konsumsi</th>
+                <th>Total Bayar</th>
                 <th>Bukti</th>
                 <th>Status</th>
               </tr>
@@ -2446,6 +2609,78 @@
         <button type="button" class="btn-secondary btn-sm" id="closeModalBtn">✕ Tutup</button>
       </div>
       <div class="modal-body center-media" id="modalBodyContent"></div>
+    </div>
+  </div>
+
+  <!-- ===================================================================
+       MODAL 3: WINDOWS KONFIRMASI DAFTAR GROUP ARISAN & SPLIT PEMBAYARAN
+       =================================================================== -->
+  <div class="modal-overlay hidden" id="groupConfirmModal">
+    <div class="modal-box" style="max-width:740px;">
+      <div class="modal-header" style="background:var(--primary-light);">
+        <div>
+          <strong style="font-size:1.05rem; color:var(--primary);">👨‍👩‍👧‍👦 Konfirmasi Split Pembayaran Group Arisan</strong>
+          <div style="font-size:0.8rem; color:var(--text-secondary);" id="groupModalSubtitle">
+            Ditemukan Group Arisan. Seluruh pembayaran akan di-split ke anggota group terpilih.
+          </div>
+        </div>
+        <button type="button" class="btn-secondary btn-sm" id="closeGroupModalBtn">✕ Batal</button>
+      </div>
+      <div class="modal-body">
+        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; background:#f8fafc; border:1.5px solid var(--border-color); border-radius:10px; padding:12px 14px; margin-bottom:14px;">
+          <div>
+            <div style="font-weight:800; font-size:0.92rem; color:var(--text-main);" id="modalGroupNameTitle">Nama Group</div>
+            <div style="font-size:0.78rem; color:var(--text-secondary);" id="modalGroupPJInfo">Penanggung Jawab: -</div>
+          </div>
+          <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.84rem; font-weight:700; color:var(--primary); background:#ffffff; padding:8px 14px; border-radius:8px; border:1.5px solid var(--primary); margin:0;">
+            <input type="checkbox" id="chkModalSelectAllGroup" checked style="width:17px; height:17px; accent-color:var(--primary); cursor:pointer;" />
+            <span>Pilih Semua Anggota Group</span>
+          </label>
+        </div>
+
+        <div class="table-responsive" style="margin-bottom:14px;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th style="width:45px; text-align:center;">Bayar</th>
+                <th>Anggota Group</th>
+                <th>Peran</th>
+                <th>Uang Arisan</th>
+                <th>Uang Kas</th>
+                <th>Uang Konsumsi</th>
+                <th>Subtotal / Orang</th>
+              </tr>
+            </thead>
+            <tbody id="modalGroupMembersTableBody"></tbody>
+          </table>
+        </div>
+
+        <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:10px; background:var(--primary-light); border:1.5px solid var(--primary-border); border-radius:10px; padding:12px; margin-bottom:16px; text-align:center;">
+          <div>
+            <div style="font-size:0.72rem; font-weight:700; color:var(--text-muted); text-transform:uppercase;">Total Uang Arisan</div>
+            <div style="font-size:0.95rem; font-weight:800; color:var(--primary);" id="modalSumArisan">Rp 0</div>
+          </div>
+          <div>
+            <div style="font-size:0.72rem; font-weight:700; color:var(--text-muted); text-transform:uppercase;">Total Uang Kas</div>
+            <div style="font-size:0.95rem; font-weight:800; color:#b45309;" id="modalSumKas">Rp 0</div>
+          </div>
+          <div>
+            <div style="font-size:0.72rem; font-weight:700; color:var(--text-muted); text-transform:uppercase;">Total Konsumsi</div>
+            <div style="font-size:0.95rem; font-weight:800; color:#0284c7;" id="modalSumKonsumsi">Rp 0</div>
+          </div>
+          <div>
+            <div style="font-size:0.72rem; font-weight:700; color:var(--text-muted); text-transform:uppercase;">Total Pembayaran</div>
+            <div style="font-size:1.05rem; font-weight:800; color:var(--primary);" id="modalSumGrandTotal">Rp 0</div>
+          </div>
+        </div>
+
+        <div style="display:flex; justify-content:flex-end; gap:10px; flex-wrap:wrap;">
+          <button type="button" class="btn-secondary" id="btnCancelGroupModal">Batal</button>
+          <button type="button" class="btn-primary btn-auto" id="btnConfirmSaveGroupPay">
+            ✅ Konfirmasi & Simpan Split Pembayaran Group
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 
