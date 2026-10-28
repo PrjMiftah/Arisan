@@ -850,6 +850,7 @@ async function loadAllDashboardModules() {
   ]);
   populateAdminPesertaDropdowns();
   renderPembayaranTableRows();
+  renderMemberGallery();
   updateQuickStatsBar();
 }
 
@@ -1723,6 +1724,10 @@ const formPengumuman = document.getElementById('formPengumuman');
 if (formPengumuman) {
   formPengumuman.addEventListener('submit', async (e) => {
     e.preventDefault();
+    if (!isUserAdmin()) {
+      showGlobalAlert('Hanya Role Admin yang dapat membuat pengumuman baru atau mengunggah dokumen PDF.', 'error');
+      return;
+    }
     const btn = document.getElementById('btnSubmitPengumuman');
     btn.disabled = true;
     btn.textContent = 'Menerbitkan...';
@@ -1823,6 +1828,10 @@ const formGaleri = document.getElementById('formGaleri');
 if (formGaleri) {
   formGaleri.addEventListener('submit', async (e) => {
     e.preventDefault();
+    if (!isUserAdmin()) {
+      showGlobalAlert('Hanya Role Admin yang dapat mengunggah foto kegiatan baru.', 'error');
+      return;
+    }
     if (!uploadedGalFotoDataUrl) {
       showGlobalAlert('Silakan pilih foto kegiatan terlebih dahulu.', 'error');
       return;
@@ -1841,7 +1850,7 @@ if (formGaleri) {
         lokasi: document.getElementById('galLokasi').value.trim() || null,
         deskripsi: document.getElementById('galDeskripsi').value.trim() || null,
         foto_url: uploadedGalFotoDataUrl,
-        diunggah_oleh: currentLoggedUser ? currentLoggedUser.nama_lengkap || currentLoggedUser.user_id : 'Anggota'
+        diunggah_oleh: currentLoggedUser ? currentLoggedUser.nama_lengkap || currentLoggedUser.user_id : 'Admin'
       });
 
       formGaleri.reset();
@@ -1860,7 +1869,7 @@ if (formGaleri) {
 }
 
 // ============================================================================
-// MODUL SETTING PERIODE ARISAN & PEMENANG ARISAN
+// MODUL SETTING PERIODE ARISAN & PEMENANG ARISAN (FORM KHUSUS ADMIN)
 // ============================================================================
 async function loadPeriodeAndPemenangData() {
   const tbodyPeriode = document.getElementById('tableBodyPeriode');
@@ -1979,6 +1988,10 @@ const formPeriodeArisan = document.getElementById('formPeriodeArisan');
 if (formPeriodeArisan) {
   formPeriodeArisan.addEventListener('submit', async (e) => {
     e.preventDefault();
+    if (!isUserAdmin()) {
+      showGlobalAlert('Hanya Role Admin yang dapat menambah atau mengatur Periode Arisan Baru.', 'error');
+      return;
+    }
     const btn = document.getElementById('btnSubmitPeriode');
     btn.disabled = true;
     btn.textContent = 'Menyimpan Periode...';
@@ -2031,6 +2044,10 @@ if (formPeriodeArisan) {
 const btnKocokUndian = document.getElementById('btnKocokUndian');
 if (btnKocokUndian) {
   btnKocokUndian.addEventListener('click', () => {
+    if (!isUserAdmin()) {
+      showGlobalAlert('Hanya Role Admin yang dapat melakukan kocok undian pemenang arisan.', 'error');
+      return;
+    }
     const kandidat = cachedAnggotaList.filter((a) => !a.sudah_menang && a.status_aktif !== false);
     const pool = kandidat.length > 0 ? kandidat : cachedAnggotaList;
     if (pool.length === 0) {
@@ -2047,6 +2064,10 @@ const formPemenangArisan = document.getElementById('formPemenangArisan');
 if (formPemenangArisan) {
   formPemenangArisan.addEventListener('submit', async (e) => {
     e.preventDefault();
+    if (!isUserAdmin()) {
+      showGlobalAlert('Hanya Role Admin yang dapat menetapkan Pemenang Arisan.', 'error');
+      return;
+    }
     const btn = document.getElementById('btnSubmitPemenang');
     const periodeId = document.getElementById('winPeriode').value;
     const anggotaId = document.getElementById('winAnggota').value;
@@ -2121,6 +2142,97 @@ if (formPemenangArisan) {
 }
 
 // ============================================================================
+// MODUL 5: DAFTAR SELURUH ANGGOTA ARISAN (GALLERY NAMA & FOTO SAJA + CARI BY NAMA)
+// ============================================================================
+function renderMemberGallery() {
+  const container = document.getElementById('memberGalleryContainer');
+  const searchInput = document.getElementById('searchAnggotaInput');
+  const countBadge = document.getElementById('countAnggotaGalleryBadge');
+  if (!container) return;
+
+  const query = searchInput ? String(searchInput.value || '').trim().toLowerCase() : '';
+
+  // Ambil seluruh peserta arisan dari adnan_DataAnggota (kecuali akun sistem murni jika bernama Admin Arisan)
+  const allMembers = (cachedAnggotaList || []).filter((a) => {
+    const uid = String(a.user_id || '').trim().toLowerCase();
+    const nama = String(a.nama_lengkap || '').trim().toLowerCase();
+    if (uid === 'admin' && nama.includes('admin arisan')) return false;
+    return Boolean(nama);
+  });
+
+  const filteredMembers = allMembers.filter((a) => {
+    if (!query) return true;
+    const namaLengkap = String(a.nama_lengkap || '').toLowerCase();
+    const panggilan = String(a.nama_panggilan || a.panggilan || '').toLowerCase();
+    return namaLengkap.includes(query) || panggilan.includes(query);
+  });
+
+  if (countBadge) {
+    countBadge.textContent = query
+      ? `Menampilkan ${filteredMembers.length} dari ${allMembers.length} Anggota`
+      : `${allMembers.length} Anggota Terdaftar`;
+  }
+
+  if (filteredMembers.length === 0) {
+    container.innerHTML = `
+      <p style="grid-column:1/-1; text-align:center; color:var(--text-muted); padding:24px 0;">
+        ${query ? `Tidak ditemukan anggota dengan nama "<b>${searchInput.value}</b>".` : 'Belum ada data anggota yang terdaftar.'}
+      </p>
+    `;
+    return;
+  }
+
+  container.innerHTML = filteredMembers
+    .map((a, idx) => {
+      const nama = a.nama_lengkap || 'Anggota Arisan';
+      const photoUrl = a.foto_url || a.foto || null;
+      const initials = nama
+        .split(' ')
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((part) => part[0].toUpperCase())
+        .join('') || 'KA';
+
+      const mediaKey = `member_photo_${a.id || idx}`;
+      if (photoUrl) {
+        registerMediaPreview(mediaKey, `Foto Anggota - ${nama}`, photoUrl);
+      }
+
+      const photoContent = photoUrl
+        ? `<img src="${photoUrl}" alt="${nama}" onclick="openMediaByKey('${mediaKey}')" title="Klik untuk memperbesar foto ${nama}" />`
+        : `<span>${initials}</span>`;
+
+      return `
+        <div class="member-gallery-card">
+          <div class="member-photo-box">
+            ${photoContent}
+          </div>
+          <div class="member-name-label">${nama}</div>
+        </div>
+      `;
+    })
+    .join('');
+}
+
+const searchAnggotaInputEl = document.getElementById('searchAnggotaInput');
+if (searchAnggotaInputEl) {
+  searchAnggotaInputEl.addEventListener('input', () => {
+    renderMemberGallery();
+  });
+}
+
+const btnResetSearchAnggota = document.getElementById('btnResetSearchAnggota');
+if (btnResetSearchAnggota) {
+  btnResetSearchAnggota.addEventListener('click', () => {
+    if (searchAnggotaInputEl) {
+      searchAnggotaInputEl.value = '';
+      renderMemberGallery();
+      searchAnggotaInputEl.focus();
+    }
+  });
+}
+
+// ============================================================================
 // ALUR SETELAH LOGIN: CEK adnan_DataAnggota & TAMPILKAN FOTO + HAK AKSES ADMIN
 // ============================================================================
 async function handlePostLoginFlow(user) {
@@ -2146,10 +2258,23 @@ async function handlePostLoginFlow(user) {
   document.getElementById('welcomeUserText').textContent = displayName;
   document.getElementById('userDetailText').textContent = `User ID: ${displayUid} • Role: ${adminFlag ? 'Administrator' : 'Peserta Arisan'}`;
 
-  // Tampilkan Tab Pengeluaran & Kartu Pengeluaran HANYA jika User adalah Admin
-  document.getElementById('roleBadgePill').classList.toggle('hidden', !adminFlag);
-  document.getElementById('navBtnPengeluaran').classList.toggle('hidden', !adminFlag);
-  document.getElementById('galleryCardPengeluaran').classList.toggle('hidden', !adminFlag);
+  // Tampilkan fitur-fitur Khusus Admin HANYA jika login menggunakan Role Admin:
+  // - Tab & Kartu Pengeluaran
+  // - Buat Pengumuman Baru / Unggah Dokumen PDF
+  // - Unggah Foto Kegiatan Baru
+  // - Tambah / Setting Periode Arisan Baru & Penetapan Pemenang
+  [
+    'roleBadgePill',
+    'navBtnPengeluaran',
+    'galleryCardPengeluaran',
+    'formPengumumanCard',
+    'formGaleriCard',
+    'formPeriodeCard',
+    'formPemenangCard'
+  ].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle('hidden', !adminFlag);
+  });
 
   // Set default tanggal hari ini di semua form
   ['payTanggal', 'expTanggal', 'galTanggal', 'winTanggal'].forEach((id) => {

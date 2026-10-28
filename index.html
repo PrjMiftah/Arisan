@@ -798,6 +798,102 @@
       padding: 14px 16px;
     }
 
+    /* Galeri Daftar Anggota Arisan (Hanya Foto & Nama) */
+    .member-search-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+      background: var(--surface);
+      border: 1.5px solid var(--border-light);
+      padding: 14px 16px;
+      border-radius: 12px;
+    }
+
+    .member-search-input-wrap {
+      flex: 1;
+      min-width: 240px;
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .member-search-input-wrap input {
+      width: 100%;
+      padding: 11px 16px;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      font-size: 0.94rem;
+      outline: none;
+      background: #ffffff;
+    }
+
+    .member-search-input-wrap input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.14);
+    }
+
+    .member-gallery-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 18px;
+    }
+
+    .member-gallery-card {
+      background: #ffffff;
+      border: 1.5px solid var(--border-light);
+      border-radius: 16px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      padding: 20px 16px 18px;
+      box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04);
+      transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+    }
+
+    .member-gallery-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 24px rgba(15, 118, 110, 0.12);
+      border-color: var(--primary);
+    }
+
+    .member-photo-box {
+      width: 124px;
+      height: 124px;
+      border-radius: 50%;
+      overflow: hidden;
+      background: linear-gradient(135deg, #0f766e, #115e59);
+      border: 3px solid var(--primary-border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2.1rem;
+      font-weight: 800;
+      color: #ffffff;
+      margin-bottom: 14px;
+      flex-shrink: 0;
+      box-shadow: 0 6px 16px rgba(15, 118, 110, 0.18);
+    }
+
+    .member-photo-box img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      cursor: pointer;
+      display: block;
+    }
+
+    .member-name-label {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text-main);
+      line-height: 1.35;
+      word-break: break-word;
+    }
+
     /* Daftar Pengumuman Card */
     .announcement-list {
       display: flex;
@@ -1032,6 +1128,9 @@
       .photo-gallery-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
+      .member-gallery-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
       .main-tab-nav {
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1095,6 +1194,11 @@
       .summary-grid {
         grid-template-columns: 1fr;
         gap: 14px;
+      }
+
+      .member-gallery-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
       }
 
       .stats-bar {
@@ -1233,9 +1337,12 @@
         <button type="button" class="main-tab-btn" data-main-view="viewPeriode" id="navBtnPeriode">
           <span>🏆</span> <span>4. Periode Arisan</span>
         </button>
+        <button type="button" class="main-tab-btn" data-main-view="viewDaftarAnggota" id="navBtnDaftarAnggota">
+          <span>👥</span> <span>5. Anggota Arisan</span>
+        </button>
         <!-- TAB PENGELUARAN: Di posisi terakhir sebelum Biodata Saya & Hanya Muncul jika User Admin -->
         <button type="button" class="main-tab-btn hidden" data-main-view="viewPengeluaran" id="navBtnPengeluaran">
-          <span>📊</span> <span>5. Pengeluaran</span>
+          <span>📊</span> <span>6. Pengeluaran</span>
         </button>
         <button type="button" class="main-tab-btn" data-main-view="viewBiodata" id="navBtnBiodata">
           <span>👤</span> <span>Biodata Saya</span>
@@ -1351,22 +1458,38 @@
                 <span class="gallery-badge">Menu 4 • Periode & Undian</span>
               </div>
               <h3 style="margin-top: 14px;">4. Setting Periode & Pemenang</h3>
-              <p>Pengaturan jadwal periode arisan, besaran iuran per slot, tuan rumah, serta pencatatan & undian pemenang arisan.</p>
+              <p>Jadwal periode arisan, besaran iuran per slot, tuan rumah, serta daftar pemenang arisan.</p>
             </div>
             <div class="gallery-card-footer">
-              <span>Kelola Periode & Pemenang</span>
+              <span>Lihat Periode & Pemenang</span>
               <span>&rarr;</span>
             </div>
           </div>
 
-          <!-- 5. PENGELUARAN (KHUSUS ADMIN - SEBELUM BIODATA SAYA) -->
+          <!-- 5. DAFTAR SELURUH ANGGOTA ARISAN (GALLERY NAMA & FOTO + CARI BY NAMA) -->
+          <div class="gallery-menu-card" data-open-view="viewDaftarAnggota">
+            <div>
+              <div class="gallery-card-top">
+                <div class="gallery-icon-box icon-teal">👥</div>
+                <span class="gallery-badge">Menu 5 • Galeri Anggota</span>
+              </div>
+              <h3 style="margin-top: 14px;">5. Daftar Anggota Arisan</h3>
+              <p>Galeri seluruh peserta Arisan Keluarga Besar Adnan menampilkan Foto & Nama lengkap dengan fitur pencarian nama.</p>
+            </div>
+            <div class="gallery-card-footer">
+              <span>Buka Galeri Anggota</span>
+              <span>&rarr;</span>
+            </div>
+          </div>
+
+          <!-- 6. PENGELUARAN (KHUSUS ADMIN - SEBELUM BIODATA SAYA) -->
           <div class="gallery-menu-card hidden" data-open-view="viewPengeluaran" id="galleryCardPengeluaran">
             <div>
               <div class="gallery-card-top">
                 <div class="gallery-icon-box icon-amber">📊</div>
-                <span class="gallery-badge admin-only">Menu 5 • Khusus Admin</span>
+                <span class="gallery-badge admin-only">Menu 6 • Khusus Admin</span>
               </div>
-              <h3 style="margin-top: 14px;">5. Pengeluaran / Akuntansi</h3>
+              <h3 style="margin-top: 14px;">6. Pengeluaran / Akuntansi</h3>
               <p>Pencatatan pengeluaran kas keluarga, pencairan arisan, konsumsi & santunan (Khusus Admin).</p>
             </div>
             <div class="gallery-card-footer">
@@ -1562,8 +1685,8 @@
           </button>
         </div>
 
-        <div class="card-box" id="formPengumumanCard">
-          <h4>Buat Pengumuman Baru / Unggah Dokumen PDF</h4>
+        <div class="card-box hidden" id="formPengumumanCard">
+          <h4>Buat Pengumuman Baru / Unggah Dokumen PDF <span class="gallery-badge admin-only" style="margin-left:8px;">👑 Khusus Admin</span></h4>
           <form id="formPengumuman">
             <div class="form-grid">
               <div class="form-group">
@@ -1626,8 +1749,8 @@
           </button>
         </div>
 
-        <div class="card-box">
-          <h4>Unggah Foto Kegiatan Baru</h4>
+        <div class="card-box hidden" id="formGaleriCard">
+          <h4>Unggah Foto Kegiatan Baru <span class="gallery-badge admin-only" style="margin-left:8px;">👑 Khusus Admin</span></h4>
           <form id="formGaleri">
             <div class="form-grid">
               <div class="form-group">
@@ -1703,8 +1826,8 @@
 
         <!-- SUB-TAB 1: SETTING PERIODE ARISAN -->
         <div class="sub-tab-panel active" id="subTabPeriodeList">
-          <div class="card-box">
-            <h4>Tambah / Setting Periode Arisan Baru</h4>
+          <div class="card-box hidden" id="formPeriodeCard">
+            <h4>Tambah / Setting Periode Arisan Baru <span class="gallery-badge admin-only" style="margin-left:8px;">👑 Khusus Admin</span></h4>
             <form id="formPeriodeArisan">
               <div class="form-grid">
                 <div class="form-group">
@@ -1781,9 +1904,12 @@
 
         <!-- SUB-TAB 2: PEMENANG ARISAN -->
         <div class="sub-tab-panel" id="subTabPemenangList">
-          <div class="card-box">
+          <div class="card-box hidden" id="formPemenangCard">
             <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:14px;">
-              <h4 style="margin-bottom:0; border:none; padding:0;">Penetapan / Undian Pemenang Arisan</h4>
+              <h4 style="margin-bottom:0; border:none; padding:0;">
+                Penetapan / Undian Pemenang Arisan
+                <span class="gallery-badge admin-only" style="margin-left:8px;">👑 Khusus Admin</span>
+              </h4>
               <button type="button" class="btn-secondary btn-sm" id="btnKocokUndian">
                 🎲 Kocok Nama Peserta Otomatis
               </button>
@@ -1868,12 +1994,52 @@
       </section>
 
       <!-- ===============================================================
-           MENU 5: PENGELUARAN / AKUNTANSI (HANYA MUNCUL UNTUK USER ADMIN)
+           MENU 5: DAFTAR SELURUH ANGGOTA ARISAN (GALLERY NAMA & FOTO + CARI BY NAMA)
+           =============================================================== -->
+      <section class="main-section-panel" id="viewDaftarAnggota">
+        <div class="section-header">
+          <div>
+            <h3>👥 5. Daftar Seluruh Anggota Arisan Keluarga Adnan</h3>
+            <p>Galeri foto dan nama seluruh anggota peserta arisan yang terdaftar pada tabel <code>adnan_DataAnggota</code>.</p>
+          </div>
+          <button type="button" class="btn-secondary btn-sm" data-open-view="viewGalleryHome">
+            &larr; Kembali ke Menu Gallery
+          </button>
+        </div>
+
+        <div class="card-box">
+          <!-- Bar Pencarian Anggota Berdasarkan Nama -->
+          <div class="member-search-bar">
+            <div class="member-search-input-wrap">
+              <input
+                type="text"
+                id="searchAnggotaInput"
+                placeholder="🔍 Cari anggota arisan berdasarkan Nama..."
+                autocomplete="off"
+              />
+            </div>
+            <button type="button" class="btn-secondary btn-sm" id="btnResetSearchAnggota">
+              ✕ Reset Pencarian
+            </button>
+            <span class="gallery-badge" id="countAnggotaGalleryBadge" style="background:var(--primary-light); color:var(--primary); border:1px solid var(--primary-border);">
+              0 Anggota
+            </span>
+          </div>
+
+          <!-- Grid Gallery Anggota: Berisi Foto & Nama Saja -->
+          <div class="member-gallery-grid" id="memberGalleryContainer">
+            <p style="grid-column:1/-1; text-align:center; color:var(--text-muted);">Memuat galeri anggota arisan...</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===============================================================
+           MENU 6: PENGELUARAN / AKUNTANSI (HANYA MUNCUL UNTUK USER ADMIN)
            =============================================================== -->
       <section class="main-section-panel" id="viewPengeluaran">
         <div class="section-header">
           <div>
-            <h3>📊 5. Pengeluaran & Akuntansi Kas (Khusus Admin)</h3>
+            <h3>📊 6. Pengeluaran & Akuntansi Kas (Khusus Admin)</h3>
             <p>Pencatatan pengeluaran kas arisan, pencairan pemenang, santunan, dan operasional.</p>
           </div>
           <button type="button" class="btn-secondary btn-sm" data-open-view="viewGalleryHome">
