@@ -3045,6 +3045,8 @@ function renderRegisteredUsersTable() {
     return;
   }
 
+  const adminFlag = isUserAdmin();
+
   // Kumpulkan seluruh header kolom dari adnan_User KECUALI 'id'
   const headerKeys = [];
   cachedUserList.forEach((row) => {
@@ -3061,7 +3063,7 @@ function renderRegisteredUsersTable() {
       ${headerKeys
         .map((col) => `<th>${col.replace(/_/g, ' ').toUpperCase()}</th>`)
         .join('')}
-      <th style="text-align:center;">AKSI (UPDATE & SIMPAN)</th>
+      ${adminFlag ? `<th style="text-align:center;">AKSI ADMIN (EDIT SEMUA & SIMPAN)</th>` : ''}
     </tr>
   `;
 
@@ -3072,58 +3074,7 @@ function renderRegisteredUsersTable() {
           const colLower = col.toLowerCase();
           const val = row[col];
 
-          // Kolom Password dengan ikon 🔑 untuk update password
-          if (colLower === 'password') {
-            return `
-              <td>
-                <div style="display:inline-flex; align-items:center; gap:6px;">
-                  <input
-                    type="text"
-                    id="usrPassInput_${idx}"
-                    value="${escapeHtmlAttr(val)}"
-                    readonly
-                    style="width:125px; padding:6px 9px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:0.83rem; font-family:monospace; background:#f8fafc; color:var(--text-main);"
-                  />
-                  <button
-                    type="button"
-                    class="btn-secondary btn-sm"
-                    style="padding:5px 8px;"
-                    title="Klik untuk update Password"
-                    onclick="unlockUserField(${idx}, 'password')"
-                  >🔑</button>
-                </div>
-              </td>
-            `;
-          }
-
-          // Kolom Role dengan ikon 🛡️ untuk update Role
-          if (colLower === 'role') {
-            const currentRole = String(val || 'peserta').toLowerCase();
-            const isAdminRole = currentRole === 'admin';
-            return `
-              <td>
-                <div style="display:inline-flex; align-items:center; gap:6px;">
-                  <select
-                    id="usrRoleSelect_${idx}"
-                    disabled
-                    style="padding:6px 9px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:0.83rem; font-weight:700; background:#f8fafc; color:${isAdminRole ? 'var(--primary)' : 'var(--text-main)'};"
-                  >
-                    <option value="peserta" ${!isAdminRole ? 'selected' : ''}>peserta</option>
-                    <option value="admin" ${isAdminRole ? 'selected' : ''}>admin</option>
-                  </select>
-                  <button
-                    type="button"
-                    class="btn-secondary btn-sm"
-                    style="padding:5px 8px;"
-                    title="Klik untuk update Role"
-                    onclick="unlockUserField(${idx}, 'role')"
-                  >🛡️</button>
-                </div>
-              </td>
-            `;
-          }
-
-          // Khusus kolom tanggal: format dd mmm yyyy (contoh: 28 Okt 2026)
+          // Khusus kolom tanggal: tampilkan format dd mmm yyyy (contoh: 28 Okt 2026)
           if (isDateColumnOrIsoValue(col, val)) {
             return `<td style="white-space:nowrap; font-weight:600;">${formatDateDdMmmYyyy(val)}</td>`;
           }
@@ -3133,85 +3084,218 @@ function renderRegisteredUsersTable() {
             return `<td><img src="${val}" alt="Foto" style="width:32px; height:32px; border-radius:50%; object-fit:cover;" /></td>`;
           }
 
-          // Jika boolean (status_aktif)
-          if (typeof val === 'boolean') {
-            return `<td><span class="status-pill ${val ? 'complete' : 'incomplete'}">${val ? 'Aktif' : 'Nonaktif'}</span></td>`;
+          // Jika bukan Admin, tampilkan secara read-only
+          if (!adminFlag) {
+            if (colLower === 'password') {
+              return `<td><code>••••••</code></td>`;
+            }
+            if (typeof val === 'boolean') {
+              return `<td><span class="status-pill ${val ? 'complete' : 'incomplete'}">${val ? 'Aktif' : 'Nonaktif'}</span></td>`;
+            }
+            return `<td>${val !== null && val !== undefined && val !== '' ? val : '-'}</td>`;
           }
 
-          if (colLower === 'user_id' || colLower === 'username') {
-            return `<td><strong>${val ?? '-'}</strong></td>`;
+          // =================================================================
+          // MODE USER ADMIN: SELURUH KOLOM DAPAT DIEDIT OLEH ADMIN
+          // =================================================================
+
+          // 1. Kolom Password dengan ikon 🔑
+          if (colLower === 'password') {
+            return `
+              <td>
+                <div style="display:inline-flex; align-items:center; gap:5px;">
+                  <input
+                    type="text"
+                    class="usr-edit-field"
+                    data-row="${idx}"
+                    data-col="${col}"
+                    id="usrPassInput_${idx}"
+                    value="${escapeHtmlAttr(val)}"
+                    readonly
+                    onclick="unlockUserField(${idx}, 'all')"
+                    style="width:120px; padding:6px 8px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:0.82rem; font-family:monospace; background:#f8fafc; color:var(--text-main);"
+                  />
+                  <button
+                    type="button"
+                    class="btn-secondary btn-sm"
+                    style="padding:5px 7px;"
+                    title="Klik untuk update Password"
+                    onclick="unlockUserField(${idx}, 'password')"
+                  >🔑</button>
+                </div>
+              </td>
+            `;
           }
 
-          return `<td>${val !== null && val !== undefined && val !== '' ? val : '-'}</td>`;
+          // 2. Kolom Role dengan ikon 🛡️
+          if (colLower === 'role') {
+            const currentRole = String(val || 'peserta').toLowerCase();
+            const isAdminRole = currentRole === 'admin';
+            return `
+              <td>
+                <div style="display:inline-flex; align-items:center; gap:5px;">
+                  <select
+                    class="usr-edit-field"
+                    data-row="${idx}"
+                    data-col="${col}"
+                    id="usrRoleSelect_${idx}"
+                    disabled
+                    style="padding:6px 8px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:0.82rem; font-weight:700; background:#f8fafc; color:${isAdminRole ? 'var(--primary)' : 'var(--text-main)'};"
+                  >
+                    <option value="peserta" ${!isAdminRole ? 'selected' : ''}>peserta</option>
+                    <option value="admin" ${isAdminRole ? 'selected' : ''}>admin</option>
+                  </select>
+                  <button
+                    type="button"
+                    class="btn-secondary btn-sm"
+                    style="padding:5px 7px;"
+                    title="Klik untuk update Role"
+                    onclick="unlockUserField(${idx}, 'role')"
+                  >🛡️</button>
+                </div>
+              </td>
+            `;
+          }
+
+          // 3. Kolom Boolean (misal status_aktif)
+          if (typeof val === 'boolean' || colLower === 'status_aktif') {
+            const isTrue = val !== false;
+            return `
+              <td>
+                <select
+                  class="usr-edit-field"
+                  data-row="${idx}"
+                  data-col="${col}"
+                  data-type="boolean"
+                  disabled
+                  style="padding:6px 8px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:0.82rem; font-weight:600; background:#f8fafc;"
+                >
+                  <option value="true" ${isTrue ? 'selected' : ''}>Aktif (true)</option>
+                  <option value="false" ${!isTrue ? 'selected' : ''}>Nonaktif (false)</option>
+                </select>
+              </td>
+            `;
+          }
+
+          // 4. Seluruh kolom teks lainnya (user_id, username, nama, nama_lengkap, no_hp, deskripsi, dll.)
+          const isWideCol = colLower.includes('nama') || colLower.includes('deskripsi');
+          return `
+            <td>
+              <input
+                type="text"
+                class="usr-edit-field"
+                data-row="${idx}"
+                data-col="${col}"
+                id="usrField_${idx}_${col}"
+                value="${escapeHtmlAttr(val ?? '')}"
+                readonly
+                onclick="unlockUserField(${idx}, 'all')"
+                style="width:${isWideCol ? '165px' : '125px'}; padding:6px 8px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:0.82rem; ${colLower === 'user_id' ? 'font-weight:700;' : ''} background:#f8fafc; color:var(--text-main);"
+              />
+            </td>
+          `;
         })
         .join('');
 
-      return `
-        <tr id="usrRow_${idx}">
-          ${cellsHtml}
+      const actionCellHtml = adminFlag
+        ? `
           <td style="white-space:nowrap; text-align:center;">
             <div style="display:inline-flex; align-items:center; gap:6px;">
               <button
                 type="button"
                 class="btn-secondary btn-sm"
-                title="Buka kunci edit Password & Role"
-                onclick="unlockUserField(${idx}, 'both')"
+                title="Buka kunci edit seluruh kolom pada baris ini"
+                onclick="unlockUserField(${idx}, 'all')"
               >✏️ Edit</button>
               <button
                 type="button"
                 class="btn-primary btn-sm"
                 id="btnSaveUser_${idx}"
-                title="Simpan perubahan Password & Role ke adnan_User"
+                title="Simpan seluruh perubahan baris ini ke adnan_User"
                 onclick="saveUserPasswordAndRole(${idx})"
               >💾 Simpan</button>
             </div>
           </td>
+        `
+        : '';
+
+      return `
+        <tr id="usrRow_${idx}">
+          ${cellsHtml}
+          ${actionCellHtml}
         </tr>
       `;
     })
     .join('');
 }
 
-function unlockUserField(idx, fieldType = 'both') {
+function unlockUserField(idx, fieldType = 'all') {
+  if (!isUserAdmin()) {
+    showGlobalAlert('Hanya User Admin yang dapat mengedit data Daftar User Terdaftar.', 'error');
+    return;
+  }
+
+  // Buka kunci seluruh input & select pada baris tersebut agar Admin bisa mengedit seluruhnya
+  const rowFields = document.querySelectorAll(`.usr-edit-field[data-row="${idx}"]`);
+  rowFields.forEach((el) => {
+    if (el.tagName === 'SELECT') {
+      el.disabled = false;
+    } else {
+      el.readOnly = false;
+    }
+    el.style.background = '#ffffff';
+    el.style.borderColor = 'var(--primary)';
+    el.style.boxShadow = '0 0 0 2px rgba(15, 118, 110, 0.14)';
+  });
+
   const passInp = document.getElementById(`usrPassInput_${idx}`);
   const roleSel = document.getElementById(`usrRoleSelect_${idx}`);
 
-  if ((fieldType === 'password' || fieldType === 'both') && passInp) {
-    passInp.readOnly = false;
-    passInp.style.background = '#ffffff';
-    passInp.style.borderColor = 'var(--primary)';
-    passInp.style.boxShadow = '0 0 0 3px rgba(15, 118, 110, 0.14)';
-    if (fieldType === 'password' || fieldType === 'both') {
-      passInp.focus();
-      passInp.select();
-    }
-  }
-
-  if ((fieldType === 'role' || fieldType === 'both') && roleSel) {
-    roleSel.disabled = false;
-    roleSel.style.background = '#ffffff';
-    roleSel.style.borderColor = 'var(--primary)';
-    roleSel.style.boxShadow = '0 0 0 3px rgba(15, 118, 110, 0.14)';
-    if (fieldType === 'role') {
-      roleSel.focus();
-    }
+  if (fieldType === 'password' && passInp) {
+    passInp.focus();
+    passInp.select();
+  } else if (fieldType === 'role' && roleSel) {
+    roleSel.focus();
+  } else if (rowFields.length > 0) {
+    rowFields[0].focus();
   }
 }
 
 async function saveUserPasswordAndRole(idx) {
+  if (!isUserAdmin()) {
+    showGlobalAlert('Hanya User Admin yang dapat menyimpan perubahan Daftar User.', 'error');
+    return;
+  }
+
   const userRow = cachedUserList[idx];
   if (!userRow) return;
 
-  const passInp = document.getElementById(`usrPassInput_${idx}`);
-  const roleSel = document.getElementById(`usrRoleSelect_${idx}`);
   const saveBtn = document.getElementById(`btnSaveUser_${idx}`);
+  const rowFields = document.querySelectorAll(`.usr-edit-field[data-row="${idx}"]`);
 
-  const newPassword = passInp ? passInp.value.trim() : userRow.password;
-  const newRole = roleSel ? roleSel.value : userRow.role || 'peserta';
+  // Kumpulkan nilai dari seluruh kolom yang diedit oleh Admin
+  const updatePayload = {};
+  rowFields.forEach((el) => {
+    const col = el.getAttribute('data-col');
+    const dtype = el.getAttribute('data-type');
+    if (!col) return;
+    if (dtype === 'boolean') {
+      updatePayload[col] = el.value === 'true';
+    } else {
+      const trimmed = String(el.value ?? '').trim();
+      updatePayload[col] = trimmed === '' ? null : trimmed;
+    }
+  });
 
-  if (!newPassword) {
+  if (updatePayload.password !== undefined && !updatePayload.password) {
     showGlobalAlert('Password tidak boleh kosong.', 'error');
+    const passInp = document.getElementById(`usrPassInput_${idx}`);
     if (passInp) passInp.focus();
+    return;
+  }
+
+  if (updatePayload.user_id !== undefined && !updatePayload.user_id) {
+    showGlobalAlert('User ID tidak boleh kosong.', 'error');
     return;
   }
 
@@ -3228,35 +3312,30 @@ async function saveUserPasswordAndRole(idx) {
 
     const updated = await adaptiveSupabaseWrite(
       TABLES.USER,
-      {
-        password: newPassword,
-        role: newRole
-      },
+      updatePayload,
       queryFilter
     );
 
     cachedUserList[idx] = {
       ...userRow,
-      ...(updated || {}),
-      password: newPassword,
-      role: newRole
+      ...updatePayload,
+      ...(updated || {})
     };
 
-    // Jika user yang diupdate adalah akun yang sedang login, sinkronkan session
+    // Jika user yang diupdate adalah akun yang sedang login, sinkronkan session & hak akses
     if (
       currentLoggedUser &&
       ((userRow.id && String(currentLoggedUser.id) === String(userRow.id)) ||
         (userRow.user_id &&
           String(currentLoggedUser.user_id).toLowerCase() === String(userRow.user_id).toLowerCase()))
     ) {
-      currentLoggedUser.password = newPassword;
-      currentLoggedUser.role = newRole;
+      Object.assign(currentLoggedUser, updatePayload);
       localStorage.setItem(SESSION_KEY, JSON.stringify(currentLoggedUser));
     }
 
     renderRegisteredUsersTable();
     showGlobalAlert(
-      `✅ Data User <b>${userRow.user_id || userRow.nama || ''}</b> berhasil diperbarui (Password & Role: <b>${newRole}</b>)!`,
+      `✅ Seluruh perubahan data User <b>${cachedUserList[idx].user_id || cachedUserList[idx].nama || ''}</b> berhasil disimpan ke <code>adnan_User</code>!`,
       'success'
     );
   } catch (err) {

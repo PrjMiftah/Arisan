@@ -219,22 +219,28 @@
     }
 
     /* =====================================================================
-       TOP MAIN NAVIGATION TABS (PROPORSIONAL OTOMATIS 6 ATAU 7 TAB)
+       TOP MAIN NAVIGATION TABS (PROPORSIONAL OTOMATIS DI DESKTOP & MOBILE)
        ===================================================================== */
     .main-nav-wrapper {
       background: #f1f5f9;
       padding: 12px 22px 0;
       border-bottom: 1px solid var(--border-light);
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
     }
 
     .main-tab-nav {
       display: flex;
+      flex-wrap: wrap;
       gap: 6px;
       width: 100%;
+      min-width: 0;
     }
 
     .main-tab-btn {
-      flex: 1 1 0%;
+      flex: 1 1 auto;
+      min-width: 0;
       appearance: none;
       background: #ffffff;
       border: 1.5px solid var(--border-light);
@@ -269,7 +275,7 @@
     }
 
     /* =====================================================================
-       SUB-TAB BAR (UNTUK ENTRY BIODATA & PERIODE ARISAN)
+       SUB-TAB BAR (UNTUK ENTRY BIODATA & PENGATURAN)
        ===================================================================== */
     .sub-tab-nav {
       display: grid;
@@ -280,6 +286,9 @@
       padding: 8px;
       border-radius: 12px;
       border: 1px solid var(--border-light);
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
     }
 
     .sub-tab-nav.two-cols {
@@ -301,11 +310,14 @@
       align-items: center;
       justify-content: center;
       gap: 8px;
-      font-size: 0.88rem;
+      font-size: 0.86rem;
       font-weight: 600;
       color: var(--text-muted);
       transition: all 0.2s ease;
       min-height: 44px;
+      min-width: 0;
+      width: 100%;
+      line-height: 1.3;
     }
 
     .sub-tab-btn.active {
@@ -535,12 +547,18 @@
     .app-body {
       padding: 26px;
       flex: 1;
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
     }
 
     .main-section-panel,
     .sub-tab-panel {
       display: none;
       animation: fadeIn 0.2s ease;
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
     }
 
     .main-section-panel.active,
@@ -582,6 +600,9 @@
       padding: 22px;
       margin-bottom: 22px;
       box-shadow: 0 2px 10px rgba(0, 0, 0, 0.02);
+      width: 100%;
+      max-width: 100%;
+      min-width: 0;
     }
 
     .card-box h4 {
@@ -1138,18 +1159,30 @@
       }
       .main-tab-nav {
         display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 6px;
+      }
+      .main-tab-btn {
+        white-space: normal;
+        word-break: break-word;
+        line-height: 1.25;
+      }
+      .sub-tab-nav,
+      .sub-tab-nav.two-cols,
+      .sub-tab-nav.three-cols {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
       }
     }
 
     @media (max-width: 768px) {
       body {
-        padding: 10px 8px;
+        padding: 8px 6px;
         align-items: flex-start;
       }
 
       .app-header {
-        padding: 16px;
+        padding: 15px 14px;
       }
 
       .header-actions {
@@ -1160,22 +1193,26 @@
       }
 
       .main-nav-wrapper {
-        padding: 10px 12px;
+        padding: 10px 10px;
       }
 
       .main-tab-nav {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 8px;
+        gap: 7px;
       }
 
       .main-tab-btn {
         border-radius: 10px;
         border: 1.5px solid var(--border-light);
-        padding: 10px;
-        min-height: 46px;
-        font-size: 0.83rem;
+        padding: 9px 10px;
+        min-height: 44px;
+        font-size: 0.8rem;
+        line-height: 1.25;
         justify-content: flex-start;
+        text-align: left;
+        white-space: normal;
+        word-break: break-word;
       }
 
       .main-tab-btn.active {
@@ -1184,13 +1221,31 @@
         border: 1.5px solid var(--primary);
       }
 
-      .sub-tab-nav {
+      .sub-tab-nav,
+      .sub-tab-nav.two-cols,
+      .sub-tab-nav.three-cols {
         grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 8px;
+        gap: 7px;
+        padding: 6px;
+      }
+
+      .sub-tab-btn {
+        padding: 9px 10px;
+        min-height: 42px;
+        font-size: 0.79rem;
+        line-height: 1.25;
+        justify-content: flex-start;
+        text-align: left;
+        white-space: normal;
+        word-break: break-word;
       }
 
       .app-body {
-        padding: 18px 14px;
+        padding: 16px 12px;
+      }
+
+      .card-box {
+        padding: 16px 14px;
       }
 
       .gallery-menu-grid,
@@ -1226,6 +1281,15 @@
       .btn-secondary {
         width: 100%;
         text-align: center;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .sub-tab-nav,
+      .sub-tab-nav.two-cols,
+      .sub-tab-nav.three-cols {
+        grid-template-columns: 1fr;
+        gap: 6px;
       }
     }
   </style>
@@ -2166,7 +2230,7 @@
                   👤 Daftar User Terdaftar (Tabel: <code>adnan_User</code>)
                 </h4>
                 <p style="font-size:0.82rem; color:var(--text-muted); margin-top:2px;">
-                  Menampilkan seluruh header kolom <code>adnan_User</code> kecuali <code>id</code> (format tanggal <strong>dd mmm yyyy</strong>). Klik ikon <strong>🔑 / ✏️</strong> pada baris user untuk mengubah <strong>Password</strong> & <strong>Role</strong>, lalu klik ikon <strong>💾 Simpan</strong>.
+                  Menampilkan seluruh header kolom <code>adnan_User</code> kecuali <code>id</code> (format tanggal <strong>dd mmm yyyy</strong>). <strong>User Admin</strong> dapat mengedit <strong>seluruh kolom</strong> (User ID, Nama, Password, Role, Deskripsi, dll.) dengan klik <strong>✏️ Edit</strong> lalu <strong>💾 Simpan</strong>.
                 </p>
               </div>
               <button type="button" class="btn-secondary btn-sm" id="btnRefreshDaftarUser">
@@ -2726,6 +2790,6 @@
     </div>
   </div>
 
-  <script src="js/app.js"></script>
+  <script src="js/app.js?v=20261028c"></script>
 </body>
 </html>
