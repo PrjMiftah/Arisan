@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Login - Arisan Keluarga Adnan</title>
+  <style>
+    :root {
+      --primary: #0f766e;
+      --primary-hover: #115e59;
+      --bg-start: #0f766e;
+      --bg-end: #0f172a;
+      --card-bg: #ffffff;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --border: #cbd5e1;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, var(--bg-start), var(--bg-end));
+      padding: 20px;
+      color: var(--text-main);
+    }
+
+    .auth-card {
+      background: var(--card-bg);
+      width: 100%;
+      max-width: 420px;
+      padding: 36px 30px;
+      border-radius: 18px;
+      box-shadow: 0 20px 45px rgba(0, 0, 0, 0.3);
+      transition: transform 0.2s ease;
+    }
+
+    .brand-badge {
+      width: 56px;
+      height: 56px;
+      margin: 0 auto 14px;
+      background: #f0fdfa;
+      border: 2px solid #99f6e4;
+      color: var(--primary);
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      font-weight: 700;
+    }
+
+    .auth-card h1 {
+      text-align: center;
+      font-size: 1.5rem;
+      color: var(--text-main);
+      margin-bottom: 4px;
+    }
+
+    .auth-card p.subtitle {
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.92rem;
+      margin-bottom: 24px;
+    }
+
+    .form-group {
+      margin-bottom: 16px;
+    }
+
+    .form-group label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #334155;
+      margin-bottom: 6px;
+    }
+
+    .form-group input {
+      width: 100%;
+      padding: 12px 14px;
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      font-size: 0.95rem;
+      color: var(--text-main);
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .form-group input:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.15);
+    }
+
+    .btn-primary {
+      width: 100%;
+      padding: 13px;
+      background: var(--primary);
+      color: #ffffff;
+      border: none;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+      margin-top: 4px;
+    }
+
+    .btn-primary:hover {
+      background: var(--primary-hover);
+    }
+
+    .btn-primary:active {
+      transform: scale(0.99);
+    }
+
+    .btn-primary:disabled {
+      background: #94a3b8;
+      cursor: not-allowed;
+    }
+
+    .btn-outline {
+      width: 100%;
+      padding: 11px;
+      background: transparent;
+      color: #dc2626;
+      border: 1.5px solid #fecaca;
+      border-radius: 10px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 18px;
+      transition: background 0.2s;
+    }
+
+    .btn-outline:hover {
+      background: #fef2f2;
+    }
+
+    .alert {
+      margin-top: 16px;
+      padding: 12px 14px;
+      border-radius: 10px;
+      font-size: 0.86rem;
+      line-height: 1.45;
+      display: none;
+      word-break: break-word;
+    }
+
+    .alert.error {
+      display: block;
+      background: #fef2f2;
+      color: #b91c1c;
+      border: 1px solid #fecaca;
+    }
+
+    .alert.success {
+      display: block;
+      background: #f0fdf4;
+      color: #15803d;
+      border: 1px solid #bbf7d0;
+    }
+
+    .alert code {
+      background: rgba(0, 0, 0, 0.06);
+      padding: 2px 5px;
+      border-radius: 4px;
+      font-family: Consolas, monospace;
+      font-size: 0.82rem;
+    }
+
+    .register-footer {
+      margin-top: 22px;
+      padding: 14px 12px 4px;
+      border-top: 1px solid #e2e8f0;
+      text-align: center;
+      font-size: 0.92rem;
+      color: #475569;
+      border-radius: 8px;
+      transition: background-color 0.3s;
+    }
+
+    .register-footer.highlight-prompt {
+      background-color: #f0fdfa;
+      border: 1px dashed #14b8a6;
+      padding: 12px;
+    }
+
+    .register-footer a {
+      color: var(--primary);
+      font-weight: 700;
+      text-decoration: none;
+      margin-left: 6px;
+      cursor: pointer;
+    }
+
+    .register-footer a:hover {
+      text-decoration: underline;
+    }
+
+    .user-info-box {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 16px;
+      text-align: center;
+      margin-top: 12px;
+    }
+
+    .user-info-box p {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      margin-top: 6px;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- VIEW 1: LOGIN & REGISTER USER -->
+  <div class="auth-card" id="authView">
+    <div class="brand-badge">KA</div>
+    <h1 id="formTitle">Login Arisan</h1>
+    <p class="subtitle" id="formSubtitle">Keluarga Adnan</p>
+
+    <!-- FORM LOGIN -->
+    <form id="loginForm">
+      <div class="form-group">
+        <label for="loginUsername">Username</label>
+        <input
+          type="text"
+          id="loginUsername"
+          placeholder="Masukkan username Anda"
+          autocomplete="username"
+          required
+        />
+      </div>
+      <div class="form-group">
+        <label for="loginPassword">Password</label>
+        <input
+          type="password"
+          id="loginPassword"
+          placeholder="Masukkan password"
+          autocomplete="current-password"
+          required
+        />
+      </div>
+      <button type="submit" class="btn-primary" id="loginBtn">Masuk</button>
+    </form>
+
+    <!-- FORM REGISTER USER -->
+    <form id="registerForm" class="hidden">
+      <div class="form-group">
+        <label for="regNama">Nama Lengkap</label>
+        <input
+          type="text"
+          id="regNama"
+          placeholder="Masukkan nama lengkap"
+          required
+        />
+      </div>
+      <div class="form-group">
+        <label for="regUsername">Username</label>
+        <input
+          type="text"
+          id="regUsername"
+          placeholder="Buat username untuk login"
+          autocomplete="username"
+          required
+        />
+      </div>
+      <div class="form-group">
+        <label for="regNoHp">No. WhatsApp / HP (Opsional)</label>
+        <input
+          type="tel"
+          id="regNoHp"
+          placeholder="Contoh: 08123456789"
+        />
+      </div>
+      <div class="form-group">
+        <label for="regPassword">Password</label>
+        <input
+          type="password"
+          id="regPassword"
+          placeholder="Buat password"
+          autocomplete="new-password"
+          required
+        />
+      </div>
+      <button type="submit" class="btn-primary" id="regBtn">Register User</button>
+    </form>
+
+    <!-- KOTAK PESAN VALIDASI -->
+    <div id="alertBox" class="alert"></div>
+
+    <!-- TULISAN REGISTER USER DI BAGIAN BAWAH -->
+    <div class="register-footer" id="registerFooter">
+      <span id="togglePromptText">Belum terdaftar?</span>
+      <a href="#register" id="toggleAuthLink">Register User</a>
+    </div>
+  </div>
+
+  <!-- VIEW 2: SETELAH BERHASIL LOGIN -->
+  <div class="auth-card hidden" id="dashboardView">
+    <div class="brand-badge">✓</div>
+    <h1 id="welcomeUserText">Selamat Datang!</h1>
+    <p class="subtitle">Anda berhasil login ke Arisan Keluarga Adnan</p>
+
+    <div class="user-info-box">
+      <strong>Status Terverifikasi (Tabel: adnan_User)</strong>
+      <p id="userDetailText"></p>
+    </div>
+
+    <button type="button" class="btn-outline" id="logoutBtn">Keluar (Logout)</button>
+  </div>
+
+  <script src="js/app.js"></script>
+</body>
+</html>
+
