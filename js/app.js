@@ -28,7 +28,7 @@ const logoutBtn = document.getElementById('logoutBtn');
 let isRegisterMode = false;
 
 /**
- * Menampilkan pesan status (error / success / warning)
+ * Menampilkan pesan status (error / success)
  */
 function showAlert(message, type = 'error') {
   if (!alertBox) return;
@@ -68,9 +68,9 @@ function setAuthMode(registerMode) {
 }
 
 /**
- * Mengecek apakah user terdaftar di tabel adnan_User
+ * Mengecek apakah user terdaftar di tabel adnan_User (berdasarkan user_id atau username)
  */
-async function checkUserInSupabase(usernameInput) {
+async function checkUserInSupabase(userIdInput) {
   const endpoint = `${SUPABASE_REST_URL}/${USER_TABLE}?select=*`;
   const response = await fetch(endpoint, {
     method: 'GET',
@@ -86,40 +86,47 @@ async function checkUserInSupabase(usernameInput) {
     if (errData.code === '42501') {
       throw new Error(
         'Akses tabel <b>adnan_User</b> ditolak oleh Supabase (Error 42501).<br>' +
-        'Silakan jalankan isi file <code>supabase_schema.sql</code> di SQL Editor Supabase Anda: ' +
-        '<code>GRANT SELECT, INSERT ON public."adnan_User" TO anon;</code>'
+        'Silakan jalankan isi file <code>supabase_schema.sql</code> di SQL Editor Supabase Anda.'
       );
     }
     throw new Error(errData.message || `Gagal mengakses tabel ${USER_TABLE} (HTTP ${response.status}).`);
   }
 
   const users = await response.json();
-  const normalized = usernameInput.toLowerCase();
+  const normalized = userIdInput.toLowerCase();
 
-  // Cari kecocokan pada kolom username, nama, atau email (fleksibel terhadap skema tabel)
+  // Cari kecocokan pada kolom user_id, username, atau nama_lengkap
   const matchedUser = (users || []).find((row) => {
-    const candidateUsername = String(row.username || row.user || row.nama || row.email || '').toLowerCase();
-    return candidateUsername === normalized;
+    const uid = String(row.user_id || '').toLowerCase();
+    const uname = String(row.username || '').toLowerCase();
+    const namaLengkap = String(row.nama_lengkap || '').toLowerCase();
+    return uid === normalized || uname === normalized || namaLengkap === normalized;
   });
 
   return matchedUser || null;
 }
 
 /**
- * Mendaftarkan user baru ke tabel adnan_User
+ * Mendaftarkan user baru ke tabel adnan_User sesuai struktur kolom:
+ * user_id (NOT NULL), nama_lengkap (NOT NULL), password (NOT NULL), role, deskripsi, status_aktif
  */
-async function registerUserToSupabase({ nama, username, no_hp, password }) {
-  // 1. Cek terlebih dahulu apakah user sudah terdaftar
-  const existingUser = await checkUserInSupabase(username);
+async function registerUserToSupabase({ nama_lengkap, user_id, deskripsi, no_hp, password }) {
+  // 1. Cek terlebih dahulu apakah user_id sudah terdaftar
+  const existingUser = await checkUserInSupabase(user_id);
   if (existingUser) {
-    throw new Error(`Username <b>${username}</b> sudah terdaftar! Silakan langsung Login.`);
+    throw new Error(`User ID / Username <b>${user_id}</b> sudah terdaftar! Silakan langsung Login.`);
   }
 
-  // 2. Insert data user baru ke tabel adnan_User
+  // 2. Insert data user baru ke tabel adnan_User (sertakan user_id & nama_lengkap yang wajib / NOT NULL)
   const payload = {
-    username,
-    password,
-    nama: nama || username,
+    user_id: user_id,
+    username: user_id,
+    nama_lengkap: nama_lengkap || user_id,
+    nama: nama_lengkap || user_id,
+    password: password,
+    role: 'peserta',
+    status_aktif: true,
+    ...(deskripsi ? { deskripsi } : {}),
     ...(no_hp ? { no_hp } : {})
   };
 
@@ -138,12 +145,6 @@ async function registerUserToSupabase({ nama, username, no_hp, password }) {
       errData = await response.json();
     } catch (_) {}
 
-    if (errData.code === '42501') {
-      throw new Error(
-        'Izin INSERT ke tabel <b>adnan_User</b> belum diaktifkan (Error 42501).<br>' +
-        'Jalankan perintah di <code>supabase_schema.sql</code> pada Supabase SQL Editor.'
-      );
-    }
     throw new Error(errData.message || 'Gagal mendaftarkan user baru ke tabel adnan_User.');
   }
 
@@ -164,9 +165,12 @@ function renderLoggedInState(user) {
   authView.classList.add('hidden');
   dashboardView.classList.remove('hidden');
 
-  const displayName = user.nama || user.username || 'Anggota';
+  const displayName = user.nama_lengkap || user.nama || user.user_id || user.username || 'Peserta';
+  const displayUserId = user.user_id || user.username || '-';
+  const displayRole = user.role || 'peserta';
+
   welcomeUserText.textContent = `Selamat Datang, ${displayName}!`;
-  userDetailText.textContent = `Username: ${user.username || '-'} ${user.no_hp ? '| No. HP: ' + user.no_hp : ''}`;
+  userDetailText.textContent = `User ID: ${displayUserId} | Role: ${displayRole}`;
 }
 
 // Event Listener: Klik tulisan "Register User" di bagian bawah
@@ -181,12 +185,12 @@ if (toggleAuthLink) {
 if (loginForm) {
   loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const username = document.getElementById('loginUsername').value.trim();
+    const userId = document.getElementById('loginUsername').value.trim();
     const password = document.getElementById('loginPassword').value.trim();
     const loginBtn = document.getElementById('loginBtn');
 
-    if (!username || !password) {
-      showAlert('Harap isi username dan password.', 'error');
+    if (!userId || !password) {
+      showAlert('Harap isi User ID / Username dan Password.', 'error');
       return;
     }
 
@@ -195,11 +199,11 @@ if (loginForm) {
     hideAlert();
 
     try {
-      const foundUser = await checkUserInSupabase(username);
+      const foundUser = await checkUserInSupabase(userId);
 
       if (!foundUser) {
         showAlert(
-          `User <b>${username}</b> belum terdaftar di <code>adnan_User</code>.<br>` +
+          `User <b>${userId}</b> belum terdaftar di <code>adnan_User</code>.<br>` +
           `Silakan klik tulisan <b>Register User</b> di bawah untuk mendaftar.`,
           'error'
         );
@@ -208,9 +212,15 @@ if (loginForm) {
         return;
       }
 
-      // Validasi password jika kolom password ada di tabel
+      // Validasi status aktif jika ada
+      if (foundUser.status_aktif === false) {
+        showAlert('Akun Anda saat ini berstatus tidak aktif.', 'error');
+        return;
+      }
+
+      // Validasi password
       if (foundUser.password !== undefined && foundUser.password !== null && String(foundUser.password) !== password) {
-        showAlert('Password yang Anda masukkan tidak sesuai.', 'error');
+        showAlert('Password yang Anda masukkan salah.', 'error');
         return;
       }
 
@@ -233,14 +243,15 @@ if (loginForm) {
 if (registerForm) {
   registerForm.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const nama = document.getElementById('regNama').value.trim();
-    const username = document.getElementById('regUsername').value.trim();
-    const no_hp = document.getElementById('regNoHp').value.trim();
+    const nama_lengkap = document.getElementById('regNama').value.trim();
+    const user_id = document.getElementById('regUsername').value.trim();
+    const no_hp = document.getElementById('regNoHp') ? document.getElementById('regNoHp').value.trim() : '';
+    const deskripsi = document.getElementById('regDeskripsi') ? document.getElementById('regDeskripsi').value.trim() : no_hp;
     const password = document.getElementById('regPassword').value.trim();
     const regBtn = document.getElementById('regBtn');
 
-    if (!username || !password) {
-      showAlert('Username dan Password wajib diisi.', 'error');
+    if (!user_id || !nama_lengkap || !password) {
+      showAlert('Nama Lengkap, User ID / Username, dan Password wajib diisi.', 'error');
       return;
     }
 
@@ -249,16 +260,16 @@ if (registerForm) {
     hideAlert();
 
     try {
-      await registerUserToSupabase({ nama, username, no_hp, password });
-      showAlert('Registrasi berhasil! Silakan login menggunakan akun yang baru didaftarkan.', 'success');
+      await registerUserToSupabase({ nama_lengkap, user_id, deskripsi, no_hp, password });
+      showAlert('Registrasi berhasil disimpan ke adnan_User! Mengalihkan ke form Login...', 'success');
 
-      document.getElementById('loginUsername').value = username;
+      document.getElementById('loginUsername').value = user_id;
       document.getElementById('loginPassword').value = '';
       registerForm.reset();
 
       setTimeout(() => {
         setAuthMode(false);
-        showAlert('Akun berhasil terdaftar di adnan_User. Silakan masuk.', 'success');
+        showAlert(`User <b>${user_id}</b> berhasil terdaftar! Silakan masukkan password untuk Login.`, 'success');
       }, 1000);
     } catch (error) {
       showAlert(error.message, 'error');
@@ -289,4 +300,3 @@ document.addEventListener('DOMContentLoaded', () => {
     localStorage.removeItem(SESSION_KEY);
   }
 });
-
