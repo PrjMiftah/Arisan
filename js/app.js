@@ -306,8 +306,36 @@ function populateAllBankDropdowns() {
 }
 
 // ============================================================================
-// HELPER FORMAT RUPIAH, TANGGAL & FILE READER
+// HELPER FORMAT RUPIAH, TANGGAL (dd mmm yyyy) & FILE READER
 // ============================================================================
+const BULAN_PENDEK_ID = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+
+function formatDateDdMmmYyyy(val) {
+  if (val === null || val === undefined || val === '') return '-';
+  const str = String(val).trim();
+  const d = new Date(str);
+  if (isNaN(d.getTime())) return str;
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = BULAN_PENDEK_ID[d.getMonth()] || 'Jan';
+  const year = d.getFullYear();
+  return `${day} ${month} ${year}`;
+}
+
+function isDateColumnOrIsoValue(colName, val) {
+  const c = String(colName || '').toLowerCase();
+  const v = String(val || '').trim();
+  if (
+    c.includes('created_at') ||
+    c.includes('updated_at') ||
+    c.includes('tanggal') ||
+    c.includes('tgl') ||
+    c.includes('date')
+  ) {
+    return true;
+  }
+  return /^\d{4}-\d{2}-\d{2}(T|\s|$)/.test(v);
+}
+
 function formatRupiah(num) {
   const n = Number(num || 0);
   return 'Rp ' + n.toLocaleString('id-ID');
@@ -637,6 +665,10 @@ function switchPeriodeSubTab(targetSubTabId) {
   document.querySelectorAll('#viewPeriode .sub-tab-panel').forEach((panel) => {
     panel.classList.toggle('active', panel.id === targetSubTabId);
   });
+
+  if (targetSubTabId === 'subTabDaftarUser') {
+    loadRegisteredUsersData();
+  }
 }
 
 // ============================================================================
@@ -980,6 +1012,7 @@ async function loadAllDashboardModules() {
     fetchAllAnggota(),
     loadPeriodeAndPemenangData(),
     loadGroupArisanData(),
+    loadRegisteredUsersData(),
     loadPembayaranData(),
     loadPengeluaranData(),
     loadPengumumanData(),
@@ -2958,6 +2991,291 @@ if (formGroupArisan) {
       btn.disabled = false;
       btn.textContent = '💾 Simpan Group Arisan';
     }
+  });
+}
+
+// ============================================================================
+// SUB-TAB 4 DI PENGATURAN: DAFTAR USER TERDAFTAR (adnan_User)
+// Seluruh header ditampilkan kecuali 'id', format tanggal dd mmm yyyy,
+// dilengkapi ikon Update Password, Update Role, dan Simpan.
+// ============================================================================
+let cachedUserList = [];
+
+function escapeHtmlAttr(val) {
+  return String(val ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+async function loadRegisteredUsersData() {
+  const thead = document.getElementById('tableHeadDaftarUser');
+  const tbody = document.getElementById('tableBodyDaftarUser');
+  if (!thead || !tbody) return;
+
+  try {
+    let res = await fetch(`${SUPABASE_REST_URL}/${TABLES.USER}?select=*&order=created_at.asc`, {
+      method: 'GET',
+      headers: supabaseHeaders
+    });
+    if (!res.ok) {
+      res = await fetch(`${SUPABASE_REST_URL}/${TABLES.USER}?select=*`, {
+        method: 'GET',
+        headers: supabaseHeaders
+      });
+    }
+    if (!res.ok) throw new Error('Gagal memuat daftar user dari tabel adnan_User.');
+
+    const rows = await res.json();
+    cachedUserList = Array.isArray(rows) ? rows : [];
+    renderRegisteredUsersTable();
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:#dc2626;">${err.message}</td></tr>`;
+  }
+}
+
+function renderRegisteredUsersTable() {
+  const thead = document.getElementById('tableHeadDaftarUser');
+  const tbody = document.getElementById('tableBodyDaftarUser');
+  if (!thead || !tbody) return;
+
+  if (!cachedUserList || cachedUserList.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--text-muted);">Belum ada user terdaftar pada tabel adnan_User.</td></tr>`;
+    return;
+  }
+
+  // Kumpulkan seluruh header kolom dari adnan_User KECUALI 'id'
+  const headerKeys = [];
+  cachedUserList.forEach((row) => {
+    Object.keys(row || {}).forEach((k) => {
+      if (k.toLowerCase() !== 'id' && !headerKeys.includes(k)) {
+        headerKeys.push(k);
+      }
+    });
+  });
+
+  // Render seluruh header kolom kecuali 'id' + kolom Aksi
+  thead.innerHTML = `
+    <tr>
+      ${headerKeys
+        .map((col) => `<th>${col.replace(/_/g, ' ').toUpperCase()}</th>`)
+        .join('')}
+      <th style="text-align:center;">AKSI (UPDATE & SIMPAN)</th>
+    </tr>
+  `;
+
+  tbody.innerHTML = cachedUserList
+    .map((row, idx) => {
+      const cellsHtml = headerKeys
+        .map((col) => {
+          const colLower = col.toLowerCase();
+          const val = row[col];
+
+          // Kolom Password dengan ikon 🔑 untuk update password
+          if (colLower === 'password') {
+            return `
+              <td>
+                <div style="display:inline-flex; align-items:center; gap:6px;">
+                  <input
+                    type="text"
+                    id="usrPassInput_${idx}"
+                    value="${escapeHtmlAttr(val)}"
+                    readonly
+                    style="width:125px; padding:6px 9px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:0.83rem; font-family:monospace; background:#f8fafc; color:var(--text-main);"
+                  />
+                  <button
+                    type="button"
+                    class="btn-secondary btn-sm"
+                    style="padding:5px 8px;"
+                    title="Klik untuk update Password"
+                    onclick="unlockUserField(${idx}, 'password')"
+                  >🔑</button>
+                </div>
+              </td>
+            `;
+          }
+
+          // Kolom Role dengan ikon 🛡️ untuk update Role
+          if (colLower === 'role') {
+            const currentRole = String(val || 'peserta').toLowerCase();
+            const isAdminRole = currentRole === 'admin';
+            return `
+              <td>
+                <div style="display:inline-flex; align-items:center; gap:6px;">
+                  <select
+                    id="usrRoleSelect_${idx}"
+                    disabled
+                    style="padding:6px 9px; border:1.5px solid #cbd5e1; border-radius:8px; font-size:0.83rem; font-weight:700; background:#f8fafc; color:${isAdminRole ? 'var(--primary)' : 'var(--text-main)'};"
+                  >
+                    <option value="peserta" ${!isAdminRole ? 'selected' : ''}>peserta</option>
+                    <option value="admin" ${isAdminRole ? 'selected' : ''}>admin</option>
+                  </select>
+                  <button
+                    type="button"
+                    class="btn-secondary btn-sm"
+                    style="padding:5px 8px;"
+                    title="Klik untuk update Role"
+                    onclick="unlockUserField(${idx}, 'role')"
+                  >🛡️</button>
+                </div>
+              </td>
+            `;
+          }
+
+          // Khusus kolom tanggal: format dd mmm yyyy (contoh: 28 Okt 2026)
+          if (isDateColumnOrIsoValue(col, val)) {
+            return `<td style="white-space:nowrap; font-weight:600;">${formatDateDdMmmYyyy(val)}</td>`;
+          }
+
+          // Jika ada kolom foto berupa base64 image
+          if ((colLower === 'foto_url' || colLower === 'foto') && val && String(val).startsWith('data:image')) {
+            return `<td><img src="${val}" alt="Foto" style="width:32px; height:32px; border-radius:50%; object-fit:cover;" /></td>`;
+          }
+
+          // Jika boolean (status_aktif)
+          if (typeof val === 'boolean') {
+            return `<td><span class="status-pill ${val ? 'complete' : 'incomplete'}">${val ? 'Aktif' : 'Nonaktif'}</span></td>`;
+          }
+
+          if (colLower === 'user_id' || colLower === 'username') {
+            return `<td><strong>${val ?? '-'}</strong></td>`;
+          }
+
+          return `<td>${val !== null && val !== undefined && val !== '' ? val : '-'}</td>`;
+        })
+        .join('');
+
+      return `
+        <tr id="usrRow_${idx}">
+          ${cellsHtml}
+          <td style="white-space:nowrap; text-align:center;">
+            <div style="display:inline-flex; align-items:center; gap:6px;">
+              <button
+                type="button"
+                class="btn-secondary btn-sm"
+                title="Buka kunci edit Password & Role"
+                onclick="unlockUserField(${idx}, 'both')"
+              >✏️ Edit</button>
+              <button
+                type="button"
+                class="btn-primary btn-sm"
+                id="btnSaveUser_${idx}"
+                title="Simpan perubahan Password & Role ke adnan_User"
+                onclick="saveUserPasswordAndRole(${idx})"
+              >💾 Simpan</button>
+            </div>
+          </td>
+        </tr>
+      `;
+    })
+    .join('');
+}
+
+function unlockUserField(idx, fieldType = 'both') {
+  const passInp = document.getElementById(`usrPassInput_${idx}`);
+  const roleSel = document.getElementById(`usrRoleSelect_${idx}`);
+
+  if ((fieldType === 'password' || fieldType === 'both') && passInp) {
+    passInp.readOnly = false;
+    passInp.style.background = '#ffffff';
+    passInp.style.borderColor = 'var(--primary)';
+    passInp.style.boxShadow = '0 0 0 3px rgba(15, 118, 110, 0.14)';
+    if (fieldType === 'password' || fieldType === 'both') {
+      passInp.focus();
+      passInp.select();
+    }
+  }
+
+  if ((fieldType === 'role' || fieldType === 'both') && roleSel) {
+    roleSel.disabled = false;
+    roleSel.style.background = '#ffffff';
+    roleSel.style.borderColor = 'var(--primary)';
+    roleSel.style.boxShadow = '0 0 0 3px rgba(15, 118, 110, 0.14)';
+    if (fieldType === 'role') {
+      roleSel.focus();
+    }
+  }
+}
+
+async function saveUserPasswordAndRole(idx) {
+  const userRow = cachedUserList[idx];
+  if (!userRow) return;
+
+  const passInp = document.getElementById(`usrPassInput_${idx}`);
+  const roleSel = document.getElementById(`usrRoleSelect_${idx}`);
+  const saveBtn = document.getElementById(`btnSaveUser_${idx}`);
+
+  const newPassword = passInp ? passInp.value.trim() : userRow.password;
+  const newRole = roleSel ? roleSel.value : userRow.role || 'peserta';
+
+  if (!newPassword) {
+    showGlobalAlert('Password tidak boleh kosong.', 'error');
+    if (passInp) passInp.focus();
+    return;
+  }
+
+  if (saveBtn) {
+    saveBtn.disabled = true;
+    saveBtn.textContent = '⏳...';
+  }
+
+  try {
+    const queryFilter =
+      userRow.id != null
+        ? `?id=eq.${encodeURIComponent(userRow.id)}`
+        : `?user_id=eq.${encodeURIComponent(userRow.user_id)}`;
+
+    const updated = await adaptiveSupabaseWrite(
+      TABLES.USER,
+      {
+        password: newPassword,
+        role: newRole
+      },
+      queryFilter
+    );
+
+    cachedUserList[idx] = {
+      ...userRow,
+      ...(updated || {}),
+      password: newPassword,
+      role: newRole
+    };
+
+    // Jika user yang diupdate adalah akun yang sedang login, sinkronkan session
+    if (
+      currentLoggedUser &&
+      ((userRow.id && String(currentLoggedUser.id) === String(userRow.id)) ||
+        (userRow.user_id &&
+          String(currentLoggedUser.user_id).toLowerCase() === String(userRow.user_id).toLowerCase()))
+    ) {
+      currentLoggedUser.password = newPassword;
+      currentLoggedUser.role = newRole;
+      localStorage.setItem(SESSION_KEY, JSON.stringify(currentLoggedUser));
+    }
+
+    renderRegisteredUsersTable();
+    showGlobalAlert(
+      `✅ Data User <b>${userRow.user_id || userRow.nama || ''}</b> berhasil diperbarui (Password & Role: <b>${newRole}</b>)!`,
+      'success'
+    );
+  } catch (err) {
+    showGlobalAlert(err.message, 'error');
+  } finally {
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.textContent = '💾 Simpan';
+    }
+  }
+}
+
+window.unlockUserField = unlockUserField;
+window.saveUserPasswordAndRole = saveUserPasswordAndRole;
+
+const btnRefreshDaftarUser = document.getElementById('btnRefreshDaftarUser');
+if (btnRefreshDaftarUser) {
+  btnRefreshDaftarUser.addEventListener('click', () => {
+    loadRegisteredUsersData();
   });
 }
 

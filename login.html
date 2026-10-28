@@ -1848,31 +1848,35 @@
       </section>
 
       <!-- ===============================================================
-           MENU 5: PENGATURAN (PERIODE ARISAN, PEMENANG & ENTRY GROUP ARISAN)
+           MENU 5: PENGATURAN (PERIODE ARISAN, PEMENANG, GROUP ARISAN & DAFTAR USER)
            =============================================================== -->
       <section class="main-section-panel" id="viewPeriode">
         <div class="section-header">
           <div>
-            <h3>⚙️ 5. Pengaturan (Periode Arisan, Pemenang & Group Arisan)</h3>
-            <p>Kelola setting periode & split iuran arisan, penetapan pemenang, serta pengaturan Group Arisan (maks. 5 anggota termasuk Penanggung Jawab).</p>
+            <h3>⚙️ 5. Pengaturan (Periode Arisan, Pemenang, Group Arisan & Daftar User)</h3>
+            <p>Kelola setting periode & split iuran arisan, penetapan pemenang, pengaturan Group Arisan (maks. 5 orang), serta Daftar User terdaftar (update Password & Role).</p>
           </div>
           <button type="button" class="btn-secondary btn-sm" data-open-view="viewGalleryHome">
             &larr; Kembali ke Menu Gallery
           </button>
         </div>
 
-        <div class="sub-tab-nav three-cols">
+        <div class="sub-tab-nav">
           <button type="button" class="sub-tab-btn active" data-periode-subtab="subTabPeriodeList">
             <span class="tab-step-num">1</span>
-            <span>Setting Periode & Iuran Arisan</span>
+            <span>Setting Periode & Iuran</span>
           </button>
           <button type="button" class="sub-tab-btn" data-periode-subtab="subTabPemenangList">
             <span class="tab-step-num">2</span>
-            <span>Daftar & Penetapan Pemenang</span>
+            <span>Penetapan Pemenang</span>
           </button>
           <button type="button" class="sub-tab-btn" data-periode-subtab="subTabGroupArisan">
             <span class="tab-step-num">3</span>
-            <span>Entry Group Arisan (Maks 5 Orang)</span>
+            <span>Entry Group Arisan</span>
+          </button>
+          <button type="button" class="sub-tab-btn" data-periode-subtab="subTabDaftarUser">
+            <span class="tab-step-num">4</span>
+            <span>Daftar User Terdaftar</span>
           </button>
         </div>
 
@@ -2147,6 +2151,44 @@
                 </thead>
                 <tbody id="tableBodyGroupArisan">
                   <tr><td colspan="7" style="text-align:center;">Memuat daftar group arisan...</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- SUB-TAB 4: DAFTAR USER TERDAFTAR (SELURUH HEADER KECUALI id, FORMAT TANGGAL dd mmm yyyy, UPDATE PASSWORD & ROLE + SIMPAN) -->
+        <div class="sub-tab-panel" id="subTabDaftarUser">
+          <div class="card-box">
+            <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:14px; padding-bottom:10px; border-bottom:1px solid var(--border-light);">
+              <div>
+                <h4 style="margin:0; padding:0; border:none;">
+                  👤 Daftar User Terdaftar (Tabel: <code>adnan_User</code>)
+                </h4>
+                <p style="font-size:0.82rem; color:var(--text-muted); margin-top:2px;">
+                  Menampilkan seluruh header kolom <code>adnan_User</code> kecuali <code>id</code> (format tanggal <strong>dd mmm yyyy</strong>). Klik ikon <strong>🔑 / ✏️</strong> pada baris user untuk mengubah <strong>Password</strong> & <strong>Role</strong>, lalu klik ikon <strong>💾 Simpan</strong>.
+                </p>
+              </div>
+              <button type="button" class="btn-secondary btn-sm" id="btnRefreshDaftarUser">
+                🔄 Muat Ulang Daftar User
+              </button>
+            </div>
+
+            <div class="table-responsive">
+              <table class="data-table" id="tableDaftarUser">
+                <thead id="tableHeadDaftarUser">
+                  <tr>
+                    <th>User ID</th>
+                    <th>Nama</th>
+                    <th>Password</th>
+                    <th>Role</th>
+                    <th>Deskripsi</th>
+                    <th>Tanggal</th>
+                    <th>Aksi</th>
+                  </tr>
+                </thead>
+                <tbody id="tableBodyDaftarUser">
+                  <tr><td colspan="7" style="text-align:center;">Memuat daftar user terdaftar...</td></tr>
                 </tbody>
               </table>
             </div>
