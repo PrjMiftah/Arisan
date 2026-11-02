@@ -3,8 +3,8 @@
 Aplikasi web responsif (Desktop & Mobile Phone) untuk pengelolaan Arisan Keluarga Besar Adnan yang terintegrasi dengan database **Supabase**.
 
 ## Link Aplikasi Live (GitHub Pages)
-- **URL Aplikasi:** https://malikafathindah.github.io/ArisanAdnan/
-- **URL Login:** https://malikafathindah.github.io/ArisanAdnan/login.html
+- **URL Aplikasi:** https://prjmiftah.github.io/Arisan/
+- **URL Login:** https://prjmiftah.github.io/Arisan/login.html
 
 ## Fitur Utama
 1. **Login & Register User (`adnan_User`)** — Verifikasi anggota & pembuatan akun baru.
@@ -15,4 +15,4 @@ Aplikasi web responsif (Desktop & Mobile Phone) untuk pengelolaan Arisan Keluarg
 6. **Menu 4: Galeri Kegiatan (`adnan_Galeri`)** — Dokumentasi foto kegiatan arisan & silaturahmi keluarga.
 7. **Menu 5: Setting Periode & Pemenang Arisan (`adnan_Arisan`, `adnan_PeriodeArisan`, `adnan_PemenangArisan`)** — Pengaturan jadwal periode arisan dan pengundian pemenang.
 
-# ArisanAdnan
+# Arisan
