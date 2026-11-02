@@ -326,13 +326,17 @@ function getActivePeriodeList() {
 
 function formatPeriodeArisanLabel(p) {
   if (!p) return '';
-  const bulanText = p.bulan_tahun ? ` (${p.bulan_tahun})` : '';
-  return `Periode Ke-${p.periode_ke}${bulanText}`;
+  if (p.keterangan && String(p.keterangan).trim()) {
+    return String(p.keterangan).trim();
+  }
+  const bulanText = p.bulan_tahun ? ` - ${p.bulan_tahun}` : '';
+  return `Periode ${p.periode_ke}${bulanText}`;
 }
 
 function getPaymentPeriodeArisanLabel(payRow) {
   if (!payRow) return '-';
   if (payRow.periode_arisan) return String(payRow.periode_arisan).trim();
+  if (payRow.Periode_Arisan) return String(payRow.Periode_Arisan).trim();
   if (payRow['Periode Arisan']) return String(payRow['Periode Arisan']).trim();
   if (payRow.nama_periode) return String(payRow.nama_periode).trim();
   const ket = String(payRow.keterangan || '');
@@ -340,11 +344,11 @@ function getPaymentPeriodeArisanLabel(payRow) {
   if (perMatch && perMatch[1]) return perMatch[1].trim();
   if (payRow.arisan_id && Array.isArray(cachedPeriodeList) && cachedPeriodeList.length > 0) {
     const relPeriode = cachedPeriodeList.find((p) => String(p.id) === String(payRow.arisan_id));
-    if (relPeriode) return formatPeriodeArisanLabel(relPeriode);
+    if (relPeriode) return relPeriode.keterangan || formatPeriodeArisanLabel(relPeriode);
   }
   if (isJenisArisan(payRow)) {
     const activePer = getActivePeriodeList()[0];
-    if (activePer) return formatPeriodeArisanLabel(activePer);
+    if (activePer) return activePer.keterangan || formatPeriodeArisanLabel(activePer);
   }
   return '-';
 }
@@ -723,7 +727,13 @@ async function adaptiveSupabaseWrite(tableName, payloadObj, queryFilter = '') {
     // Jika ada kolom pada payload yang tidak ditemukan di schema cache Supabase (PGRST204)
     const missingColMatch = (errData.message || '').match(/Could not find the '([^']+)' column/);
     if (errData.code === 'PGRST204' && missingColMatch && missingColMatch[1]) {
-      delete payload[missingColMatch[1]];
+      const missingCol = missingColMatch[1];
+      if (missingCol === 'periode_arisan' && payload.periode_arisan !== undefined) {
+        payload['Periode_Arisan'] = payload.periode_arisan;
+        delete payload.periode_arisan;
+        continue;
+      }
+      delete payload[missingCol];
       continue;
     }
 
@@ -1273,24 +1283,79 @@ function computePeriodeArisanPemasukanTotals() {
   let sumArisan = 0;
   let sumKas = 0;
   let sumKonsumsi = 0;
-  // Hanya menghitung Periode Arisan yang Aktif; yang Tidak Aktif diabaikan jumlahnya
+
+  // 1. Ambil data Periode Aktif (dari kotak disamping / tabel adnan_Arisan dengan status Aktif)
   const activePeriods = getActivePeriodeList();
-  activePeriods.forEach((p) => {
-    const sp = getArisanSplitValues(p);
+  const activePeriode = activePeriods[0] || null;
+
+  const activeKet = activePeriode && activePeriode.keterangan ? String(activePeriode.keterangan).trim().toLowerCase() : '';
+  const activeId = activePeriode && activePeriode.id ? String(activePeriode.id).trim().toLowerCase() : '';
+  const activeNo = activePeriode && activePeriode.periode_ke != null ? String(activePeriode.periode_ke).trim() : '';
+  const activeBulan = activePeriode && activePeriode.bulan_tahun ? String(activePeriode.bulan_tahun).trim().toLowerCase() : '';
+
+  // 2. Cari pada tabel adnan_Pembayaran dan filter berdasarkan Periode_Arisan sesuai Periode Aktif
+  const arisanPayments = (cachedPembayaranList || []).filter((r) => {
+    if (!isJenisArisan(r)) return false;
+
+    // Abaikan jika status ditolak
+    const st = String(r.status || '').toLowerCase();
+    if (st === 'ditolak') return false;
+
+    // Jika belum ada jadwal periode aktif yang diset
+    if (!activePeriode) return false;
+
+    // Nilai header Periode_Arisan / periode_arisan pada record pembayaran
+    const rPeriode = String(
+      r.Periode_Arisan ||
+      r.periode_arisan ||
+      r['Periode Arisan'] ||
+      getPaymentPeriodeArisanLabel(r) ||
+      ''
+    ).trim().toLowerCase();
+
+    // Kecocokan 1: ID Periode cocok
+    if (r.arisan_id && activeId && String(r.arisan_id).toLowerCase() === activeId) {
+      return true;
+    }
+
+    // Kecocokan 2: Header Periode_Arisan sama persis atau mengandung keterangan Periode Aktif
+    if (rPeriode && activeKet && (rPeriode === activeKet || rPeriode.includes(activeKet) || activeKet.includes(rPeriode))) {
+      return true;
+    }
+
+    // Kecocokan 3: Cocok dengan format nomor periode (contoh: "Periode 1")
+    if (activeNo && rPeriode && (rPeriode === `periode ${activeNo}` || rPeriode.startsWith(`periode ${activeNo}`) || rPeriode.startsWith(`periode ke-${activeNo}`))) {
+      return true;
+    }
+
+    // Kecocokan 4: Cocok dengan Bulan & Tahun
+    if (activeBulan && rPeriode && rPeriode.includes(activeBulan)) {
+      return true;
+    }
+
+    return false;
+  });
+
+  arisanPayments.forEach((p) => {
+    const sp = getPaymentSplitValues(p);
     sumArisan += Number(sp.uang_arisan || 0);
     sumKas += Number(sp.uang_kas || 0);
     sumKonsumsi += Number(sp.uang_konsumsi || 0);
-    sumTotal += Number(sp.total || 0);
+    sumTotal += Number(sp.total_rincian || p.nominal || 0);
   });
+
   totalSplitArisanPeriode = sumArisan;
   totalSplitKasPeriode = sumKas;
   totalSplitKonsumsiPeriode = sumKonsumsi;
   totalPemasukanArisan = sumTotal;
+
   return {
     total: sumTotal,
     uang_arisan: sumArisan,
     uang_kas: sumKas,
-    uang_konsumsi: sumKonsumsi
+    uang_konsumsi: sumKonsumsi,
+    count: arisanPayments.length,
+    payments: arisanPayments
   };
 }
 
@@ -1310,11 +1375,7 @@ function updateQuickStatsBar() {
 
   if (elMasukArisan) elMasukArisan.textContent = formatRupiah(totalPemasukanArisan);
   if (elSubMasukArisan) {
-    if (activePeriods.length > 0) {
-      // elSubMasukArisan.textContent = `🔍 Klik Rincian Setoran Arisan (Arisan: ${formatRupiah(totalSplitArisanPeriode)} • Kas: ${formatRupiah(totalSplitKasPeriode)} • Konsumsi: ${formatRupiah(totalSplitKonsumsiPeriode)})`;
-    } else {
-      elSubMasukArisan.textContent = '';
-    }
+    elSubMasukArisan.textContent = '';
   }
   if (elMasukLain) elMasukLain.textContent = formatRupiah(totalPemasukanLain);
 
@@ -1331,11 +1392,14 @@ function updateQuickStatsBar() {
 
   const activePeriode = activePeriods[0] || null;
   if (activePeriode) {
-    elPeriode.textContent = `Periode #${activePeriode.periode_ke} (${activePeriode.bulan_tahun})`;
+    const activeLabel = (activePeriode.keterangan && String(activePeriode.keterangan).trim())
+      ? String(activePeriode.keterangan).trim()
+      : `Periode ${activePeriode.periode_ke}${activePeriode.bulan_tahun ? ' - ' + activePeriode.bulan_tahun : ''}`;
+    elPeriode.textContent = activeLabel;
     elTglPeriode.textContent = `${activePeriode.tanggal_arisan || '-'} • ${activePeriode.tempat_arisan || ''}`;
   } else {
-    elPeriode.textContent = 'Belum Ada Periode Aktif';
-    elTglPeriode.textContent = '';
+    elPeriode.textContent = 'Periode Arisan Belum di Input';
+    elTglPeriode.textContent = 'Belum ada jadwal periode berstatus Aktif di adnan_Arisan';
   }
 
   const lastWinner =
@@ -1370,50 +1434,82 @@ function renderTransparencyBreakdown(activeFilter = 'Uang Arisan') {
   const subtitleEl = document.getElementById('transparencyModalSubtitle');
   if (!gridEl || !tbodyEl) return;
 
-  // MODE 1: PEMASUKAN UANG ARISAN (Sesuai Pemasukan Periode Arisan Aktif dari adnan_Arisan)
+  // MODE 1: PEMASUKAN UANG ARISAN (Sesuai Data di adnan_Pembayaran yang telah dikelompokkan berdasar Periode)
   if (
     activeFilter === 'Uang Arisan' ||
     activeFilter === 'PEMASUKAN_PERIODE_ARISAN' ||
-    String(activeFilter).startsWith('PERIODE_KE_')
+    String(activeFilter).startsWith('PERIODE_')
   ) {
     computePeriodeArisanPemasukanTotals();
-    const activePeriods = getActivePeriodeList();
+
+    // Ambil semua transaksi arisan dari adnan_Pembayaran (kecuali yang ditolak)
+    const arisanPayments = (cachedPembayaranList || []).filter(r => isJenisArisan(r) && String(r.status || '').toLowerCase() !== 'ditolak');
+
+    // Kelompokkan data berdasarkan label Periode Arisan
+    const summaryByPeriod = {};
+    arisanPayments.forEach(r => {
+      const perLabel = getPaymentPeriodeArisanLabel(r);
+      if (!summaryByPeriod[perLabel]) {
+        summaryByPeriod[perLabel] = {
+          total: 0, count: 0, uang_arisan: 0, uang_kas: 0, uang_konsumsi: 0, items: []
+        };
+      }
+      const sp = getPaymentSplitValues(r);
+      // Tambahkan nominal untuk seluruh transaksi valid (kecuali ditolak)
+      if (String(r.status || '').toLowerCase() !== 'ditolak') {
+        summaryByPeriod[perLabel].total += Number(sp.total_rincian || r.nominal || 0);
+        summaryByPeriod[perLabel].uang_arisan += Number(sp.uang_arisan || 0);
+        summaryByPeriod[perLabel].uang_kas += Number(sp.uang_kas || 0);
+        summaryByPeriod[perLabel].uang_konsumsi += Number(sp.uang_konsumsi || 0);
+      }
+      summaryByPeriod[perLabel].count += 1;
+      summaryByPeriod[perLabel].items.push(r);
+    });
+
     if (titleEl) {
-      titleEl.textContent = '📊 Rincian Pemasukan Uang Arisan (Periode Arisan Aktif)';
+      titleEl.textContent = '  Rincian Pemasukan Uang Arisan (Dari Tabel Pembayaran)';
     }
     if (subtitleEl) {
       subtitleEl.innerHTML =
-        'Menampilkan rincian pemasukan berdasarkan data <strong>Periode Arisan Aktif (adnan_Arisan)</strong> di Supabase (Periode tidak aktif diabaikan jumlahnya).';
+        'Menampilkan rekap pemasukan Uang Arisan riil berdasarkan data transaksi di <strong>adnan_Pembayaran</strong>, dikelompokkan per <strong>Periode Arisan</strong>.';
     }
+
+    // Header Tabel Disamakan untuk Menampilkan Kolom Periode dan Pembayar
     if (theadEl) {
       theadEl.innerHTML = `
         <tr>
-          <th>Periode Ke</th>
-          <th>Bulan / Tahun</th>
-          <th>Tanggal & Tempat</th>
+          <th>Tanggal</th>
+          <th>Nama Pembayar</th>
+          <th>Periode Arisan</th>
+          <th>Metode & Bank</th>
           <th>Uang Arisan</th>
           <th>Uang Kas</th>
-          <th>Uang Konsumsi</th>
-          <th>Total Pemasukan Periode</th>
+          <th>Konsumsi</th>
+          <th>Total Rincian</th>
+          <th>Bukti</th>
           <th>Status</th>
         </tr>
       `;
     }
 
+    const periodKeys = Object.keys(summaryByPeriod).sort();
+
     const periodCards = [
       {
         key: 'Uang Arisan',
-        title: '💰 Total Pemasukan Periode Arisan Aktif',
+        title: '  Total Pemasukan Arisan',
         amount: totalPemasukanArisan,
-        count: `${activePeriods.length} Periode Aktif • Arisan: ${formatRupiah(totalSplitArisanPeriode)} | Kas: ${formatRupiah(totalSplitKasPeriode)} | Konsumsi: ${formatRupiah(totalSplitKonsumsiPeriode)}`
+        count: `${arisanPayments.length} Transaksi Tercatat`
       },
-      ...activePeriods.map((p) => {
-        const sp = getArisanSplitValues(p);
+      ...periodKeys.map((k) => {
+        const s = summaryByPeriod[k];
+        const safeKey = 'PERIODE_' + k.replace(/[^a-zA-Z0-9]/g, '_');
         return {
-          key: `PERIODE_KE_${p.periode_ke}`,
-          title: `📅 Periode Ke-${p.periode_ke} (${p.bulan_tahun || '-'})`,
-          amount: sp.total,
-          count: `Arisan: ${formatRupiah(sp.uang_arisan)} • Kas: ${formatRupiah(sp.uang_kas)} • Konsumsi: ${formatRupiah(sp.uang_konsumsi)}`
+          key: safeKey,
+          originalKey: k,
+          title: `  ${k}`,
+          amount: s.total,
+          count: `${s.count} Transaksi`
         };
       })
     ];
@@ -1430,40 +1526,65 @@ function renderTransparencyBreakdown(activeFilter = 'Uang Arisan') {
       )
       .join('');
 
-    const filteredPeriods = activePeriods.filter((p) => {
-      if (String(activeFilter).startsWith('PERIODE_KE_')) {
-        const num = String(activeFilter).replace('PERIODE_KE_', '');
-        return String(p.periode_ke) === num;
+    let filteredPayments = arisanPayments;
+    if (String(activeFilter).startsWith('PERIODE_')) {
+      const matchingCard = periodCards.find(c => c.key === activeFilter);
+      if (matchingCard && matchingCard.originalKey) {
+        filteredPayments = summaryByPeriod[matchingCard.originalKey].items;
       }
-      return true;
-    });
+    }
 
-    if (filteredPeriods.length === 0) {
-      tbodyEl.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--text-muted);">Belum ada Periode Arisan berstatus Aktif pada tabel Supabase (adnan_Arisan).</td></tr>`;
+    if (filteredPayments.length === 0) {
+      tbodyEl.innerHTML = `<tr><td colspan="10" style="text-align:center; color:var(--text-muted);">Belum ada data pembayaran arisan.</td></tr>`;
       return;
     }
 
-    tbodyEl.innerHTML = filteredPeriods
-      .map((p) => {
-        const sp = getArisanSplitValues(p);
+    tbodyEl.innerHTML = filteredPayments
+      .map((r, idx) => {
+        const statusLower = String(r.status || 'Pending').toLowerCase();
+        const isPending = statusLower === 'pending' || statusLower === 'menunggu';
+        const metodeText =
+          r.metode_bayar === 'Transfer Bank' || r.metode_bayar === 'Transfer'
+            ? `Transfer ${r.nama_bank ? '(' + r.nama_bank + ')' : ''}`
+            : 'Tunai';
+
+        const mediaKey = `arisan_pay_${r.id || idx}`;
+        if (r.bukti_bayar_url) {
+          registerMediaPreview(mediaKey, `Bukti Pembayaran - ${r.nama_pembayar || 'Peserta'}`, r.bukti_bayar_url);
+        }
+        const buktiBtn = r.bukti_bayar_url
+          ? `<button type="button" class="btn-secondary btn-sm" onclick="openMediaByKey('${mediaKey}')">  Lihat Bukti</button>`
+          : `<span style="color:#94a3b8; font-size:0.8rem;">-</span>`;
+
+        const sp = getPaymentSplitValues(r);
+        const cleanKet = stripInternalMetaFromKeterangan(r.keterangan);
+        const perLabel = getPaymentPeriodeArisanLabel(r);
+        const totalRincianVal = sp.total_rincian || Number(r.nominal || 0);
+
         return `
           <tr>
-            <td><strong>Periode Ke-${p.periode_ke}</strong></td>
-            <td><strong>${p.bulan_tahun || '-'}</strong></td>
-            <td>${p.tanggal_arisan || '-'}<br><small style="color:#64748b;">${p.tempat_arisan || '-'}</small></td>
+            <td>${r.tanggal_bayar || '-'}</td>
+            <td>
+              <strong>${r.nama_pembayar || '-'}</strong>
+              ${cleanKet ? `<br><small style="color:#64748b;">${cleanKet}</small>` : ''}
+            </td>
+            <td><strong>${perLabel}</strong></td>
+            <td>${metodeText}</td>
             <td><span style="color:var(--primary); font-weight:700;">${formatRupiah(sp.uang_arisan)}</span></td>
             <td><span style="color:#b45309; font-weight:700;">${formatRupiah(sp.uang_kas)}</span></td>
             <td><span style="color:#0284c7; font-weight:700;">${formatRupiah(sp.uang_konsumsi)}</span></td>
-            <td><strong style="color:var(--primary);">${formatRupiah(sp.total)}</strong></td>
-            <td><span class="status-pill complete">${p.status || 'aktif'}</span></td>
+            <td><strong>${formatRupiah(totalRincianVal)}</strong></td>
+            <td>${buktiBtn}</td>
+            <td><span class="status-pill ${isPending ? 'incomplete' : 'complete'}">${r.status || 'Pending'}</span></td>
           </tr>
         `;
       })
       .join('');
+
     return;
   }
 
-    // MODE 2: TOTAL PENGELUARAN (Murni dari adnan_Pengeluaran)
+  // MODE 2: TOTAL PENGELUARAN (Murni dari adnan_Pengeluaran)
   if (
     activeFilter === 'TOTAL_PENGELUARAN' ||
     String(activeFilter).startsWith('EXP_KAT_')
@@ -1598,26 +1719,26 @@ function renderTransparencyBreakdown(activeFilter = 'Uang Arisan') {
   ) {
     computePeriodeArisanPemasukanTotals();
     const totalMasukAll = totalPemasukanArisan + totalPemasukanLain;
-    const totalKeluarAll = totalPengeluaranKas; // Hanya adnan_Pengeluaran
+    const totalKeluarAll = totalPengeluaranKas; // Murni dari adnan_Pengeluaran
     const saldoAkhir = totalMasukAll - totalKeluarAll;
 
     if (titleEl) {
-      titleEl.textContent = '⚖️ Rincian Saldo Kas Keluarga (Penerimaan vs Pengeluaran)';
+      titleEl.textContent = '🏛️ Rincian Saldo Kas Keluarga (Pemasukan vs Pengeluaran)';
     }
     if (subtitleEl) {
       subtitleEl.innerHTML =
-        'Rekapitulasi <strong>Penerimaan (adnan_Pembayaran & Jadwal Periode)</strong> dikurangi <strong>Pengeluaran Kas (adnan_Pengeluaran)</strong>.';
+        'Rekapitulasi mutasi <strong>Pemasukan (adnan_Pembayaran)</strong> dikurangi <strong>Total Pengeluaran (adnan_Pengeluaran)</strong> sehingga menghasilkan Saldo Kas Keluarga.';
     }
     if (theadEl) {
       theadEl.innerHTML = `
         <tr>
-          <th>Tanggal</th>
-          <th>Arus Kas</th>
-          <th>Tabel Sumber</th>
-          <th>Keterangan / Nama</th>
-          <th>Penerimaan (+)</th>
-          <th>Pengeluaran (-)</th>
-          <th>Status</th>
+          <th>TANGGAL</th>
+          <th>ARUS KAS</th>
+          <th>KATEGORI / SUMBER</th>
+          <th>KETERANGAN / NAMA</th>
+          <th>PEMASUKAN (+)</th>
+          <th>PENGELUARAN (-)</th>
+          <th>STATUS</th>
         </tr>
       `;
     }
@@ -1625,21 +1746,21 @@ function renderTransparencyBreakdown(activeFilter = 'Uang Arisan') {
     const saldoCards = [
       {
         key: 'SALDO_KAS',
-        title: '💰 Saldo Akhir Kas',
+        title: '🏛️ Saldo Akhir Kas Keluarga',
         amount: saldoAkhir,
-        count: `Penerimaan (${formatRupiah(totalMasukAll)}) - Pengeluaran (${formatRupiah(totalKeluarAll)})`
+        count: `Pemasukan (${formatRupiah(totalMasukAll)}) - Pengeluaran (${formatRupiah(totalKeluarAll)})`
       },
       {
         key: 'MUTASI_MASUK',
-        title: '📥 Total Penerimaan (+)',
+        title: '📈 Total Seluruh Pemasukan (+)',
         amount: totalMasukAll,
-        count: `adnan_Pembayaran & Periode Aktif`
+        count: `Periode Arisan: ${formatRupiah(totalPemasukanArisan)} • Lainnya: ${formatRupiah(totalPemasukanLain)}`
       },
       {
         key: 'MUTASI_KELUAR',
-        title: '📤 Total Pengeluaran (-)',
+        title: '📉 Total Seluruh Pengeluaran (-)',
         amount: totalKeluarAll,
-        count: `adnan_Pengeluaran (${(cachedPengeluaranList || []).length} Data)`
+        count: `Kas (adnan_Pengeluaran): ${formatRupiah(totalKeluarAll)}`
       }
     ];
 
@@ -1655,62 +1776,78 @@ function renderTransparencyBreakdown(activeFilter = 'Uang Arisan') {
       )
       .join('');
 
-    const mutasiRows = [
-      // Sisi Penerimaan 1: Periode Arisan Aktif
-      ...getActivePeriodeList().map((p) => {
-        const sp = getArisanSplitValues(p);
-        return {
-          tipe: 'MASUK',
-          tanggal: p.tanggal_arisan || '-',
-          sumber: 'adnan_Arisan (Periode)',
-          keterangan: `Periode Ke-${p.periode_ke} (${p.bulan_tahun || '-'})`,
-          masuk: sp.total,
-          keluar: 0,
-          status: p.status || 'aktif'
-        };
-      }),
-      // Sisi Penerimaan 2: adnan_Pembayaran (Penerimaan Lainnya: Sumbangan, Zakat, dll.)
-      ...(cachedPembayaranList || []).filter((r) => !isJenisArisan(r)).map((r) => ({
+    // PEMASUKAN (+): SEMUA DARI TABEL adnan_Pembayaran
+    const mutasiMasukRows = (cachedPembayaranList || []).map((r) => {
+      const sp = getPaymentSplitValues(r);
+      const isArs = isJenisArisan(r);
+      const cleanKet = stripInternalMetaFromKeterangan(r.keterangan);
+      const nominalMasuk = isArs ? Number(sp.total_rincian || r.nominal || 0) : Number(r.nominal || 0);
+      const perLabel = getPaymentPeriodeArisanLabel(r);
+      const sumberText = isArs
+        ? `Pembayaran Arisan (${perLabel})`
+        : `Pembayaran Lainnya: ${r.jenis_bayar || 'Lainnya'}`;
+
+      let ketText = r.nama_pembayar || '-';
+      if (cleanKet) {
+        ketText += ` • ${cleanKet}`;
+      }
+
+      return {
         tipe: 'MASUK',
         tanggal: r.tanggal_bayar || '-',
-        sumber: 'adnan_Pembayaran',
-        keterangan: `${r.jenis_bayar} - a.n ${r.nama_pembayar || '-'}`,
-        masuk: Number(r.nominal || 0),
+        sumber: sumberText,
+        keterangan: ketText,
+        masuk: nominalMasuk,
         keluar: 0,
-        status: r.status || 'Pending'
-      })),
-      // Sisi Pengeluaran: Murni dari adnan_Pengeluaran
-      ...(cachedPengeluaranList || []).map((r) => ({
+        status: r.status || 'disetujui'
+      };
+    });
+
+    // PENGELUARAN (-): SEMUA DARI TABEL adnan_Pengeluaran
+    const mutasiKeluarRows = (cachedPengeluaranList || []).map((r) => {
+      const cleanKet = stripExpInternalMeta(r.deskripsi || r.nama_pengeluaran || '-');
+      let ketText = r.penerima ? `${r.penerima}` : '-';
+      if (cleanKet && cleanKet !== '-') {
+        ketText = ketText === '-' ? cleanKet : `${ketText} • ${cleanKet}`;
+      }
+
+      return {
         tipe: 'KELUAR',
         tanggal: r.tanggal_pengeluaran || r.tanggal || '-',
-        sumber: 'adnan_Pengeluaran',
-        keterangan: `${r.kategori}: ${r.penerima ? 'Untuk ' + r.penerima + ' - ' : ''}${stripExpInternalMeta(r.deskripsi || r.nama_pengeluaran || '-')}`,
+        sumber: `Pengeluaran Kas: ${r.kategori || 'Kas'}`,
+        keterangan: ketText,
         masuk: 0,
         keluar: Number(r.nominal || 0),
         status: 'Tercatat'
-      }))
-    ].filter((m) => {
+      };
+    });
+
+    const allMutasi = [...mutasiMasukRows, ...mutasiKeluarRows];
+    // Urutkan berdasarkan tanggal terbaru ke terlama
+    allMutasi.sort((a, b) => String(b.tanggal || '').localeCompare(String(a.tanggal || '')));
+
+    const filteredMutasi = allMutasi.filter((m) => {
       if (activeFilter === 'MUTASI_MASUK') return m.tipe === 'MASUK';
       if (activeFilter === 'MUTASI_KELUAR') return m.tipe === 'KELUAR';
       return true;
     });
 
-    if (mutasiRows.length === 0) {
+    if (filteredMutasi.length === 0) {
       tbodyEl.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--text-muted);">Belum ada data mutasi kas.</td></tr>`;
       return;
     }
 
-    tbodyEl.innerHTML = mutasiRows
+    tbodyEl.innerHTML = filteredMutasi
       .map(
         (m) => `
         <tr>
           <td>${m.tanggal}</td>
           <td>
-            <span class="status-pill ${m.tipe === 'MASUK' ? 'complete' : 'incomplete'}">
-              ${m.tipe === 'MASUK' ? '+ PENERIMAAN' : '- PENGELUARAN'}
+            <span class="status-pill ${m.tipe === 'MASUK' ? 'complete' : 'incomplete'}" style="${m.tipe === 'KELUAR' ? 'background:#fef2f2; color:#dc2626; border:1px solid #fecaca;' : ''}">
+              ${m.tipe === 'MASUK' ? '+ PEMASUKAN' : '- PENGELUARAN'}
             </span>
           </td>
-          <td><code>${m.sumber}</code></td>
+          <td><strong>${m.sumber}</strong></td>
           <td>${m.keterangan}</td>
           <td><strong style="color:var(--primary);">${m.masuk > 0 ? '+ ' + formatRupiah(m.masuk) : '-'}</strong></td>
           <td><strong style="color:#dc2626;">${m.keluar > 0 ? '- ' + formatRupiah(m.keluar) : '-'}</strong></td>
@@ -1906,20 +2043,24 @@ function isPaymentOwnedByCurrentUser(row) {
 
 function getActivePeriodeSplitRates() {
   const payPeriode = document.getElementById('payPeriode');
+  const payPeriodeId = document.getElementById('payPeriodeId');
   const activeList = getActivePeriodeList();
-  if (payPeriode && payPeriode.options && payPeriode.options.length > 1) {
-    const selectedId = payPeriode.value;
-    const foundBySelect = selectedId
-      ? activeList.find((p) => String(p.id) === String(selectedId)) ||
-      cachedPeriodeList.find((p) => String(p.id) === String(selectedId)) ||
-      null
-      : null;
-    if (foundBySelect && isPeriodeArisanAktif(foundBySelect)) {
-      return getArisanSplitValues(foundBySelect);
-    }
+  const targetId = (payPeriodeId && payPeriodeId.value) || (payPeriode && payPeriode.dataset && payPeriode.dataset.arisanId);
+  const targetKet = payPeriode ? payPeriode.value.trim() : '';
+
+  let found = null;
+  if (targetId) {
+    found = activeList.find((p) => String(p.id) === String(targetId)) ||
+            cachedPeriodeList.find((p) => String(p.id) === String(targetId));
   }
-  const foundPeriode = activeList[0] || null;
-  return getArisanSplitValues(foundPeriode);
+  if (!found && targetKet) {
+    found = activeList.find((p) => String(p.keterangan || '').trim().toLowerCase() === targetKet.toLowerCase()) ||
+            cachedPeriodeList.find((p) => String(p.keterangan || '').trim().toLowerCase() === targetKet.toLowerCase());
+  }
+  if (!found) {
+    found = activeList[0] || null;
+  }
+  return getArisanSplitValues(found);
 }
 
 function extractGroupMembersArray(groupRow) {
@@ -2132,25 +2273,43 @@ if (chkSelectAllGroupPayEl) {
 function syncPayPeriodeByJenis() {
   const payJenis = document.getElementById('payJenis');
   const payPeriode = document.getElementById('payPeriode');
+  const payPeriodeId = document.getElementById('payPeriodeId');
   const payPeriodeHint = document.getElementById('payPeriodeHint');
   if (!payJenis || !payPeriode) return;
 
   const isUangArisan = payJenis.value === 'Uang Arisan';
-  payPeriode.disabled = !isUangArisan;
   if (!isUangArisan) {
     payPeriode.value = '';
+    payPeriode.placeholder = '- Nonaktif untuk ' + payJenis.value + ' -';
+    payPeriode.disabled = true;
+    if (payPeriodeId) payPeriodeId.value = '';
     if (payPeriodeHint) {
       payPeriodeHint.textContent = '(Nonaktif - Hanya untuk Uang Arisan)';
       payPeriodeHint.style.color = '#64748b';
     }
   } else {
+    payPeriode.disabled = false;
     const activePeriods = getActivePeriodeList();
-    if (!payPeriode.value && activePeriods.length > 0) {
-      payPeriode.value = activePeriods[0].id;
-    }
-    if (payPeriodeHint) {
-      payPeriodeHint.textContent = '(Aktif untuk Uang Arisan)';
-      payPeriodeHint.style.color = 'var(--primary)';
+    const activePer = activePeriods[0] || null;
+    if (activePer) {
+      const activeLabel = (activePer.keterangan && String(activePer.keterangan).trim())
+        ? String(activePer.keterangan).trim()
+        : `Periode ${activePer.periode_ke}${activePer.bulan_tahun ? ' - ' + activePer.bulan_tahun : ''}`;
+      payPeriode.value = activeLabel;
+      payPeriode.placeholder = activeLabel;
+      if (payPeriodeId) payPeriodeId.value = activePer.id || '';
+      if (payPeriodeHint) {
+        payPeriodeHint.textContent = '(Aktif untuk Uang Arisan)';
+        payPeriodeHint.style.color = 'var(--primary)';
+      }
+    } else {
+      payPeriode.value = '';
+      payPeriode.placeholder = 'Periode Arisan Belum di Input';
+      if (payPeriodeId) payPeriodeId.value = '';
+      if (payPeriodeHint) {
+        payPeriodeHint.textContent = '⚠️ Periode Arisan Belum di Input';
+        payPeriodeHint.style.color = '#dc2626';
+      }
     }
   }
   syncPayGroupSplitUI();
@@ -2466,6 +2625,8 @@ async function loadPembayaranData() {
     const rows = await res.json();
     cachedPembayaranList = (rows || []).map((r) => ({
       ...r,
+      periode_arisan: r.periode_arisan || r.Periode_Arisan || r['Periode Arisan'] || null,
+      Periode_Arisan: r.Periode_Arisan || r.periode_arisan || r['Periode Arisan'] || null,
       jenis_bayar_db: r.jenis_bayar,
       jenis_bayar: getEffectiveJenisBayar(r)
     }));
@@ -2674,17 +2835,23 @@ async function executeSavePembayaran(confirmedFromGroupModal = false) {
   btn.textContent = 'Menyimpan Pembayaran...';
 
   try {
-    const selectedPeriodeId =
-      jenisBayar === 'Uang Arisan' ? document.getElementById('payPeriode').value || null : null;
-    const selectedPeriodeObj =
-      jenisBayar === 'Uang Arisan'
-        ? (selectedPeriodeId &&
-          (getActivePeriodeList().find((p) => String(p.id) === String(selectedPeriodeId)) ||
-            cachedPeriodeList.find((p) => String(p.id) === String(selectedPeriodeId)))) ||
-        getActivePeriodeList()[0] ||
-        null
-        : null;
-    const selectedPeriodeLabel = selectedPeriodeObj ? formatPeriodeArisanLabel(selectedPeriodeObj) : null;
+    const payPeriodeInput = document.getElementById('payPeriode');
+    const payPeriodeIdInput = document.getElementById('payPeriodeId');
+    const selectedPeriodeLabel = jenisBayar === 'Uang Arisan'
+      ? (payPeriodeInput ? payPeriodeInput.value.trim() : null)
+      : null;
+    const selectedPeriodeId = jenisBayar === 'Uang Arisan'
+      ? (payPeriodeIdInput && payPeriodeIdInput.value
+        ? payPeriodeIdInput.value
+        : (getActivePeriodeList()[0] ? getActivePeriodeList()[0].id : null))
+      : null;
+
+    if (jenisBayar === 'Uang Arisan' && (!selectedPeriodeLabel || selectedPeriodeLabel === 'Periode Arisan Belum di Input')) {
+      showGlobalAlert('⚠️ <b>Periode Arisan Belum di Input</b> pada tabel <code>adnan_Arisan</code>. Harap atur dan aktifkan Periode Arisan terlebih dahulu pada Menu Pengaturan (Setting Periode & Iuran).', 'error');
+      btn.disabled = false;
+      btn.textContent = '💾 Simpan Pembayaran (Status: Pending)';
+      return;
+    }
     const tanggalBayar = document.getElementById('payTanggal').value || todayISO();
     const noRek = document.getElementById('payNoRekening').value.trim();
     const ketInput = document.getElementById('payKeterangan').value.trim();
@@ -3477,18 +3644,10 @@ async function loadPeriodeAndPemenangData() {
     cachedPeriodeList = Array.isArray(rowsArisan) ? rowsArisan : [];
     const activePeriods = getActivePeriodeList();
 
-    // Pada Form Pembayaran (#payPeriode), hanya tampilkan Periode Arisan yang Aktif
-    const payPeriodeOptions = [
-      '<option value="">-- Pilih Periode Arisan Aktif --</option>',
-      ...activePeriods.map((p) => `<option value="${p.id}">${formatPeriodeArisanLabel(p)}</option>`)
-    ].join('');
-
     const allPeriodeOptions = [
       '<option value="">-- Pilih Periode Arisan --</option>',
       ...cachedPeriodeList.map((p) => `<option value="${p.id}">${formatPeriodeArisanLabel(p)}</option>`)
     ].join('');
-
-    if (payPeriodeSelect) payPeriodeSelect.innerHTML = payPeriodeOptions;
     if (winPeriodeSelect) winPeriodeSelect.innerHTML = allPeriodeOptions;
     syncPayPeriodeByJenis();
 
@@ -3497,7 +3656,10 @@ async function loadPeriodeAndPemenangData() {
         ? Math.max(...cachedPeriodeList.map((p) => Number(p.periode_ke || 0))) + 1
         : 1;
     const perNomorEl = document.getElementById('perNomor');
-    if (perNomorEl) perNomorEl.value = nextPeriodeNum;
+    if (perNomorEl) {
+      perNomorEl.value = nextPeriodeNum;
+      autoFillPeriodeKeterangan();
+    }
 
     if (tbodyPeriode) {
       if (cachedPeriodeList.length === 0) {
@@ -3686,6 +3848,32 @@ async function deletePemenangArisan(winnerId, periodeKe) {
 window.deletePeriodeArisan = deletePeriodeArisan;
 window.deletePemenangArisan = deletePemenangArisan;
 
+
+// ============================================================================
+// OTOMATISASI KOTAK INPUT KETERANGAN PERIODE ARISAN (Rumus: "Periode " & [Ke-] & " - " & [Bulan & Tahun])
+// ============================================================================
+function autoFillPeriodeKeterangan() {
+  const perNomorEl = document.getElementById('perNomor');
+  const perBulanTahunEl = document.getElementById('perBulanTahun');
+  const perKeteranganEl = document.getElementById('perKeterangan');
+  if (!perKeteranganEl) return;
+  const no = perNomorEl ? String(perNomorEl.value || '').trim() : '';
+  const bln = perBulanTahunEl ? String(perBulanTahunEl.value || '').trim() : '';
+  if (no || bln) {
+    perKeteranganEl.value = `Periode ${no}${bln ? ' - ' + bln : ''}`;
+  }
+}
+
+const perNomorInputEl = document.getElementById('perNomor');
+if (perNomorInputEl) {
+  perNomorInputEl.addEventListener('input', autoFillPeriodeKeterangan);
+  perNomorInputEl.addEventListener('change', autoFillPeriodeKeterangan);
+}
+const perBulanTahunInputEl = document.getElementById('perBulanTahun');
+if (perBulanTahunInputEl) {
+  perBulanTahunInputEl.addEventListener('input', autoFillPeriodeKeterangan);
+  perBulanTahunInputEl.addEventListener('change', autoFillPeriodeKeterangan);
+}
 const formPeriodeArisan = document.getElementById('formPeriodeArisan');
 if (formPeriodeArisan) {
   formPeriodeArisan.addEventListener('submit', async (e) => {
@@ -3709,8 +3897,8 @@ if (formPeriodeArisan) {
       const tempat = document.getElementById('perTempat').value.trim();
       const status = document.getElementById('perStatus').value;
       const ketRaw = document.getElementById('perKeterangan').value.trim();
-      const splitMeta = `[SPLIT:${ua},${uk},${uko}]`;
-      const keterangan = [ketRaw, splitMeta].filter(Boolean).join(' ');
+      const generatedKet = `Periode ${periodeKe}${bulanTahun ? ' - ' + bulanTahun : ''}`;
+      const keterangan = ketRaw || generatedKet;
 
       await adaptiveSupabaseWrite(TABLES.ARISAN, {
         periode_ke: periodeKe,
@@ -6263,7 +6451,7 @@ function renderDbTableData(tableName, rows) {
   let bodyHtml = '';
   rows.forEach((row, idx) => {
     bodyHtml += `<tr style="border-bottom:1px solid #e2e8f0;">`;
-    
+
     // Tombol Edit & Hapus
     bodyHtml += `
       <td style="padding:6px 10px; text-align:center; white-space:nowrap;">
@@ -6327,7 +6515,7 @@ function openEditDbModal(rowIndex) {
   const form = document.getElementById('modalEditDbFormContainer');
 
   title.textContent = `✏️ Edit: ${activeDbTable}`;
-  
+
   let html = '<div style="display:flex; flex-direction:column; gap:10px;">';
   for (const [key, value] of Object.entries(row)) {
     const isId = (key === 'id');
@@ -6412,3 +6600,5 @@ async function saveEditedDbRecord() {
     }
   }
 }
+updated_app.js
+Displaying

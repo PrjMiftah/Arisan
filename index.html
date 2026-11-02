@@ -1730,7 +1730,6 @@
             title="Klik untuk melihat rincian Pemasukan Periode Arisan">
             <span class="stat-title">Pemasukan Uang Arisan</span>
             <span class="stat-value" id="statTotalMasukArisan">Rp 0</span>
-            <span class="stat-sub" id="statSubMasukArisan">🔍 Klik Rincian Pemasukan Periode</span>
           </div>
 
           <div class="stat-card clickable-stat" id="statCardPemasukanLain"
@@ -1936,13 +1935,13 @@
                 </select>
               </div>
 
-              <!-- PERIODE ARISAN: Enable hanya jika Jenis Pembayaran === 'Uang Arisan' -->
+              <!-- PERIODE ARISAN: Mengambil langsung dari tabel adnan_Arisan dengan Status Aktif pada header Keterangan -->
               <div class="form-group">
                 <label for="payPeriode">Periode Arisan <small id="payPeriodeHint" style="color:var(--primary);">(Aktif
                     untuk Uang Arisan)</small></label>
-                <select id="payPeriode">
-                  <option value="">-- Pilih Periode Arisan --</option>
-                </select>
+                <input type="text" id="payPeriode" readonly placeholder="Periode Arisan Belum di Input"
+                  style="font-weight:700; color:var(--primary); background:#f8fafc;" />
+                <input type="hidden" id="payPeriodeId" value="" />
               </div>
 
               <div class="form-group">
@@ -2739,8 +2738,8 @@
                 </div>
 
                 <div class="form-group">
-                  <label for="perKeterangan">Keterangan Periode</label>
-                  <input type="text" id="perKeterangan" placeholder="Catatan agenda pertemuan arisan" />
+                  <label for="perKeterangan">Keterangan Periode <small style="color:var(--primary); font-weight:600;">(Otomatis: Periode [Ke-] - [Bulan & Tahun])</small></label>
+                  <input type="text" id="perKeterangan" placeholder="Contoh: Periode 1 - Januari 2026" />
                 </div>
               </div>
 
@@ -3498,7 +3497,7 @@
     </div>
   </div>
 
-  <script src="js/app.js?v=20261101f"></script>
+  <script src="js/app.js?v=20261102e"></script>
 </body>
 
 </html>
