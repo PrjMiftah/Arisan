@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="id">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
@@ -54,10 +55,20 @@
     .auth-card {
       background: var(--card-bg);
       width: 100%;
-      max-width: 430px;
+      max-width: 460px;
       padding: 34px 28px;
       border-radius: var(--radius-lg);
       box-shadow: 0 22px 50px rgba(0, 0, 0, 0.32);
+      overflow: hidden;
+    }
+
+    .auth-banner-img {
+      width: calc(100% + 56px);
+      margin: -34px -28px 22px -28px;
+      height: auto;
+      display: block;
+      object-fit: cover;
+      border-bottom: 2px solid var(--border-light);
     }
 
     .brand-badge {
@@ -295,6 +306,10 @@
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 
+    
+    .sub-tab-nav.five-cols {
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
     .sub-tab-nav.three-cols {
       grid-template-columns: repeat(3, minmax(0, 1fr));
     }
@@ -497,12 +512,35 @@
       flex-shrink: 0;
     }
 
-    .icon-teal { background: #f0fdfa; border: 1px solid #99f6e4; }
-    .icon-amber { background: #fffbeb; border: 1px solid #fde68a; }
-    .icon-blue { background: #eff6ff; border: 1px solid #bfdbfe; }
-    .icon-purple { background: #faf5ff; border: 1px solid #e9d5ff; }
-    .icon-rose { background: #fff1f2; border: 1px solid #fecdd3; }
-    .icon-emerald { background: #ecfdf5; border: 1px solid #a7f3d0; }
+    .icon-teal {
+      background: #f0fdfa;
+      border: 1px solid #99f6e4;
+    }
+
+    .icon-amber {
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+    }
+
+    .icon-blue {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+    }
+
+    .icon-purple {
+      background: #faf5ff;
+      border: 1px solid #e9d5ff;
+    }
+
+    .icon-rose {
+      background: #fff1f2;
+      border: 1px solid #fecdd3;
+    }
+
+    .icon-emerald {
+      background: #ecfdf5;
+      border: 1px solid #a7f3d0;
+    }
 
     .gallery-badge {
       font-size: 0.74rem;
@@ -567,8 +605,15 @@
     }
 
     @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(4px); }
-      to { opacity: 1; transform: translateY(0); }
+      from {
+        opacity: 0;
+        transform: translateY(4px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
 
     .section-header {
@@ -920,6 +965,237 @@
       word-break: break-word;
     }
 
+    /* =====================================================================
+       LAYAR KHUSUS LIVE UNDIAN ARISAN (SPIN WHEEL MULTI-CLIENT + HISTORY)
+       ===================================================================== */
+    .live-undian-grid {
+      display: grid;
+      grid-template-columns: 1.05fr 0.95fr;
+      gap: 22px;
+      align-items: start;
+      margin-bottom: 22px;
+    }
+
+    .wheel-stage-card {
+      background: linear-gradient(145deg, #0f172a 0%, #134e4a 60%, #0f766e 100%);
+      border-radius: 20px;
+      padding: 24px 20px;
+      color: #ffffff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.22);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .live-sync-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(255, 255, 255, 0.14);
+      border: 1px solid rgba(255, 255, 255, 0.28);
+      color: #ecfdf5;
+      padding: 6px 14px;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      margin-bottom: 14px;
+      backdrop-filter: blur(6px);
+    }
+
+    .live-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: #22c55e;
+      box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.3);
+      animation: pulseLiveDot 1.5s infinite;
+    }
+
+    @keyframes pulseLiveDot {
+
+      0%,
+      100% {
+        transform: scale(1);
+        opacity: 1;
+      }
+
+      50% {
+        transform: scale(1.25);
+        opacity: 0.75;
+      }
+    }
+
+    .wheel-canvas-container {
+      position: relative;
+      width: 100%;
+      max-width: 410px;
+      aspect-ratio: 1 / 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 6px auto 16px;
+    }
+
+    #arisanWheelCanvas {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      box-shadow: 0 0 0 8px rgba(251, 191, 36, 0.9), 0 0 30px rgba(0, 0, 0, 0.45);
+      background: #0f172a;
+      display: block;
+    }
+
+    .wheel-pointer-top {
+      position: absolute;
+      top: -14px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 0;
+      height: 0;
+      border-left: 18px solid transparent;
+      border-right: 18px solid transparent;
+      border-top: 34px solid #f59e0b;
+      filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.5));
+      z-index: 5;
+    }
+
+    .wheel-center-hub {
+      position: absolute;
+      width: 68px;
+      height: 68px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #f59e0b, #b45309);
+      border: 4px solid #ffffff;
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.55rem;
+      font-weight: 800;
+      color: #ffffff;
+      z-index: 4;
+      pointer-events: none;
+      overflow: hidden;
+    }
+
+    .wheel-center-hub img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .spin-spotlight-box {
+      width: 100%;
+      background: rgba(255, 255, 255, 0.12);
+      border: 1.5px solid rgba(251, 191, 36, 0.55);
+      border-radius: 14px;
+      padding: 14px 16px;
+      margin-top: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      flex-wrap: wrap;
+      backdrop-filter: blur(8px);
+    }
+
+    .spin-spotlight-avatar {
+      width: 58px;
+      height: 58px;
+      border-radius: 50%;
+      border: 2.5px solid #fbbf24;
+      background: #0f766e;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.3rem;
+      font-weight: 800;
+      color: #ffffff;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .spin-spotlight-avatar img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .candidate-checklist-box {
+      max-height: 230px;
+      overflow-y: auto;
+      border: 1.5px solid var(--border);
+      border-radius: 12px;
+      padding: 10px;
+      background: var(--surface);
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .candidate-check-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #ffffff;
+      border: 1px solid var(--border-light);
+      border-radius: 8px;
+      padding: 7px 10px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--text-main);
+      cursor: pointer;
+    }
+
+    .candidate-check-item input[type="checkbox"] {
+      width: 16px;
+      height: 16px;
+      accent-color: var(--primary);
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .btn-spin-live {
+      width: 100%;
+      padding: 15px 20px;
+      font-size: 1.02rem;
+      font-weight: 800;
+      color: #ffffff;
+      background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      box-shadow: 0 10px 22px rgba(217, 119, 6, 0.32);
+      transition: transform 0.15s ease, box-shadow 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    .btn-spin-live:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 14px 26px rgba(217, 119, 6, 0.42);
+    }
+
+    .btn-spin-live:disabled {
+      opacity: 0.65;
+      cursor: not-allowed;
+    }
+
+    @media (max-width: 920px) {
+      .live-undian-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .candidate-checklist-box {
+        grid-template-columns: 1fr;
+      }
+    }
+
     /* Daftar Pengumuman Card */
     .announcement-list {
       display: flex;
@@ -1150,26 +1426,32 @@
       .stats-bar {
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
+
       .gallery-menu-grid,
       .photo-gallery-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
+
       .member-gallery-grid {
         grid-template-columns: repeat(3, minmax(0, 1fr));
       }
+
       .main-tab-nav {
         display: grid;
         grid-template-columns: repeat(4, minmax(0, 1fr));
         gap: 6px;
       }
+
       .main-tab-btn {
         white-space: normal;
         word-break: break-word;
         line-height: 1.25;
       }
+
       .sub-tab-nav,
       .sub-tab-nav.two-cols,
-      .sub-tab-nav.three-cols {
+      .sub-tab-nav.three-cols,
+      .sub-tab-nav.five-cols {
         grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 8px;
       }
@@ -1223,7 +1505,8 @@
 
       .sub-tab-nav,
       .sub-tab-nav.two-cols,
-      .sub-tab-nav.three-cols {
+      .sub-tab-nav.three-cols,
+      .sub-tab-nav.five-cols {
         grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 7px;
         padding: 6px;
@@ -1285,46 +1568,40 @@
     }
 
     @media (max-width: 480px) {
+
       .sub-tab-nav,
       .sub-tab-nav.two-cols,
-      .sub-tab-nav.three-cols {
+      .sub-tab-nav.three-cols,
+      .sub-tab-nav.five-cols {
         grid-template-columns: 1fr;
         gap: 6px;
       }
     }
   </style>
 </head>
+
 <body>
 
   <!-- ===================================================================
        VIEW 1: LOGIN & REGISTER USER (Tabel: adnan_User)
        =================================================================== -->
   <div class="auth-card" id="authView">
-    <div class="brand-badge">KA</div>
+    <img src="img/banner-login.jpg" alt="Selamat Datang di Arisan Keluarga Besar Adnan dan Rokayah"
+      class="auth-banner-img" />
     <h1 id="formTitle">Login Arisan</h1>
-    <p class="subtitle" id="formSubtitle">Keluarga Besar Adnan</p>
+    <p class="subtitle" id="formSubtitle">Keluarga Besar Adnan & Rokayah</p>
 
     <!-- FORM LOGIN -->
     <form id="loginForm">
       <div class="form-group">
         <label for="loginUsername">User ID / Username</label>
-        <input
-          type="text"
-          id="loginUsername"
-          placeholder="Masukkan User ID / Username"
-          autocomplete="username"
-          required
-        />
+        <input type="text" id="loginUsername" placeholder="Masukkan User ID / Username" autocomplete="username"
+          required />
       </div>
       <div class="form-group">
         <label for="loginPassword">Password</label>
-        <input
-          type="password"
-          id="loginPassword"
-          placeholder="Masukkan password"
-          autocomplete="current-password"
-          required
-        />
+        <input type="password" id="loginPassword" placeholder="Masukkan password" autocomplete="current-password"
+          required />
       </div>
       <button type="submit" class="btn-primary" id="loginBtn">Masuk</button>
     </form>
@@ -1383,7 +1660,8 @@
     <div class="mandatory-banner hidden" id="mandatoryBanner">
       <span>⚠️</span>
       <span>
-        <strong>Biodata Peserta Belum Terdaftar:</strong> Anda wajib melengkapi dan menyimpan Biodata Peserta Arisan pada tabel <code>adnan_DataAnggota</code> sebelum membuka Menu Utama Gallery.
+        <strong>Biodata Peserta Belum Terdaftar:</strong> Anda wajib melengkapi dan menyimpan Biodata Peserta Arisan
+        pada tabel <code>adnan_DataAnggota</code> sebelum membuka Menu Utama Gallery.
       </span>
     </div>
 
@@ -1394,7 +1672,7 @@
           <span>🏠</span> <span>Menu Gallery</span>
         </button>
         <button type="button" class="main-tab-btn" data-main-view="viewPembayaran" id="navBtnPembayaran">
-          <span>💳</span> <span>Pembayaran</span>
+          <span>💳</span> <span>Penerimaan</span>
         </button>
         <button type="button" class="main-tab-btn" data-main-view="viewPengumuman" id="navBtnPengumuman">
           <span>📢</span> <span>Pengumuman</span>
@@ -1405,12 +1683,16 @@
         <button type="button" class="main-tab-btn" data-main-view="viewDaftarAnggota" id="navBtnDaftarAnggota">
           <span>👥</span> <span>Anggota Arisan</span>
         </button>
-        <button type="button" class="main-tab-btn" data-main-view="viewPeriode" id="navBtnPeriode">
-          <span>⚙️</span> <span>Pengaturan</span>
+        <button type="button" class="main-tab-btn" data-main-view="viewLiveUndian" id="navBtnLiveUndian">
+          <span>🎡</span> <span>Live Undian</span>
         </button>
-        <!-- TAB PENGELUARAN: Di posisi terakhir sebelum Biodata Saya & Hanya Muncul jika User Admin -->
+        <!-- TAB PENGELUARAN: Hanya Muncul jika User memiliki Role Admin -->
         <button type="button" class="main-tab-btn hidden" data-main-view="viewPengeluaran" id="navBtnPengeluaran">
           <span>📊</span> <span>Pengeluaran</span>
+        </button>
+        <!-- TAB PENGATURAN: Hanya Muncul jika User memiliki Role Admin -->
+        <button type="button" class="main-tab-btn hidden" data-main-view="viewPeriode" id="navBtnPeriode">
+          <span>⚙️</span> <span>Pengaturan</span>
         </button>
         <button type="button" class="main-tab-btn" data-main-view="viewBiodata" id="navBtnBiodata">
           <span>👤</span> <span>Biodata Saya</span>
@@ -1431,57 +1713,60 @@
         <div class="section-header">
           <div>
             <h3>Layar Utama Menu Arisan Keluarga Adnan</h3>
-            <p>Klik kartu pemasukan di bawah untuk melihat transparansi per jenis pembayaran, atau pilih menu layanan.</p>
+            <p>Klik kartu pemasukan di bawah untuk melihat transparansi per jenis pembayaran, atau pilih menu layanan.
+            </p>
           </div>
         </div>
 
-        <!-- Ringkasan Statistik Kas & Transparansi (Lampiran 2: Dibedakan Pemasukan Uang Arisan vs Pemasukan Lain) -->
+        <!-- Ringkasan Statistik Kas & Transparansi -->
         <div class="stats-bar">
           <div class="stat-card">
             <span class="stat-title">Periode Aktif</span>
-            <span class="stat-value" id="statPeriodeAktif">Periode #1</span>
-            <span class="stat-sub" id="statTanggalPeriode">Memuat jadwal...</span>
+            <span class="stat-value" id="statPeriodeAktif">-</span>
+            <span class="stat-sub" id="statTanggalPeriode">Memuat jadwal dari Supabase...</span>
           </div>
 
-          <div class="stat-card clickable-stat" id="statCardPemasukanArisan" title="Klik untuk melihat rincian transparan Pemasukan Uang Arisan">
+          <div class="stat-card clickable-stat" id="statCardPemasukanArisan"
+            title="Klik untuk melihat rincian Pemasukan Periode Arisan">
             <span class="stat-title">Pemasukan Uang Arisan</span>
             <span class="stat-value" id="statTotalMasukArisan">Rp 0</span>
-            <span class="stat-sub">🔍 Klik Rincian Setoran Arisan</span>
+            <span class="stat-sub" id="statSubMasukArisan">🔍 Klik Rincian Pemasukan Periode</span>
           </div>
 
-          <div class="stat-card clickable-stat" id="statCardPemasukanLain" title="Klik untuk melihat rincian transparan per Jenis Pembayaran (Zakat, Sumbangan, dll)">
+          <div class="stat-card clickable-stat" id="statCardPemasukanLain"
+            title="Klik untuk melihat rincian transparan per Jenis Pembayaran (Zakat, Sumbangan, dll)">
             <span class="stat-title">Pemasukan Lainnya</span>
             <span class="stat-value" id="statTotalMasukLain">Rp 0</span>
-            <span class="stat-sub">🔍 Klik Rincian Per Jenis Bayar</span>
           </div>
 
-          <div class="stat-card">
+          <div class="stat-card clickable-stat" id="statCardTotalPengeluaran"
+            title="Klik untuk melihat rincian Total Pengeluaran">
             <span class="stat-title">Total Pengeluaran</span>
             <span class="stat-value" id="statTotalKeluar">Rp 0</span>
-            <span class="stat-sub">Akuntansi & Pencairan</span>
           </div>
 
-          <div class="stat-card">
+          <div class="stat-card clickable-stat" id="statCardSaldoKas"
+            title="Klik untuk melihat rincian Saldo Kas Keluarga (Pemasukan vs Pengeluaran)">
             <span class="stat-title">Saldo Kas Keluarga</span>
             <span class="stat-value" id="statSaldoKas">Rp 0</span>
-            <span class="stat-sub" id="statPemenangTerakhir">Pemenang: -</span>
+            <span class="stat-sub" id="statPemenangTerakhir">🔍 Klik Rincian Saldo Kas</span>
           </div>
         </div>
 
         <!-- KARTU MENU GALLERY -->
         <div class="gallery-menu-grid">
-          <!-- 1. PEMBAYARAN -->
+          <!-- 1. PENERIMAAN -->
           <div class="gallery-menu-card" data-open-view="viewPembayaran">
             <div>
               <div class="gallery-card-top">
                 <div class="gallery-icon-box icon-teal">💳</div>
                 <span class="gallery-badge">Menu 1</span>
               </div>
-              <h3 style="margin-top: 14px;">1. Pembayaran</h3>
-              <p>Entry pembayaran Arisan, Sumbangan, Zakat, Infaq, dll. Mendukung Tunai & Transfer Bank lengkap dengan unggah bukti bayar.</p>
+              <h3 style="margin-top: 14px;">1. Penerimaan</h3>
+              <p>Pencatatan penerimaan dana yang didapat (Uang Arisan + Konsumsi per Periode, Sumbangan, Zakat, Infaq, dll.) lengkap dengan bukti struk transfer.</p>
             </div>
             <div class="gallery-card-footer">
-              <span>Buka Menu Pembayaran</span>
+              <span>Buka Menu Penerimaan</span>
               <span>&rarr;</span>
             </div>
           </div>
@@ -1494,7 +1779,8 @@
                 <span class="gallery-badge">Menu 2 • Dokumen PDF</span>
               </div>
               <h3 style="margin-top: 14px;">2. Pengumuman</h3>
-              <p>Informasi resmi undangan arisan, berita keluarga, dan laporan keuangan yang dilengkapi lampiran dokumen PDF.</p>
+              <p>Informasi resmi undangan arisan, berita keluarga, dan laporan keuangan yang dilengkapi lampiran dokumen
+                PDF.</p>
             </div>
             <div class="gallery-card-footer">
               <span>Lihat & Buat Pengumuman</span>
@@ -1526,7 +1812,8 @@
                 <span class="gallery-badge">Menu 4 • Galeri Anggota</span>
               </div>
               <h3 style="margin-top: 14px;">4. Daftar Anggota Arisan</h3>
-              <p>Galeri seluruh peserta Arisan Keluarga Besar Adnan menampilkan Foto & Nama lengkap dengan fitur pencarian nama.</p>
+              <p>Galeri seluruh peserta Arisan Keluarga Besar Adnan menampilkan Foto & Nama lengkap dengan fitur
+                pencarian nama.</p>
             </div>
             <div class="gallery-card-footer">
               <span>Buka Galeri Anggota</span>
@@ -1534,34 +1821,51 @@
             </div>
           </div>
 
-          <!-- 5. PENGATURAN (PERIODE ARISAN, PEMENANG & ENTRY GROUP ARISAN) -->
-          <div class="gallery-menu-card" data-open-view="viewPeriode">
+          <!-- LIVE UNDIAN ARISAN (SPIN WHEEL REAL-TIME MULTI-CLIENT + HISTORY PUTARAN) -->
+          <div class="gallery-menu-card" data-open-view="viewLiveUndian">
             <div>
               <div class="gallery-card-top">
-                <div class="gallery-icon-box icon-rose">⚙️</div>
-                <span class="gallery-badge">Menu 5 • Periode, Pemenang & Group</span>
+                <div class="gallery-icon-box icon-amber">🎡</div>
+                <span class="gallery-badge" style="background:#dcfce7; color:#15803d;">🟢 Live Multi-Client</span>
               </div>
-              <h3 style="margin-top: 14px;">5. Pengaturan</h3>
-              <p>Pengaturan Periode Arisan (Split Iuran Arisan Rp 100rb, Kas Rp 40rb, Konsumsi Rp 30rb), Pemenang Arisan, serta Entry Group Arisan (Maks 5 Orang).</p>
+              <h3 style="margin-top: 14px;">🎡 Live Undian Arisan</h3>
+              <p>Layar khusus putaran roda undian arisan secara <em>real-time</em>. Ditekan oleh Admin, ditonton
+                serentak oleh seluruh anggota, lengkap dengan History setiap putaran.</p>
             </div>
             <div class="gallery-card-footer">
-              <span>Buka Menu Pengaturan</span>
+              <span>Buka Layar Live Undian</span>
               <span>&rarr;</span>
             </div>
           </div>
 
-          <!-- 6. PENGELUARAN (KHUSUS ADMIN - SEBELUM BIODATA SAYA) -->
+          <!-- 5. PENGELUARAN (KHUSUS ADMIN) -->
           <div class="gallery-menu-card hidden" data-open-view="viewPengeluaran" id="galleryCardPengeluaran">
             <div>
               <div class="gallery-card-top">
                 <div class="gallery-icon-box icon-amber">📊</div>
-                <span class="gallery-badge admin-only">Menu 6 • Khusus Admin</span>
+                <span class="gallery-badge admin-only">Menu 5 • Khusus Admin</span>
               </div>
-              <h3 style="margin-top: 14px;">6. Pengeluaran / Akuntansi</h3>
+              <h3 style="margin-top: 14px;">5. Pengeluaran / Akuntansi</h3>
               <p>Pencatatan pengeluaran kas keluarga, pencairan arisan, konsumsi & santunan (Khusus Admin).</p>
             </div>
             <div class="gallery-card-footer">
               <span>Buka Akuntansi Pengeluaran</span>
+              <span>&rarr;</span>
+            </div>
+          </div>
+
+          <!-- 6. PENGATURAN (KHUSUS ADMIN) -->
+          <div class="gallery-menu-card hidden" data-open-view="viewPeriode" id="galleryCardPeriode">
+            <div>
+              <div class="gallery-card-top">
+                <div class="gallery-icon-box icon-rose">⚙️</div>
+                <span class="gallery-badge admin-only">Menu 6 • Khusus Admin</span>
+              </div>
+              <h3 style="margin-top: 14px;">6. Pengaturan</h3>
+              <p>Pengaturan Periode Arisan, Pemenang Arisan, Entry Group Arisan (Maks 5 Orang), Daftar User Terdaftar, serta Database Supabase (Khusus Role Admin).</p>
+            </div>
+            <div class="gallery-card-footer">
+              <span>Buka Menu Pengaturan</span>
               <span>&rarr;</span>
             </div>
           </div>
@@ -1574,7 +1878,8 @@
                 <span class="gallery-badge">Profil & Foto Peserta</span>
               </div>
               <h3 style="margin-top: 14px;">Biodata Saya</h3>
-              <p>Lihat ringkasan biodata kepesertaan Anda pada tabel <code>adnan_DataAnggota</code>, ambil foto kamera, atau perbarui data.</p>
+              <p>Lihat ringkasan biodata kepesertaan Anda pada tabel <code>adnan_DataAnggota</code>, ambil foto kamera,
+                atau perbarui data.</p>
             </div>
             <div class="gallery-card-footer">
               <span>Lihat / Edit Biodata</span>
@@ -1585,14 +1890,14 @@
       </section>
 
       <!-- ===============================================================
-           MENU 1: PEMBAYARAN
+           MENU 1: PEMBAYARAN (RINCIAN UANG ARISAN: ARISAN 100.000, KONSUMSI 30.000, KAS 40.000 = TOTAL 170.000; DIBAYARKAN KE PEMENANG 130.000 & SISANYA MASUK KAS)
            (Jenis Pembayaran sebelum Periode Arisan & Default Status Pending)
            =============================================================== -->
       <section class="main-section-panel" id="viewPembayaran">
         <div class="section-header">
           <div>
-            <h3>💳 1. Entry & Riwayat Pembayaran</h3>
-            <p>Pembayaran Arisan, Sumbangan, Zakat, Infaq & Dana Sosial (Tunai maupun Transfer Bank).</p>
+            <h3>💳 1. Entry & Riwayat Penerimaan</h3>
+            <p>Perincian Uang Arisan terdiri dari: <strong>a. Uang Arisan Rp 100.000</strong>, <strong>b. Konsumsi Rp 30.000</strong>, dan <strong>c. Kas Rp 40.000</strong> (Total <strong>Rp 170.000</strong>). Dibayarkan ke pemenang: <strong>Uang Arisan (Rp 100.000) + Konsumsi (Rp 30.000) = Rp 130.000</strong>, sisanya <strong>Rp 40.000 masuk Kas</strong>.</p>
           </div>
           <button type="button" class="btn-secondary btn-sm" data-open-view="viewGalleryHome">
             &larr; Kembali ke Menu Gallery
@@ -1600,12 +1905,12 @@
         </div>
 
         <div class="card-box">
-          <h4>Form Entry Pembayaran Baru</h4>
+          <h4>Form Entry Penerimaan (Perincian Uang Arisan, Konsumsi & Kas)</h4>
           <form id="formPembayaran">
             <div class="form-grid">
               <div class="form-group">
                 <label for="payNama">
-                  Nama Pembayar / Peserta <span class="required-star">*</span>
+                  Nama Peserta / Penerima Pembayaran <span class="required-star">*</span>
                   <small id="payNamaRoleHint" style="color:var(--primary); font-weight:600;"></small>
                 </label>
                 <!-- Khusus Role Admin: Bisa pilih berdasarkan Peserta dari daftar anggota -->
@@ -1614,7 +1919,7 @@
                     <option value="">-- Pilih Berdasarkan Peserta (Mode Admin) --</option>
                   </select>
                 </div>
-                <input type="text" id="payNama" required placeholder="Nama peserta pembayar" />
+                <input type="text" id="payNama" required placeholder="Nama peserta" />
               </div>
 
               <!-- JENIS PEMBAYARAN DIPINDAHKAN SEBELUM PERIODE ARISAN -->
@@ -1633,54 +1938,79 @@
 
               <!-- PERIODE ARISAN: Enable hanya jika Jenis Pembayaran === 'Uang Arisan' -->
               <div class="form-group">
-                <label for="payPeriode">Periode Arisan <small id="payPeriodeHint" style="color:var(--primary);">(Aktif untuk Uang Arisan)</small></label>
+                <label for="payPeriode">Periode Arisan <small id="payPeriodeHint" style="color:var(--primary);">(Aktif
+                    untuk Uang Arisan)</small></label>
                 <select id="payPeriode">
                   <option value="">-- Pilih Periode Arisan --</option>
                 </select>
               </div>
 
               <div class="form-group">
-                <label for="payNominal">Total Nominal Pembayaran (Rp) <span class="required-star">*</span></label>
-                <input type="number" id="payNominal" min="1000" step="500" value="170000" placeholder="Contoh: 170000" required />
+                <label for="payNominal">
+                  Nominal Dibayarkan ke Pemenang (Rp) <span class="required-star">*</span>
+                  <small id="payNominalHint" style="color:var(--primary); font-weight:600;"></small>
+                </label>
+                <input type="number" id="payNominal" min="0" step="any"
+                  placeholder="Otomatis Uang Arisan (100.000) + Konsumsi (30.000) = 130.000" required />
               </div>
 
-              <!-- WINDOW / KOTAK DAFTAR GROUP ARISAN & SPLIT PERUNTUKAN (ARISAN 100RB, KAS 40RB, KONSUMSI 30RB) -->
-              <div class="form-group full-width" id="payGroupSplitWrapper" style="background:var(--primary-light); border:1.5px solid var(--primary-border); border-radius:12px; padding:16px;">
-                <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:10px; padding-bottom:10px; border-bottom:1px dashed var(--primary-border);">
+              <!-- WINDOW / KOTAK PERINCIAN UANG ARISAN (a. Arisan 100.000, b. Konsumsi 30.000, c. Kas 40.000 = Total 170.000; Dibayarkan ke Pemenang 130.000, Sisa Masuk Kas 40.000) -->
+              <div class="form-group full-width" id="payGroupSplitWrapper"
+                style="background:var(--primary-light); border:1.5px solid var(--primary-border); border-radius:12px; padding:16px;">
+                <div
+                  style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:10px; padding-bottom:10px; border-bottom:1px dashed var(--primary-border);">
                   <div>
                     <strong style="color:var(--primary); font-size:0.95rem;" id="payGroupTitleText">
-                      📋 Rincian Split Iuran Arisan (Uang Arisan Rp 100.000 • Kas Rp 40.000 • Konsumsi Rp 30.000)
+                      📋 Perincian Uang Arisan (a. Uang Arisan Rp 100.000 + b. Konsumsi Rp 30.000 + c. Kas Rp 40.000 = Rp 170.000)
                     </strong>
-                    <div style="font-size:0.8rem; color:var(--text-secondary); margin-top:2px;" id="payGroupSubtitleText">
-                      Total Rp 170.000 per orang. Jika peserta tergabung dalam Group Arisan, centang anggota group yang dibayarkan.
+                    <div style="font-size:0.8rem; color:var(--text-secondary); margin-top:2px;"
+                      id="payGroupSubtitleText">
+                      Dibayarkan ke Pemenang: <strong>Uang Arisan (Rp 100.000) + Uang Konsumsi (Rp 30.000) = Rp 130.000</strong> • Sisanya <strong>Rp 40.000 masuk Kas</strong>.
                     </div>
                   </div>
-                  <label id="payGroupSelectAllLabel" class="hidden" style="display:inline-flex; align-items:center; gap:8px; background:#ffffff; border:1.5px solid var(--primary); padding:7px 13px; border-radius:8px; cursor:pointer; font-size:0.84rem; font-weight:700; color:var(--primary); margin:0;">
-                    <input type="checkbox" id="chkSelectAllGroupPay" checked style="width:17px; height:17px; accent-color:var(--primary);" />
+                  <label id="payGroupSelectAllLabel" class="hidden"
+                    style="display:inline-flex; align-items:center; gap:8px; background:#ffffff; border:1.5px solid var(--primary); padding:7px 13px; border-radius:8px; cursor:pointer; font-size:0.84rem; font-weight:700; color:var(--primary); margin:0;">
+                    <input type="checkbox" id="chkSelectAllGroupPay" checked
+                      style="width:17px; height:17px; accent-color:var(--primary);" />
                     <span>Pilih Semua Anggota Group</span>
                   </label>
                 </div>
 
                 <!-- Daftar Anggota Group dengan Checkbox -->
-                <div id="payGroupMemberListContainer" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(250px, 1fr)); gap:10px; margin-bottom:12px;"></div>
+                <div id="payGroupMemberListContainer"
+                  style="display:grid; grid-template-columns:repeat(auto-fill, minmax(250px, 1fr)); gap:10px; margin-bottom:12px;">
+                </div>
 
-                <!-- Ringkasan Split Peruntukan (Arisan, Kas, Konsumsi, Total) -->
-                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:10px; background:#ffffff; padding:12px; border-radius:10px; border:1px solid var(--border-light);">
+                <!-- Ringkasan Perincian Uang Arisan (a. Arisan, b. Konsumsi, c. Kas, Total 170.000, Dibayarkan ke Pemenang 130.000) -->
+                <div
+                  style="display:grid; grid-template-columns:repeat(auto-fit, minmax(165px, 1fr)); gap:10px; background:#ffffff; padding:12px; border-radius:10px; border:1px solid var(--border-light);">
                   <div>
-                    <div style="font-size:0.74rem; color:var(--text-muted); font-weight:700; text-transform:uppercase;">Split Uang Arisan</div>
-                    <div style="font-size:0.98rem; font-weight:800; color:var(--primary);" id="splitPreviewArisan">Rp 100.000</div>
+                    <div style="font-size:0.74rem; color:var(--text-muted); font-weight:700; text-transform:uppercase;">
+                      a. Uang Arisan</div>
+                    <div style="font-size:0.98rem; font-weight:800; color:var(--primary);" id="splitPreviewArisan">Rp 100.000
+                    </div>
                   </div>
                   <div>
-                    <div style="font-size:0.74rem; color:var(--text-muted); font-weight:700; text-transform:uppercase;">Split Uang Kas</div>
-                    <div style="font-size:0.98rem; font-weight:800; color:#0284c7;" id="splitPreviewKas">Rp 40.000</div>
+                    <div style="font-size:0.74rem; color:var(--text-muted); font-weight:700; text-transform:uppercase;">
+                      b. Uang Konsumsi</div>
+                    <div style="font-size:0.98rem; font-weight:800; color:#0284c7;" id="splitPreviewKonsumsi">Rp 30.000</div>
                   </div>
                   <div>
-                    <div style="font-size:0.74rem; color:var(--text-muted); font-weight:700; text-transform:uppercase;">Split Uang Konsumsi</div>
-                    <div style="font-size:0.98rem; font-weight:800; color:#d97706;" id="splitPreviewKonsumsi">Rp 30.000</div>
+                    <div style="font-size:0.74rem; color:var(--text-muted); font-weight:700; text-transform:uppercase;">
+                      c. Uang Kas (Masuk Kas)</div>
+                    <div style="font-size:0.98rem; font-weight:800; color:#b45309;" id="splitPreviewKas">Rp 40.000</div>
                   </div>
                   <div>
-                    <div style="font-size:0.74rem; color:var(--text-muted); font-weight:700; text-transform:uppercase;">Total Disesuaikan</div>
-                    <div style="font-size:1.04rem; font-weight:800; color:var(--text-main);" id="splitPreviewTotal">Rp 170.000 (1 Orang)</div>
+                    <div style="font-size:0.74rem; color:var(--text-muted); font-weight:700; text-transform:uppercase;">
+                      Total Rincian (a + b + c)</div>
+                    <div style="font-size:0.98rem; font-weight:800; color:var(--text-main);" id="splitPreviewTotalIuran">Rp 170.000
+                    </div>
+                  </div>
+                  <div style="background:#f0fdf4; border:1px solid #86efac; border-radius:8px; padding:6px 10px;">
+                    <div style="font-size:0.72rem; color:#15803d; font-weight:800; text-transform:uppercase;">
+                      Dibayarkan ke Pemenang (a + b)</div>
+                    <div style="font-size:1.04rem; font-weight:800; color:#15803d;" id="splitPreviewTotal">Rp 130.000
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1739,22 +2069,28 @@
         </div>
 
         <div class="card-box">
-          <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:14px; padding-bottom:10px; border-bottom:1px solid var(--border-light);">
+          <div
+            style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:14px; padding-bottom:10px; border-bottom:1px solid var(--border-light);">
             <div>
-              <h4 id="titleRiwayatPembayaran" style="margin:0; padding:0; border:none;">Daftar Riwayat Pembayaran Peserta</h4>
+              <h4 id="titleRiwayatPembayaran" style="margin:0; padding:0; border:none;">Daftar Riwayat Penerimaan
+                Peserta</h4>
               <p id="subtitleRiwayatPembayaran" style="font-size:0.82rem; color:var(--text-muted); margin-top:2px;">
                 Menampilkan riwayat pembayaran sesuai hak akses login.
               </p>
             </div>
             <!-- Filter Berdasarkan Peserta (Khusus Role Admin) -->
-            <div id="adminFilterPesertaBox" class="hidden" style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:var(--primary-light); border:1.5px solid var(--primary-border); padding:8px 12px; border-radius:10px;">
-              <label for="filterPembayaranPeserta" style="font-size:0.82rem; font-weight:700; color:var(--primary); margin:0;">
+            <div id="adminFilterPesertaBox" class="hidden"
+              style="display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:var(--primary-light); border:1.5px solid var(--primary-border); padding:8px 12px; border-radius:10px;">
+              <label for="filterPembayaranPeserta"
+                style="font-size:0.82rem; font-weight:700; color:var(--primary); margin:0;">
                 👑 Pilih Peserta:
               </label>
-              <select id="filterPembayaranPeserta" style="padding:7px 12px; border:1.5px solid var(--primary); border-radius:8px; font-size:0.86rem; font-weight:600; background:#ffffff; color:var(--text-main); min-width:220px;">
+              <select id="filterPembayaranPeserta"
+                style="padding:7px 12px; border:1.5px solid var(--primary); border-radius:8px; font-size:0.86rem; font-weight:600; background:#ffffff; color:var(--text-main); min-width:220px;">
                 <option value="ALL">-- Semua Peserta Arisan --</option>
               </select>
-              <span id="filterPembayaranSummary" class="gallery-badge" style="background:#ffffff; color:var(--primary); border:1px solid var(--primary-border);"></span>
+              <span id="filterPembayaranSummary" class="gallery-badge"
+                style="background:#ffffff; color:var(--primary); border:1px solid var(--primary-border);"></span>
             </div>
           </div>
 
@@ -1766,17 +2102,21 @@
                   <th>Kode</th>
                   <th>Nama Pembayar</th>
                   <th>Jenis</th>
-                  <th>Uang Arisan</th>
-                  <th>Uang Kas</th>
-                  <th>Konsumsi</th>
-                  <th>Total Bayar</th>
+                  <th>Periode Arisan</th>
+                  <th>a. Uang Arisan</th>
+                  <th>b. Konsumsi</th>
+                  <th>c. Kas (Masuk Kas)</th>
+                  <th>Total Rincian</th>
+                  <th>Dibayarkan Pemenang</th>
                   <th>Metode & Bank</th>
                   <th>Bukti</th>
                   <th>Status</th>
                 </tr>
               </thead>
               <tbody id="tableBodyPembayaran">
-                <tr><td colspan="11" style="text-align:center;">Memuat data pembayaran...</td></tr>
+                <tr>
+                  <td colspan="13" style="text-align:center;">Memuat data pembayaran...</td>
+                </tr>
               </tbody>
             </table>
           </div>
@@ -1798,7 +2138,8 @@
         </div>
 
         <div class="card-box hidden" id="formPengumumanCard">
-          <h4>Buat Pengumuman Baru / Unggah Dokumen PDF <span class="gallery-badge admin-only" style="margin-left:8px;">👑 Khusus Admin</span></h4>
+          <h4>Buat Pengumuman Baru / Unggah Dokumen PDF <span class="gallery-badge admin-only"
+              style="margin-left:8px;">👑 Khusus Admin</span></h4>
           <form id="formPengumuman">
             <div class="form-grid">
               <div class="form-group">
@@ -1825,7 +2166,8 @@
                 <label for="annPdfFile">Lampiran Dokumen PDF (Opsional, format <code>.pdf</code>)</label>
                 <div class="upload-zone">
                   <input type="file" id="annPdfFile" accept="application/pdf,.pdf" />
-                  <div id="annPdfInfo" style="margin-top:8px; font-size:0.84rem; color:var(--primary); font-weight:600;"></div>
+                  <div id="annPdfInfo"
+                    style="margin-top:8px; font-size:0.84rem; color:var(--primary); font-weight:600;"></div>
                 </div>
               </div>
             </div>
@@ -1862,7 +2204,8 @@
         </div>
 
         <div class="card-box hidden" id="formGaleriCard">
-          <h4>Unggah Foto Kegiatan Baru <span class="gallery-badge admin-only" style="margin-left:8px;">👑 Khusus Admin</span></h4>
+          <h4>Unggah Foto Kegiatan Baru <span class="gallery-badge admin-only" style="margin-left:8px;">👑 Khusus
+              Admin</span></h4>
           <form id="formGaleri">
             <div class="form-grid">
               <div class="form-group">
@@ -1912,20 +2255,407 @@
       </section>
 
       <!-- ===============================================================
-           MENU 5: PENGATURAN (PERIODE ARISAN, PEMENANG, GROUP ARISAN & DAFTAR USER)
+           MENU 5: PENGATURAN (KHUSUS ROLE ADMIN)
            =============================================================== -->
-      <section class="main-section-panel" id="viewPeriode">
+      
+
+      <!-- ===============================================================
+           MENU 4: DAFTAR SELURUH ANGGOTA ARISAN (GALLERY NAMA & FOTO + CARI BY NAMA)
+           =============================================================== -->
+      <section class="main-section-panel" id="viewDaftarAnggota">
         <div class="section-header">
           <div>
-            <h3>⚙️ 5. Pengaturan (Periode Arisan, Pemenang, Group Arisan & Daftar User)</h3>
-            <p>Kelola setting periode & split iuran arisan, penetapan pemenang, pengaturan Group Arisan (maks. 5 orang), serta Daftar User terdaftar (update Password & Role).</p>
+            <h3>👥 4. Daftar Seluruh Anggota Arisan Keluarga Adnan</h3>
+            <p>Galeri foto dan nama seluruh anggota peserta arisan yang terdaftar pada tabel
+              <code>adnan_DataAnggota</code>.</p>
           </div>
           <button type="button" class="btn-secondary btn-sm" data-open-view="viewGalleryHome">
             &larr; Kembali ke Menu Gallery
           </button>
         </div>
 
-        <div class="sub-tab-nav">
+        <div class="card-box">
+          <!-- Bar Pencarian Anggota Berdasarkan Nama -->
+          <div class="member-search-bar">
+            <div class="member-search-input-wrap">
+              <input type="text" id="searchAnggotaInput" placeholder="🔍 Cari anggota arisan berdasarkan Nama..."
+                autocomplete="off" />
+            </div>
+            <button type="button" class="btn-secondary btn-sm" id="btnResetSearchAnggota">
+              ✕ Reset Pencarian
+            </button>
+            <span class="gallery-badge" id="countAnggotaGalleryBadge"
+              style="background:var(--primary-light); color:var(--primary); border:1px solid var(--primary-border);">
+              0 Anggota
+            </span>
+          </div>
+
+          <!-- Grid Gallery Anggota: Berisi Foto & Nama Saja -->
+          <div class="member-gallery-grid" id="memberGalleryContainer">
+            <p style="grid-column:1/-1; text-align:center; color:var(--text-muted);">Memuat galeri anggota arisan...</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===============================================================
+           LAYAR KHUSUS: LIVE UNDIAN ARISAN (SPIN WHEEL MULTI-CLIENT + HISTORY PUTARAN)
+           =============================================================== -->
+      <section class="main-section-panel" id="viewLiveUndian">
+        <div class="section-header">
+          <div>
+            <h3>🎡 Layar Khusus Live Undian Arisan (Sinkronisasi Seluruh Client)</h3>
+            <p>Seluruh anggota dapat menyaksikan putaran roda undian secara <em>real-time</em>. Tombol putar dan
+              pengesahan pemenang dari riwayat putaran dikendalikan oleh <strong>User Admin</strong>.</p>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+            <button type="button" class="btn-secondary btn-sm" id="btnManualSyncSpin">
+              🔄 Sinkronkan Sekarang
+            </button>
+            <button type="button" class="btn-secondary btn-sm" data-open-view="viewGalleryHome">
+              &larr; Kembali ke Menu Gallery
+            </button>
+          </div>
+        </div>
+
+        <div class="live-undian-grid">
+          <!-- KOLOM KIRI: PANGGUNG RODA UNDIAN LIVE -->
+          <div class="wheel-stage-card">
+            <div class="live-sync-badge" id="liveSpinStatusBadge">
+              <span class="live-dot"></span>
+              <span id="liveSpinStatusText">LIVE SYNC AKTIF • Menunggu Putaran Undian</span>
+            </div>
+
+            <h4 style="color:#ffffff; font-size:1.15rem; margin-bottom:2px;" id="liveSpinPeriodeTitle">
+              Undian Pemenang Arisan Keluarga Besar Adnan
+            </h4>
+            <p style="color:#cbd5e1; font-size:0.84rem; margin-bottom:10px;" id="liveSpinSubtitleInfo">
+              Roda undian akan berputar serentak di seluruh layar anggota saat Admin menekan tombol Spin.
+            </p>
+
+            <div class="wheel-canvas-container">
+              <div class="wheel-pointer-top" title="Jarum Penunjuk Pemenang"></div>
+              <canvas id="arisanWheelCanvas" width="440" height="440"></canvas>
+              <div class="wheel-center-hub" id="wheelCenterHub">🎡</div>
+            </div>
+
+            <!-- KOTAK SOROTAN HASIL PUTARAN TERAKHIR / PEMENANG RESMI -->
+            <div class="spin-spotlight-box" id="spinSpotlightBox">
+              <div class="spin-spotlight-avatar" id="spinSpotlightAvatar">🎯</div>
+              <div style="text-align:left; flex:1; min-width:180px;">
+                <div
+                  style="font-size:0.75rem; text-transform:uppercase; letter-spacing:0.5px; color:#fde68a; font-weight:700;"
+                  id="spinSpotlightLabel">
+                  HASIL PUTARAN UNDIAN
+                </div>
+                <div style="font-size:1.12rem; font-weight:800; color:#ffffff;" id="spinSpotlightName">
+                  Belum Ada Putaran
+                </div>
+                <div style="font-size:0.8rem; color:#e2e8f0;" id="spinSpotlightMeta">
+                  Setiap hasil putaran ke-1, ke-2, dst. akan tercatat di Tabel History di bawah.
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- KOLOM KANAN: PANEL KONTROL ADMIN ATAU INFO PENONTON PESERTA -->
+          <div>
+            <!-- KARTU KONTROL KHUSUS USER ADMIN -->
+            <div class="card-box" id="adminLiveSpinControlCard">
+              <div
+                style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:12px; padding-bottom:10px; border-bottom:1px solid var(--border-light);">
+                <h4 style="margin:0; padding:0; border:none;">👑 Panel Kontrol Undian (Khusus Admin)</h4>
+                <span class="gallery-badge admin-only">Kendali Live Spin</span>
+              </div>
+
+              <div class="form-grid" style="margin-bottom:14px;">
+                <div class="form-group">
+                  <label for="liveSpinPeriodeSelect">Pilih Periode Arisan <span class="required-star">*</span></label>
+                  <select id="liveSpinPeriodeSelect"></select>
+                </div>
+
+                <div class="form-group">
+                  <label for="liveSpinNominalInput">Total Dana Arisan Diterima (Rp)</label>
+                  <input type="number" id="liveSpinNominalInput" min="0" step="any"
+                    placeholder="Sesuai periode di Supabase" />
+                </div>
+              </div>
+
+              <div class="form-group" style="margin-bottom:14px;">
+                <div
+                  style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
+                  <label style="margin:0;">Daftar Kandidat Peserta di Roda Undian (<span
+                      id="liveCandidateCountText">0</span> Peserta)</label>
+                  <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                    <label
+                      style="display:flex; align-items:center; gap:6px; font-size:0.78rem; font-weight:700; color:var(--primary); cursor:pointer; margin:0;">
+                      <input type="checkbox" id="chkAllSpinCandidates" checked
+                        style="width:15px; height:15px; accent-color:var(--primary);" />
+                      <span>Pilih Semua</span>
+                    </label>
+                    <label
+                      style="display:flex; align-items:center; gap:6px; font-size:0.78rem; font-weight:600; color:var(--text-secondary); cursor:pointer; margin:0;">
+                      <input type="checkbox" id="chkIncludeAlreadyWon"
+                        style="width:15px; height:15px; accent-color:var(--primary);" />
+                      <span>Sertakan yang Sudah Menang</span>
+                    </label>
+                  </div>
+                </div>
+                <div class="candidate-checklist-box" id="liveSpinCandidateList">
+                  <div style="grid-column:1/-1; text-align:center; color:var(--text-muted); padding:14px;">Memuat daftar
+                    kandidat...</div>
+                </div>
+              </div>
+
+              <button type="button" class="btn-spin-live" id="btnTriggerLiveSpin">
+                <span>🎡</span>
+                <span id="btnTriggerLiveSpinText">PUTAR RODA UNDIAN SEKARANG (LIVE KE SEMUA CLIENT)</span>
+              </button>
+
+              <div
+                style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-top:12px; padding-top:12px; border-top:1px dashed var(--border-light);">
+                <small style="color:var(--text-muted); font-size:0.78rem;">
+                  💡 Anda dapat memutar lebih dari 1 kali (Putaran #1, #2, #3, dst.), lalu memilih putaran mana yang
+                  disahkan sebagai pemenang pada <strong>Tabel History Putaran</strong> di bawah.
+                </small>
+                <button type="button" class="btn-secondary btn-sm" id="btnResetLiveSpinHistory"
+                  style="color:#dc2626; border-color:#fecaca;">
+                  🗑️ Reset History Putaran
+                </button>
+              </div>
+            </div>
+
+            <!-- KARTU INFORMASI LAYAR PENONTON (MUNCUL UNTUK PESERTA NON-ADMIN) -->
+            <div class="card-box hidden" id="viewerLiveSpinInfoCard"
+              style="background:linear-gradient(135deg, #f0fdfa 0%, #ffffff 100%); border:1.5px solid var(--primary-border);">
+              <h4 style="color:var(--primary); margin-bottom:8px;">📡 Mode Penonton Live Undian Arisan</h4>
+              <p style="font-size:0.88rem; color:var(--text-secondary); line-height:1.55; margin-bottom:12px;">
+                Layar Anda terhubung langsung secara <strong>Real-Time</strong> dengan ruang undian Admin. Saat
+                <strong>User Admin</strong> menekan tombol <strong>Putar Roda Undian</strong>, roda di samping akan
+                otomatis berputar serentak di perangkat Anda!
+              </p>
+              <div
+                style="background:#ffffff; border:1px solid var(--border-light); border-radius:10px; padding:12px 14px; font-size:0.83rem; color:var(--text-main);">
+                <div>✅ <strong>Transparan & Serentak:</strong> Seluruh anggota melihat putaran dan kandidat yang sama.
+                </div>
+                <div style="margin-top:6px;">✅ <strong>Riwayat Setiap Putaran:</strong> Apabila dilakukan lebih dari 1
+                  kali putaran (misal Putaran ke-1, ke-2, ke-3), seluruh hasilnya tercatat lengkap di <strong>Tabel
+                    History Putaran</strong> di bawah beserta putaran mana yang disahkan sebagai pemenang.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TABEL HISTORY SETIAP PUTARAN UNDIAN (PUTARAN KE-1, KE-2, DST. + PILIH PEMENANG RESMI) -->
+        <div class="card-box">
+          <div
+            style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:14px; padding-bottom:10px; border-bottom:1px solid var(--border-light);">
+            <div>
+              <h4 style="margin:0; padding:0; border:none;">📜 History Hasil Setiap Putaran Undian (Putaran Ke-1, Ke-2,
+                dst.)</h4>
+              <p style="font-size:0.82rem; color:var(--text-muted); margin-top:2px;">
+                Setiap kali roda diputar, nama yang keluar tercatat di bawah ini. <strong>User Admin</strong> dapat
+                memilih dari daftar history di bawah untuk menetapkan putaran mana yang menjadi <strong>Pemenang Resmi
+                  Arisan</strong>.
+              </p>
+            </div>
+            <span class="gallery-badge" id="spinHistoryCountBadge"
+              style="background:var(--primary-light); color:var(--primary); border:1px solid var(--primary-border);">
+              0 Putaran Tercatat
+            </span>
+          </div>
+
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th style="width:110px;">Putaran Ke</th>
+                  <th>Waktu Putar</th>
+                  <th>Periode Arisan</th>
+                  <th>Foto & Nama Terpilih</th>
+                  <th>Nominal Arisan</th>
+                  <th>Status Putaran</th>
+                  <th id="thActionSpinHistory">Aksi Pengesahan (Admin)</th>
+                </tr>
+              </thead>
+              <tbody id="tableBodySpinHistory">
+                <tr>
+                  <td colspan="7" style="text-align:center; color:var(--text-muted); padding:20px;">
+                    Belum ada history putaran undian pada sesi ini. Silakan tekan tombol <strong>Putar Roda
+                      Undian</strong>.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===============================================================
+           MENU 6: PENGELUARAN / AKUNTANSI (HANYA MUNCUL UNTUK USER ADMIN)
+           =============================================================== -->
+      
+
+      <!-- ===============================================================
+           LAYAR BIODATA PESERTA (adnan_DataAnggota - DILENGKAPI FOTO KAMERA & FOLDER LOKAL)
+           =============================================================== -->
+      <section class="main-section-panel" id="viewPengeluaran">
+        <div class="section-header">
+          <div>
+            <h3>📊 5. Pengeluaran & Akuntansi Kas (Khusus Admin)</h3>
+            <p>Pencatatan pengeluaran kas arisan, pencairan pemenang, santunan, dan operasional.</p>
+          </div>
+          <button type="button" class="btn-secondary btn-sm" data-open-view="viewGalleryHome">
+            &larr; Kembali ke Menu Gallery
+          </button>
+        </div>
+
+        <div class="card-box" id="adminExpenseFormCard">
+          <h4>Form Entry Pengeluaran / Akuntansi (Khusus Admin)</h4>
+          <form id="formPengeluaran">
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="expTanggal">Tanggal Pengeluaran <span class="required-star">*</span></label>
+                <input type="date" id="expTanggal" required />
+              </div>
+
+              <div class="form-group">
+                <label for="expKategori">Kategori Akuntansi <span class="required-star">*</span></label>
+                <select id="expKategori" required>
+                  <option value="Pencairan Arisan Pemenang">Pencairan Arisan Pemenang</option>
+                  <option value="Konsumsi & Tuan Rumah">Konsumsi & Subsidi Tuan Rumah</option>
+                  <option value="Santunan Sosial / Duka">Santunan Sosial / Duka / Sakit</option>
+                  <option value="Penyaluran Zakat & Sumbangan">Penyaluran Zakat & Sumbangan</option>
+                  <option value="Operasional & Administrasi">Operasional & Administrasi</option>
+                  <option value="Lainnya">Pengeluaran Lainnya</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label for="expNominal">Nominal Pengeluaran (Rp) <span class="required-star">*</span></label>
+                <input type="number" id="expNominal" min="0" step="any" placeholder="Masukkan nominal pengeluaran"
+                  required />
+              </div>
+
+              <!-- DROPDOWN MENU DARI HEADER adnan_DataAnggota + FITUR CARI NAMA -->
+              <div class="form-group">
+                <label for="expSelectAnggota">
+                  Pilih / Cari Nama Anggota (<code>adnan_DataAnggota</code>)
+                </label>
+                <div style="display:flex; flex-direction:column; gap:6px;">
+                  <input type="text" id="expSearchAnggota" placeholder="🔍 Cari nama anggota dari adnan_DataAnggota..."
+                    autocomplete="off"
+                    style="padding:8px 12px; border:1.5px solid var(--primary-border); border-radius:8px; font-size:0.85rem; background:var(--primary-light);" />
+                  <select id="expSelectAnggota">
+                    <option value="">-- Pilih Nama dari adnan_DataAnggota --</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label for="expPenerima">Nama Penerima / Tujuan Dana <span class="required-star">*</span></label>
+                <input type="text" id="expPenerima" list="expAnggotaDatalist"
+                  placeholder="Otomatis terisi dari dropdown anggota atau ketik nama penerima" required />
+                <datalist id="expAnggotaDatalist"></datalist>
+              </div>
+
+              <div class="form-group">
+                <label for="expMetode">Metode Pengeluaran <span class="required-star">*</span></label>
+                <select id="expMetode" required>
+                  <option value="Tunai">Tunai (Cash)</option>
+                  <option value="Transfer Bank">Transfer Bank</option>
+                </select>
+              </div>
+
+              <div class="form-group hidden" id="expBankGroup">
+                <label for="expNamaBank">Bank Pencairan / Transfer <span class="required-star">*</span></label>
+                <select id="expNamaBank" class="bank-dropdown-select"></select>
+              </div>
+
+              <div class="form-group hidden" id="expRekeningGroup">
+                <label for="expNoRekening">Nomor Rekening Pencairan / Transfer <span
+                    class="required-star">*</span></label>
+                <input type="text" id="expNoRekening"
+                  placeholder="Masukkan nomor rekening penerima (Contoh: 1234567890 a.n ...)" />
+              </div>
+
+              <div class="form-group full-width">
+                <label for="expDeskripsi">Uraian / Deskripsi Pengeluaran <span class="required-star">*</span></label>
+                <textarea id="expDeskripsi" placeholder="Jelaskan rincian pengeluaran akuntansi" required></textarea>
+              </div>
+
+              <div class="form-group full-width">
+                <label for="expBuktiFile">Unggah Nota / Kwitansi Pengeluaran (Opsional)</label>
+                <div class="upload-zone">
+                  <input type="file" id="expBuktiFile" accept="image/*,application/pdf" />
+                  <div class="preview-media-box" id="expBuktiPreview"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="tab-footer-actions">
+              <span></span>
+              <button type="submit" class="btn-primary btn-auto" id="btnSubmitPengeluaran">
+                💾 Catat Pengeluaran (Admin)
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <div class="card-box">
+          <div
+            style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; margin-bottom:14px; padding-bottom:10px; border-bottom:1px solid var(--border-light);">
+            <div>
+              <h4 style="margin:0; padding:0; border:none;">Buku Kas Pengeluaran / Akuntansi</h4>
+              <p style="font-size:0.82rem; color:var(--text-muted); margin-top:2px;">
+                Daftar seluruh pencatatan pengeluaran kas dari tabel <code>adnan_Pengeluaran</code>.
+              </p>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+              <input type="text" id="searchPengeluaranNama" placeholder="🔍 Cari nama penerima / uraian..."
+                style="padding:7px 12px; border:1.5px solid var(--primary-border); border-radius:8px; font-size:0.84rem; min-width:210px;" />
+              <select id="filterPengeluaranAnggota"
+                style="padding:7px 12px; border:1.5px solid var(--primary); border-radius:8px; font-size:0.84rem; font-weight:600; background:#ffffff; min-width:200px;">
+                <option value="ALL">-- Semua Penerima (adnan_DataAnggota) --</option>
+              </select>
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Tanggal</th>
+                  <th>Kode</th>
+                  <th>Kategori</th>
+                  <th>Uraian / Penerima</th>
+                  <th>Metode, Bank & No. Rek</th>
+                  <th>Nominal</th>
+                  <th>Nota/Bukti</th>
+                  <th>Dicatat Oleh</th>
+                </tr>
+              </thead>
+              <tbody id="tableBodyPengeluaran">
+                <tr>
+                  <td colspan="8" style="text-align:center;">Memuat data pengeluaran...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section class="main-section-panel" id="viewPeriode">
+        <div class="section-header">
+          <div>
+            <h3>⚙️ 6. Pengaturan (Khusus Role Admin)</h3>
+            <p>Kelola setting periode & iuran arisan, penetapan pemenang, pengaturan Group Arisan (maks. 5 orang), serta
+              Daftar User terdaftar (update Password & Role).</p>
+          </div>
+          <button type="button" class="btn-secondary btn-sm" data-open-view="viewGalleryHome">
+            &larr; Kembali ke Menu Gallery
+          </button>
+        </div>
+
+        <div class="sub-tab-nav five-cols">
           <button type="button" class="sub-tab-btn active" data-periode-subtab="subTabPeriodeList">
             <span class="tab-step-num">1</span>
             <span>Setting Periode & Iuran</span>
@@ -1942,12 +2672,17 @@
             <span class="tab-step-num">4</span>
             <span>Daftar User Terdaftar</span>
           </button>
+          <button type="button" class="sub-tab-btn" data-periode-subtab="subTabDatabaseManager">
+            <span class="tab-step-num">5</span>
+            <span>Database Supabase</span>
+          </button>
         </div>
 
         <!-- SUB-TAB 1: SETTING PERIODE ARISAN -->
         <div class="sub-tab-panel active" id="subTabPeriodeList">
           <div class="card-box hidden" id="formPeriodeCard">
-            <h4>Tambah / Setting Periode & Split Iuran Arisan <span class="gallery-badge admin-only" style="margin-left:8px;">👑 Khusus Admin</span></h4>
+            <h4>Tambah / Setting Periode & Split Iuran Arisan <span class="gallery-badge admin-only"
+                style="margin-left:8px;">👑 Khusus Admin</span></h4>
             <form id="formPeriodeArisan">
               <div class="form-grid">
                 <div class="form-group">
@@ -1972,23 +2707,26 @@
 
                 <!-- Rincian Split Iuran Arisan per Orang (Tabel adnan_Arisan) -->
                 <div class="form-group">
-                  <label for="perIuranArisan">Split 1: Uang Arisan / Orang (Rp) <span class="required-star">*</span></label>
-                  <input type="number" id="perIuranArisan" min="0" step="5000" value="100000" required />
+                  <label for="perIuranArisan">a. Uang Arisan / Orang (Rp) <span
+                      class="required-star">*</span></label>
+                  <input type="number" id="perIuranArisan" min="0" step="any" value="100000" placeholder="100000" required />
                 </div>
 
                 <div class="form-group">
-                  <label for="perIuranKas">Split 2: Uang Kas / Orang (Rp) <span class="required-star">*</span></label>
-                  <input type="number" id="perIuranKas" min="0" step="5000" value="40000" required />
+                  <label for="perIuranKonsumsi">b. Konsumsi / Orang (Rp) <span
+                      class="required-star">*</span></label>
+                  <input type="number" id="perIuranKonsumsi" min="0" step="any" value="30000" placeholder="30000" required />
                 </div>
 
                 <div class="form-group">
-                  <label for="perIuranKonsumsi">Split 3: Uang Konsumsi / Orang (Rp) <span class="required-star">*</span></label>
-                  <input type="number" id="perIuranKonsumsi" min="0" step="5000" value="30000" required />
+                  <label for="perIuranKas">c. Kas / Orang (Masuk Kas) (Rp) <span class="required-star">*</span></label>
+                  <input type="number" id="perIuranKas" min="0" step="any" value="40000" placeholder="40000" required />
                 </div>
 
                 <div class="form-group">
-                  <label for="perIuran">Total Iuran per Orang (Rp) <span class="required-star">*</span></label>
-                  <input type="number" id="perIuran" min="10000" step="5000" value="170000" readonly required style="font-weight:800; color:var(--primary);" />
+                  <label for="perIuran">Total Rincian Uang Arisan (a+b+c) (Rp) <span class="required-star">*</span></label>
+                  <input type="number" id="perIuran" min="0" step="any" value="170000" placeholder="170000" readonly required
+                    style="font-weight:800; color:var(--primary);" />
                 </div>
 
                 <div class="form-group">
@@ -2031,10 +2769,13 @@
                     <th>Total / Orang</th>
                     <th>Pemenang</th>
                     <th>Status</th>
+                    <th>Aksi</th>
                   </tr>
                 </thead>
                 <tbody id="tableBodyPeriode">
-                  <tr><td colspan="10" style="text-align:center;">Memuat data periode arisan...</td></tr>
+                  <tr>
+                    <td colspan="11" style="text-align:center;">Memuat data periode arisan...</td>
+                  </tr>
                 </tbody>
               </table>
             </div>
@@ -2044,7 +2785,8 @@
         <!-- SUB-TAB 2: PEMENANG ARISAN -->
         <div class="sub-tab-panel" id="subTabPemenangList">
           <div class="card-box hidden" id="formPemenangCard">
-            <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:14px;">
+            <div
+              style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:14px;">
               <h4 style="margin-bottom:0; border:none; padding:0;">
                 Penetapan / Undian Pemenang Arisan
                 <span class="gallery-badge admin-only" style="margin-left:8px;">👑 Khusus Admin</span>
@@ -2064,7 +2806,8 @@
                 </div>
 
                 <div class="form-group">
-                  <label for="winAnggota">Pilih Peserta Pemenang (adnan_DataAnggota) <span class="required-star">*</span></label>
+                  <label for="winAnggota">Pilih Peserta Pemenang (adnan_DataAnggota) <span
+                      class="required-star">*</span></label>
                   <select id="winAnggota" required>
                     <option value="">-- Pilih Anggota Pemenang --</option>
                   </select>
@@ -2072,7 +2815,8 @@
 
                 <div class="form-group">
                   <label for="winNominal">Total Dana Arisan Diterima (Rp) <span class="required-star">*</span></label>
-                  <input type="number" id="winNominal" min="0" step="10000" value="1000000" required />
+                  <input type="number" id="winNominal" min="0" step="any"
+                    placeholder="Masukkan nominal sesuai data periode" required />
                 </div>
 
                 <div class="form-group">
@@ -2121,10 +2865,13 @@
                     <th>Total Diterima</th>
                     <th>Metode / Bank</th>
                     <th>Keterangan</th>
+                    <th>Aksi</th>
                   </tr>
                 </thead>
                 <tbody id="tableBodyPemenang">
-                  <tr><td colspan="7" style="text-align:center;">Memuat daftar pemenang arisan...</td></tr>
+                  <tr>
+                    <td colspan="8" style="text-align:center;">Memuat daftar pemenang arisan...</td>
+                  </tr>
                 </tbody>
               </table>
             </div>
@@ -2136,9 +2883,12 @@
           <div class="card-box" id="formGroupArisanCard">
             <h4>
               Entry Group Arisan (Maksimal 5 Orang Termasuk Penanggung Jawab)
+              <span class="gallery-badge admin-only" style="margin-left:8px;">👑 Khusus Admin</span>
             </h4>
             <p style="font-size:0.84rem; color:var(--text-secondary); margin-bottom:16px;">
-              Pilih <strong>Penanggung Jawab Group</strong> dari dropdown <code>adnan_DataAnggota</code> (otomatis menjadi Anggota #1), lalu pilih hingga <strong>4 anggota lainnya</strong> (maksimal total 5 orang per group). Saat menyimpan pembayaran arisan, tagihan akan otomatis di-split ke anggota group untuk <strong>Uang Arisan (Rp 100.000)</strong>, <strong>Uang Kas (Rp 40.000)</strong>, dan <strong>Konsumsi (Rp 30.000)</strong> per orang.
+              Pilih <strong>Penanggung Jawab Group</strong> dari dropdown <code>adnan_DataAnggota</code> (otomatis
+              menjadi Anggota #1), lalu pilih hingga <strong>4 anggota lainnya</strong> (maksimal total 5 orang per
+              group). Data disimpan langsung ke tabel <code>adnan_GroupArisan</code> di Supabase.
             </p>
 
             <form id="formGroupArisan">
@@ -2149,7 +2899,8 @@
                 </div>
 
                 <div class="form-group">
-                  <label for="grpPenanggungJawab">Penanggung Jawab (Anggota #1 - dari DaftarAnggota) <span class="required-star">*</span></label>
+                  <label for="grpPenanggungJawab">Penanggung Jawab (Anggota #1 - dari DaftarAnggota) <span
+                      class="required-star">*</span></label>
                   <select id="grpPenanggungJawab" class="group-member-dropdown" required>
                     <option value="">-- Pilih Penanggung Jawab Group --</option>
                   </select>
@@ -2185,7 +2936,8 @@
 
                 <div class="form-group full-width">
                   <label for="grpKeterangan">Keterangan Group Arisan</label>
-                  <input type="text" id="grpKeterangan" placeholder="Contoh: Pembayaran kolektif dikoordinir oleh Penanggung Jawab" />
+                  <input type="text" id="grpKeterangan"
+                    placeholder="Contoh: Pembayaran kolektif dikoordinir oleh Penanggung Jawab" />
                 </div>
               </div>
 
@@ -2209,12 +2961,14 @@
                     <th>Penanggung Jawab (Anggota #1)</th>
                     <th>Daftar Anggota Group (Maks 5 Orang)</th>
                     <th>Jumlah Orang</th>
-                    <th>Total Tagihan Group (@Rp 170.000)</th>
+                    <th>Total Nominal Group (Arisan + Konsumsi)</th>
                     <th>Aksi</th>
                   </tr>
                 </thead>
                 <tbody id="tableBodyGroupArisan">
-                  <tr><td colspan="7" style="text-align:center;">Memuat daftar group arisan...</td></tr>
+                  <tr>
+                    <td colspan="7" style="text-align:center;">Memuat daftar group arisan...</td>
+                  </tr>
                 </tbody>
               </table>
             </div>
@@ -2224,13 +2978,17 @@
         <!-- SUB-TAB 4: DAFTAR USER TERDAFTAR (SELURUH HEADER KECUALI id, FORMAT TANGGAL dd mmm yyyy, UPDATE PASSWORD & ROLE + SIMPAN) -->
         <div class="sub-tab-panel" id="subTabDaftarUser">
           <div class="card-box">
-            <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:14px; padding-bottom:10px; border-bottom:1px solid var(--border-light);">
+            <div
+              style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; margin-bottom:14px; padding-bottom:10px; border-bottom:1px solid var(--border-light);">
               <div>
                 <h4 style="margin:0; padding:0; border:none;">
                   👤 Daftar User Terdaftar (Tabel: <code>adnan_User</code>)
                 </h4>
                 <p style="font-size:0.82rem; color:var(--text-muted); margin-top:2px;">
-                  Menampilkan seluruh header kolom <code>adnan_User</code> kecuali <code>id</code> (format tanggal <strong>dd mmm yyyy</strong>). <strong>User Admin</strong> dapat mengedit <strong>seluruh kolom</strong> (User ID, Nama, Password, Role, Deskripsi, dll.) dengan klik <strong>✏️ Edit</strong> lalu <strong>💾 Simpan</strong>.
+                  Menampilkan seluruh header kolom <code>adnan_User</code> kecuali <code>id</code> (format tanggal
+                  <strong>dd mmm yyyy</strong>). <strong>User Admin</strong> dapat mengedit <strong>seluruh
+                    kolom</strong> (User ID, Nama, Password, Role, Deskripsi, dll.) dengan klik <strong>✏️ Edit</strong>
+                  lalu <strong>💾 Simpan</strong>.
                 </p>
               </div>
               <button type="button" class="btn-secondary btn-sm" id="btnRefreshDaftarUser">
@@ -2252,162 +3010,72 @@
                   </tr>
                 </thead>
                 <tbody id="tableBodyDaftarUser">
-                  <tr><td colspan="7" style="text-align:center;">Memuat daftar user terdaftar...</td></tr>
+                  <tr>
+                    <td colspan="7" style="text-align:center;">Memuat daftar user terdaftar...</td>
+                  </tr>
                 </tbody>
               </table>
             </div>
           </div>
         </div>
-      </section>
+      
 
-      <!-- ===============================================================
-           MENU 4: DAFTAR SELURUH ANGGOTA ARISAN (GALLERY NAMA & FOTO + CARI BY NAMA)
-           =============================================================== -->
-      <section class="main-section-panel" id="viewDaftarAnggota">
-        <div class="section-header">
-          <div>
-            <h3>👥 4. Daftar Seluruh Anggota Arisan Keluarga Adnan</h3>
-            <p>Galeri foto dan nama seluruh anggota peserta arisan yang terdaftar pada tabel <code>adnan_DataAnggota</code>.</p>
-          </div>
-          <button type="button" class="btn-secondary btn-sm" data-open-view="viewGalleryHome">
-            &larr; Kembali ke Menu Gallery
-          </button>
-        </div>
-
-        <div class="card-box">
-          <!-- Bar Pencarian Anggota Berdasarkan Nama -->
-          <div class="member-search-bar">
-            <div class="member-search-input-wrap">
-              <input
-                type="text"
-                id="searchAnggotaInput"
-                placeholder="🔍 Cari anggota arisan berdasarkan Nama..."
-                autocomplete="off"
-              />
-            </div>
-            <button type="button" class="btn-secondary btn-sm" id="btnResetSearchAnggota">
-              ✕ Reset Pencarian
-            </button>
-            <span class="gallery-badge" id="countAnggotaGalleryBadge" style="background:var(--primary-light); color:var(--primary); border:1px solid var(--primary-border);">
-              0 Anggota
-            </span>
-          </div>
-
-          <!-- Grid Gallery Anggota: Berisi Foto & Nama Saja -->
-          <div class="member-gallery-grid" id="memberGalleryContainer">
-            <p style="grid-column:1/-1; text-align:center; color:var(--text-muted);">Memuat galeri anggota arisan...</p>
-          </div>
-        </div>
-      </section>
-
-      <!-- ===============================================================
-           MENU 6: PENGELUARAN / AKUNTANSI (HANYA MUNCUL UNTUK USER ADMIN)
-           =============================================================== -->
-      <section class="main-section-panel" id="viewPengeluaran">
-        <div class="section-header">
-          <div>
-            <h3>📊 6. Pengeluaran & Akuntansi Kas (Khusus Admin)</h3>
-            <p>Pencatatan pengeluaran kas arisan, pencairan pemenang, santunan, dan operasional.</p>
-          </div>
-          <button type="button" class="btn-secondary btn-sm" data-open-view="viewGalleryHome">
-            &larr; Kembali ke Menu Gallery
-          </button>
-        </div>
-
-        <div class="card-box" id="adminExpenseFormCard">
-          <h4>Form Entry Pengeluaran / Akuntansi (Khusus Admin)</h4>
-          <form id="formPengeluaran">
-            <div class="form-grid">
-              <div class="form-group">
-                <label for="expTanggal">Tanggal Pengeluaran <span class="required-star">*</span></label>
-                <input type="date" id="expTanggal" required />
+<!-- ======================================================== -->
+<!-- TAB / PANEL MANAJEMEN TABEL DA<!-- SUB-TAB 5: DATABASE SUPABASE VIEWER & EDITOR -->
+        <div class="sub-tab-panel" id="subTabDatabaseManager">
+          <div class="card-box" id="adminDbManagerCard">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; border-bottom: 2px solid #f1f5f9; padding-bottom: 12px;">
+              <div>
+                <h3 style="margin: 0; font-size: 1.15rem; color: #1e293b; display: flex; align-items: center; gap: 8px;">
+                  🗄️ Database Supabase Viewer & Editor 
+                  <span class="gallery-badge admin-only">Admin Only</span>
+                </h3>
+                <p style="margin: 4px 0 0; color: #64748b; font-size: 0.85rem;">Pilih tabel untuk menampilkan data, mengedit, atau menghapus baris data secara langsung.</p>
               </div>
-
-              <div class="form-group">
-                <label for="expKategori">Kategori Akuntansi <span class="required-star">*</span></label>
-                <select id="expKategori" required>
-                  <option value="Pencairan Arisan Pemenang">Pencairan Arisan Pemenang</option>
-                  <option value="Konsumsi & Tuan Rumah">Konsumsi & Subsidi Tuan Rumah</option>
-                  <option value="Santunan Sosial / Duka">Santunan Sosial / Duka / Sakit</option>
-                  <option value="Penyaluran Zakat & Sumbangan">Penyaluran Zakat & Sumbangan</option>
-                  <option value="Operasional & Administrasi">Operasional & Administrasi</option>
-                  <option value="Lainnya">Pengeluaran Lainnya</option>
+              
+              <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                <!-- DROPDOWN TABEL SUPABASE -->
+                <select id="dbTableSelector" style="padding: 8px 12px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-weight: 600; font-size: 0.9rem; background: #fff; color: #1e293b; min-width: 260px;">
+                  <option value="">-- Pilih Tabel Supabase --</option>
+                  <option value="adnan_User">adnan_User (Akun Pengguna)</option>
+                  <option value="adnan_DataAnggota">adnan_DataAnggota (Data Anggota)</option>
+                  <option value="adnan_Arisan">adnan_Arisan (Pengaturan Periode)</option>
+                  <option value="adnan_PeriodeArisan">adnan_PeriodeArisan (Peserta & Jadwal)</option>
+                  <option value="adnan_GroupArisan">adnan_GroupArisan (Grup / Kelompok)</option>
+                  <option value="adnan_PemenangArisan">adnan_PemenangArisan (Pemenang Undian)</option>
+                  <option value="adnan_Pembayaran">adnan_Pembayaran (Penerimaan Kas)</option>
+                  <option value="adnan_Pengeluaran">adnan_Pengeluaran (Pengeluaran Kas)</option>
+                  <option value="adnan_Pengumuman">adnan_Pengumuman (Pengumuman)</option>
+                  <option value="adnan_Galeri">adnan_Galeri (Dokumentasi / Galeri)</option>
                 </select>
-              </div>
-
-              <div class="form-group">
-                <label for="expNominal">Nominal Pengeluaran (Rp) <span class="required-star">*</span></label>
-                <input type="number" id="expNominal" min="1000" step="500" placeholder="Contoh: 500000" required />
-              </div>
-
-              <div class="form-group">
-                <label for="expPenerima">Nama Penerima / Tujuan Dana</label>
-                <input type="text" id="expPenerima" placeholder="Contoh: Bpk. H. Mansyur / Katering" />
-              </div>
-
-              <div class="form-group">
-                <label for="expMetode">Metode Pengeluaran <span class="required-star">*</span></label>
-                <select id="expMetode" required>
-                  <option value="Tunai">Tunai (Cash)</option>
-                  <option value="Transfer Bank">Transfer Bank</option>
-                </select>
-              </div>
-
-              <div class="form-group hidden" id="expBankGroup">
-                <label for="expNamaBank">Bank Pencairan / Transfer</label>
-                <select id="expNamaBank" class="bank-dropdown-select"></select>
-              </div>
-
-              <div class="form-group full-width">
-                <label for="expDeskripsi">Uraian / Deskripsi Pengeluaran <span class="required-star">*</span></label>
-                <textarea id="expDeskripsi" placeholder="Jelaskan rincian pengeluaran akuntansi" required></textarea>
-              </div>
-
-              <div class="form-group full-width">
-                <label for="expBuktiFile">Unggah Nota / Kwitansi Pengeluaran (Opsional)</label>
-                <div class="upload-zone">
-                  <input type="file" id="expBuktiFile" accept="image/*,application/pdf" />
-                  <div class="preview-media-box" id="expBuktiPreview"></div>
-                </div>
+                <button type="button" id="btnRefreshDbTable" class="btn-secondary btn-sm" style="padding: 8px 14px;">
+                  🔄 Refresh
+                </button>
               </div>
             </div>
 
-            <div class="tab-footer-actions">
-              <span></span>
-              <button type="submit" class="btn-primary btn-auto" id="btnSubmitPengeluaran">
-                💾 Catat Pengeluaran (Admin)
-              </button>
-            </div>
-          </form>
-        </div>
+            <div id="dbTableStatus" style="font-size: 0.85rem; color: #475569; margin-bottom: 10px; display: none;"></div>
 
-        <div class="card-box">
-          <h4>Buku Kas Pengeluaran / Akuntansi</h4>
-          <div class="table-responsive">
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>Tanggal</th>
-                  <th>Kode</th>
-                  <th>Kategori</th>
-                  <th>Uraian / Penerima</th>
-                  <th>Metode</th>
-                  <th>Nominal</th>
-                  <th>Nota/Bukti</th>
-                  <th>Dicatat Oleh</th>
-                </tr>
-              </thead>
-              <tbody id="tableBodyPengeluaran">
-                <tr><td colspan="8" style="text-align:center;">Memuat data pengeluaran...</td></tr>
-              </tbody>
-            </table>
+            <!-- Area Tampilan Data Tabel -->
+            <div class="table-responsive" style="max-height: 480px; overflow-y: auto;">
+              <table class="data-table">
+                <thead id="dbTableHeader" style="position: sticky; top: 0; z-index: 2;">
+                  <tr>
+                    <th style="padding: 12px; color: #64748b;">Silakan pilih salah satu tabel di dropdown atas</th>
+                  </tr>
+                </thead>
+                <tbody id="dbTableBody">
+                  <tr>
+                    <td style="padding: 24px; text-align: center; color: #94a3b8;">Belum ada tabel yang dipilih.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
-      </section>
 
-      <!-- ===============================================================
-           LAYAR BIODATA PESERTA (adnan_DataAnggota - DILENGKAPI FOTO KAMERA & FOLDER LOKAL)
-           =============================================================== -->
+</section>
+
       <section class="main-section-panel" id="viewBiodata">
         <div class="section-header">
           <div>
@@ -2416,15 +3084,19 @@
           </div>
           <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
             <!-- Pilihan Biodata Berdasarkan Peserta (Khusus Role Admin) -->
-            <div id="adminBiodataFilterBox" class="hidden" style="display:flex; align-items:center; gap:8px; background:var(--primary-light); border:1.5px solid var(--primary-border); padding:6px 12px; border-radius:10px;">
-              <label for="adminSelectBioPeserta" style="font-size:0.8rem; font-weight:700; color:var(--primary); margin:0;">
+            <div id="adminBiodataFilterBox" class="hidden"
+              style="display:flex; align-items:center; gap:8px; background:var(--primary-light); border:1.5px solid var(--primary-border); padding:6px 12px; border-radius:10px;">
+              <label for="adminSelectBioPeserta"
+                style="font-size:0.8rem; font-weight:700; color:var(--primary); margin:0;">
                 👑 Pilih Peserta:
               </label>
-              <select id="adminSelectBioPeserta" style="padding:6px 10px; border:1.5px solid var(--primary); border-radius:8px; font-size:0.84rem; font-weight:600; background:#ffffff; min-width:200px;">
+              <select id="adminSelectBioPeserta"
+                style="padding:6px 10px; border:1.5px solid var(--primary); border-radius:8px; font-size:0.84rem; font-weight:600; background:#ffffff; min-width:200px;">
                 <option value="">-- Biodata Saya --</option>
               </select>
             </div>
-            <button type="button" class="btn-secondary btn-sm" data-open-view="viewGalleryHome" id="btnBackToGalleryFromBio">
+            <button type="button" class="btn-secondary btn-sm" data-open-view="viewGalleryHome"
+              id="btnBackToGalleryFromBio">
               &larr; Kembali ke Menu Gallery
             </button>
           </div>
@@ -2468,7 +3140,8 @@
                       Ambil Foto Langsung dari Kamera atau Pilih dari Folder Lokal
                     </div>
                     <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px;">
-                      Foto ini akan disimpan pada kolom <code>foto_url</code> di tabel <code>adnan_DataAnggota</code> dan ditampilkan di pojok kiri atas aplikasi.
+                      Foto ini akan disimpan pada kolom <code>foto_url</code> di tabel <code>adnan_DataAnggota</code>
+                      dan ditampilkan di pojok kiri atas aplikasi.
                     </p>
                     <div class="photo-capture-buttons">
                       <button type="button" class="btn-primary btn-sm" id="btnOpenCamera">
@@ -2566,7 +3239,8 @@
 
                 <div class="form-group full-width">
                   <label for="bioAlamat">Alamat Lengkap Domisili <span class="required-star">*</span></label>
-                  <textarea id="bioAlamat" placeholder="Masukkan alamat lengkap tempat tinggal saat ini" required></textarea>
+                  <textarea id="bioAlamat" placeholder="Masukkan alamat lengkap tempat tinggal saat ini"
+                    required></textarea>
                 </div>
 
                 <div class="form-group full-width">
@@ -2592,7 +3266,8 @@
               <h4>3. Data Keluarga, Silsilah & Rekening Pencairan</h4>
               <div class="form-grid">
                 <div class="form-group">
-                  <label for="bioNamaAyah">Nama Ayah / Orang Tua (Jalur Keluarga) <span class="required-star">*</span></label>
+                  <label for="bioNamaAyah">Nama Ayah / Orang Tua (Jalur Keluarga) <span
+                      class="required-star">*</span></label>
                   <input type="text" id="bioNamaAyah" placeholder="Contoh: H. Abdul Mukti Adnan" required />
                 </div>
 
@@ -2666,34 +3341,36 @@
   </div>
 
   <!-- ===================================================================
-       MODAL 1: TRANSPARANSI RINCIAN PEMASUKAN PER JENIS PEMBAYARAN (LAMPIRAN 2)
+       MODAL 1: TRANSPARANSI RINCIAN PEMASUKAN, PENGELUARAN & SALDO KAS
        =================================================================== -->
   <div class="modal-overlay hidden" id="transparencyModal">
     <div class="modal-box">
       <div class="modal-header">
         <div>
-          <strong id="transparencyModalTitle" style="font-size:1.05rem;">📊 Transparansi Pemasukan Per Jenis Pembayaran</strong>
-          <div style="font-size:0.8rem; color:var(--text-muted);">Klik salah satu jenis pembayaran di bawah untuk memfilter rincian transaksi anggota</div>
+          <strong id="transparencyModalTitle" style="font-size:1.05rem;">📊 Rincian Transparansi Keuangan
+            Arisan</strong>
+          <div id="transparencyModalSubtitle" style="font-size:0.8rem; color:var(--text-muted);">Klik salah satu kartu
+            kategori di bawah untuk memfilter rincian data</div>
         </div>
         <button type="button" class="btn-secondary btn-sm" id="closeTransparencyModalBtn">✕ Tutup</button>
       </div>
       <div class="modal-body">
-        <!-- Kartu Breakdown Per Jenis Pembayaran -->
+        <!-- Kartu Breakdown -->
         <div class="transparency-Breakdown-grid" id="transparencyBreakdownGrid"></div>
 
-        <!-- Tabel Detail Transaksi Sesuai Filter Jenis Pembayaran -->
+        <!-- Tabel Detail Sesuai Mode Kartu Statistik yang Diklik -->
         <div class="table-responsive">
           <table class="data-table">
-            <thead>
+            <thead id="transparencyTableHead">
               <tr>
                 <th>Tanggal</th>
-                <th>Nama Pembayar</th>
+                <th>Nama</th>
                 <th>Jenis</th>
                 <th>Metode & Bank</th>
                 <th>Uang Arisan</th>
                 <th>Uang Kas</th>
                 <th>Konsumsi</th>
-                <th>Total Bayar</th>
+                <th>Total</th>
                 <th>Bukti</th>
                 <th>Status</th>
               </tr>
@@ -2725,7 +3402,8 @@
     <div class="modal-box" style="max-width:740px;">
       <div class="modal-header" style="background:var(--primary-light);">
         <div>
-          <strong style="font-size:1.05rem; color:var(--primary);">👨‍👩‍👧‍👦 Konfirmasi Split Pembayaran Group Arisan</strong>
+          <strong style="font-size:1.05rem; color:var(--primary);">👨‍👩‍👧‍👦 Konfirmasi Split Pembayaran Group
+            Arisan</strong>
           <div style="font-size:0.8rem; color:var(--text-secondary);" id="groupModalSubtitle">
             Ditemukan Group Arisan. Seluruh pembayaran akan di-split ke anggota group terpilih.
           </div>
@@ -2733,13 +3411,17 @@
         <button type="button" class="btn-secondary btn-sm" id="closeGroupModalBtn">✕ Batal</button>
       </div>
       <div class="modal-body">
-        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; background:#f8fafc; border:1.5px solid var(--border-color); border-radius:10px; padding:12px 14px; margin-bottom:14px;">
+        <div
+          style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; background:#f8fafc; border:1.5px solid var(--border-color); border-radius:10px; padding:12px 14px; margin-bottom:14px;">
           <div>
-            <div style="font-weight:800; font-size:0.92rem; color:var(--text-main);" id="modalGroupNameTitle">Nama Group</div>
+            <div style="font-weight:800; font-size:0.92rem; color:var(--text-main);" id="modalGroupNameTitle">Nama Group
+            </div>
             <div style="font-size:0.78rem; color:var(--text-secondary);" id="modalGroupPJInfo">Penanggung Jawab: -</div>
           </div>
-          <label style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.84rem; font-weight:700; color:var(--primary); background:#ffffff; padding:8px 14px; border-radius:8px; border:1.5px solid var(--primary); margin:0;">
-            <input type="checkbox" id="chkModalSelectAllGroup" checked style="width:17px; height:17px; accent-color:var(--primary); cursor:pointer;" />
+          <label
+            style="display:flex; align-items:center; gap:8px; cursor:pointer; font-size:0.84rem; font-weight:700; color:var(--primary); background:#ffffff; padding:8px 14px; border-radius:8px; border:1.5px solid var(--primary); margin:0;">
+            <input type="checkbox" id="chkModalSelectAllGroup" checked
+              style="width:17px; height:17px; accent-color:var(--primary); cursor:pointer;" />
             <span>Pilih Semua Anggota Group</span>
           </label>
         </div>
@@ -2751,32 +3433,43 @@
                 <th style="width:45px; text-align:center;">Bayar</th>
                 <th>Anggota Group</th>
                 <th>Peran</th>
-                <th>Uang Arisan</th>
-                <th>Uang Kas</th>
-                <th>Uang Konsumsi</th>
-                <th>Subtotal / Orang</th>
+                <th>a. Uang Arisan</th>
+                <th>b. Konsumsi</th>
+                <th>c. Kas (Masuk Kas)</th>
+                <th>Total Rincian</th>
+                <th>Dibayarkan Pemenang (a+b)</th>
               </tr>
             </thead>
             <tbody id="modalGroupMembersTableBody"></tbody>
           </table>
         </div>
 
-        <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:10px; background:var(--primary-light); border:1.5px solid var(--primary-border); border-radius:10px; padding:12px; margin-bottom:16px; text-align:center;">
+        <div
+          style="display:grid; grid-template-columns:repeat(auto-fit, minmax(135px, 1fr)); gap:10px; background:var(--primary-light); border:1.5px solid var(--primary-border); border-radius:10px; padding:12px; margin-bottom:16px; text-align:center;">
           <div>
-            <div style="font-size:0.72rem; font-weight:700; color:var(--text-muted); text-transform:uppercase;">Total Uang Arisan</div>
+            <div style="font-size:0.72rem; font-weight:700; color:var(--text-muted); text-transform:uppercase;">a. Total
+              Uang Arisan</div>
             <div style="font-size:0.95rem; font-weight:800; color:var(--primary);" id="modalSumArisan">Rp 0</div>
           </div>
           <div>
-            <div style="font-size:0.72rem; font-weight:700; color:var(--text-muted); text-transform:uppercase;">Total Uang Kas</div>
-            <div style="font-size:0.95rem; font-weight:800; color:#b45309;" id="modalSumKas">Rp 0</div>
-          </div>
-          <div>
-            <div style="font-size:0.72rem; font-weight:700; color:var(--text-muted); text-transform:uppercase;">Total Konsumsi</div>
+            <div style="font-size:0.72rem; font-weight:700; color:var(--text-muted); text-transform:uppercase;">b. Total
+              Konsumsi</div>
             <div style="font-size:0.95rem; font-weight:800; color:#0284c7;" id="modalSumKonsumsi">Rp 0</div>
           </div>
           <div>
-            <div style="font-size:0.72rem; font-weight:700; color:var(--text-muted); text-transform:uppercase;">Total Pembayaran</div>
-            <div style="font-size:1.05rem; font-weight:800; color:var(--primary);" id="modalSumGrandTotal">Rp 0</div>
+            <div style="font-size:0.72rem; font-weight:700; color:var(--text-muted); text-transform:uppercase;">c. Total
+              Masuk Kas</div>
+            <div style="font-size:0.95rem; font-weight:800; color:#b45309;" id="modalSumKas">Rp 0</div>
+          </div>
+          <div>
+            <div style="font-size:0.72rem; font-weight:700; color:var(--text-muted); text-transform:uppercase;">Total
+              Rincian (a+b+c)</div>
+            <div style="font-size:0.95rem; font-weight:800; color:var(--text-main);" id="modalSumTotalRincian">Rp 0</div>
+          </div>
+          <div style="background:#f0fdf4; border:1px solid #86efac; border-radius:8px; padding:4px 8px;">
+            <div style="font-size:0.7rem; font-weight:800; color:#15803d; text-transform:uppercase;">Dibayarkan
+              Pemenang (a+b)</div>
+            <div style="font-size:1.02rem; font-weight:800; color:#15803d;" id="modalSumGrandTotal">Rp 0</div>
           </div>
         </div>
 
@@ -2790,6 +3483,22 @@
     </div>
   </div>
 
-  <script src="js/app.js?v=20261028c"></script>
+    <!-- MODAL EDIT RECORD DATABASE SUPABASE -->
+  <div id="modalEditDbRecord" style="display:none; position:fixed; z-index:99999; inset:0; width:100%; height:100%; background:rgba(15,23,42,0.6); backdrop-filter:blur(2px); align-items:center; justify-content:center; padding:16px;">
+    <div style="background:#fff; border-radius:12px; max-width:540px; width:100%; max-height:85vh; display:flex; flex-direction:column; box-shadow:0 20px 25px -5px rgba(0,0,0,0.25); overflow:hidden;">
+      <div style="padding:14px 18px; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; background:var(--surface);">
+        <h4 style="margin:0; font-size:1.05rem; color:#1e293b;" id="modalEditDbTitle">✏️ Ubah Data</h4>
+        <button type="button" onclick="closeEditDbModal()" style="border:none; background:transparent; font-size:1.4rem; cursor:pointer; color:#64748b; line-height:1;">&times;</button>
+      </div>
+      <div style="padding:16px 20px; overflow-y:auto; flex:1;" id="modalEditDbFormContainer"></div>
+      <div style="padding:12px 18px; border-top:1px solid #e2e8f0; display:flex; justify-content:flex-end; gap:8px; background:#f8fafc; border-bottom-left-radius:12px; border-bottom-right-radius:12px;">
+        <button type="button" onclick="closeEditDbModal()" class="btn-secondary btn-sm" style="padding:6px 14px;">Batal</button>
+        <button type="button" id="btnSaveDbRecord" onclick="saveEditedDbRecord()" class="btn-primary btn-sm" style="width:auto; padding:6px 16px;">Simpan Perubahan</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/app.js?v=20261101f"></script>
 </body>
+
 </html>

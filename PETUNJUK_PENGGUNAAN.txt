@@ -1,0 +1,10 @@
+PETUNJUK PENGGUNAAN FILE ZIP:
+
+Pilihan 1 (Eksekusi 1-Klik Otomatis):
+1. Ekstrak seluruh isi file ZIP ini langsung ke dalam folder proyek Anda (di folder yang sama tempat index.html berada).
+2. Jalankan skrip `jalankan_update.py` (klik dua kali atau ketik `python jalankan_update.py` di terminal).
+3. Selesai! File `index.html` dan `js/app.js` Anda langsung terpasang panel manajemen database.
+
+Pilihan 2 (Salin Manual):
+1. Buka `snippet_index.html` -> Salin dan tempelkan ke bagian tab Pengaturan di `index.html`.
+2. Buka `snippet_app.js` -> Salin dan tempelkan ke baris paling bawah di `js/app.js`.

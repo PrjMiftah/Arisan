@@ -1,0 +1,69 @@
+<!-- ======================================================== -->
+<!-- SUB-TAB 5: DATABASE SUPABASE VIEWER & EDITOR             -->
+<!-- ======================================================== -->
+<div class="sub-tab-panel" id="subTabDatabaseManager">
+  <div class="card-box" id="adminDbManagerCard">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px; border-bottom: 2px solid #f1f5f9; padding-bottom: 12px;">
+      <div>
+        <h3 style="margin: 0; font-size: 1.15rem; color: #1e293b; display: flex; align-items: center; gap: 8px;">
+          🗄️ Database Supabase Viewer & Editor 
+          <span class="gallery-badge admin-only">Admin Only</span>
+        </h3>
+        <p style="margin: 4px 0 0; color: #64748b; font-size: 0.85rem;">Pilih tabel untuk menampilkan data, mengedit, atau menghapus baris data secara langsung.</p>
+      </div>
+      
+      <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+        <!-- DROPDOWN TABEL SUPABASE -->
+        <select id="dbTableSelector" style="padding: 8px 12px; border-radius: 8px; border: 1.5px solid #cbd5e1; font-weight: 600; font-size: 0.9rem; background: #fff; color: #1e293b; min-width: 260px;">
+          <option value="">-- Pilih Tabel Supabase --</option>
+          <option value="adnan_User">adnan_User (Akun Pengguna)</option>
+          <option value="adnan_DataAnggota">adnan_DataAnggota (Data Anggota)</option>
+          <option value="adnan_Arisan">adnan_Arisan (Pengaturan Periode)</option>
+          <option value="adnan_PeriodeArisan">adnan_PeriodeArisan (Peserta & Jadwal)</option>
+          <option value="adnan_GroupArisan">adnan_GroupArisan (Grup / Kelompok)</option>
+          <option value="adnan_PemenangArisan">adnan_PemenangArisan (Pemenang Undian)</option>
+          <option value="adnan_Pembayaran">adnan_Pembayaran (Penerimaan Kas)</option>
+          <option value="adnan_Pengeluaran">adnan_Pengeluaran (Pengeluaran Kas)</option>
+          <option value="adnan_Pengumuman">adnan_Pengumuman (Pengumuman)</option>
+          <option value="adnan_Galeri">adnan_Galeri (Dokumentasi / Galeri)</option>
+        </select>
+        <button type="button" id="btnRefreshDbTable" class="btn-secondary btn-sm" style="padding: 8px 14px;">
+          🔄 Refresh
+        </button>
+      </div>
+    </div>
+
+    <div id="dbTableStatus" style="font-size: 0.85rem; color: #475569; margin-bottom: 10px; display: none;"></div>
+
+    <!-- Area Tampilan Data Tabel -->
+    <div class="table-responsive" style="max-height: 480px; overflow-y: auto;">
+      <table class="data-table">
+        <thead id="dbTableHeader" style="position: sticky; top: 0; z-index: 2;">
+          <tr>
+            <th style="padding: 12px; color: #64748b;">Silakan pilih salah satu tabel di dropdown atas</th>
+          </tr>
+        </thead>
+        <tbody id="dbTableBody">
+          <tr>
+            <td style="padding: 24px; text-align: center; color: #94a3b8;">Belum ada tabel yang dipilih.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+  <!-- MODAL EDIT RECORD DATABASE SUPABASE -->
+  <div id="modalEditDbRecord" style="display:none; position:fixed; z-index:99999; inset:0; width:100%; height:100%; background:rgba(15,23,42,0.6); backdrop-filter:blur(2px); align-items:center; justify-content:center; padding:16px;">
+    <div style="background:#fff; border-radius:12px; max-width:540px; width:100%; max-height:85vh; display:flex; flex-direction:column; box-shadow:0 20px 25px -5px rgba(0,0,0,0.25); overflow:hidden;">
+      <div style="padding:14px 18px; border-bottom:1px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; background:var(--surface);">
+        <h4 style="margin:0; font-size:1.05rem; color:#1e293b;" id="modalEditDbTitle">✏️ Ubah Data</h4>
+        <button type="button" onclick="closeEditDbModal()" style="border:none; background:transparent; font-size:1.4rem; cursor:pointer; color:#64748b; line-height:1;">&times;</button>
+      </div>
+      <div style="padding:16px 20px; overflow-y:auto; flex:1;" id="modalEditDbFormContainer"></div>
+      <div style="padding:12px 18px; border-top:1px solid #e2e8f0; display:flex; justify-content:flex-end; gap:8px; background:#f8fafc; border-bottom-left-radius:12px; border-bottom-right-radius:12px;">
+        <button type="button" onclick="closeEditDbModal()" class="btn-secondary btn-sm" style="padding:6px 14px;">Batal</button>
+        <button type="button" id="btnSaveDbRecord" onclick="saveEditedDbRecord()" class="btn-primary btn-sm" style="width:auto; padding:6px 16px;">Simpan Perubahan</button>
+      </div>
+    </div>
+  </div>

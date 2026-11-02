@@ -174,6 +174,7 @@ CREATE TABLE IF NOT EXISTS public."adnan_Pembayaran" (
     kode_transaksi TEXT,
     anggota_id UUID,
     arisan_id UUID,
+    periode_arisan TEXT,
     user_id TEXT,
     nama_pembayar TEXT NOT NULL,
     nama_group TEXT,
@@ -196,6 +197,10 @@ CREATE TABLE IF NOT EXISTS public."adnan_Pembayaran" (
 );
 
 ALTER TABLE public."adnan_Pembayaran" ALTER COLUMN status SET DEFAULT 'Pending';
+ALTER TABLE public."adnan_Pembayaran" DROP CONSTRAINT IF EXISTS "adnan_Pembayaran_jenis_bayar_check";
+ALTER TABLE public."adnan_Pembayaran" DROP CONSTRAINT IF EXISTS "adnan_Pembayaran_metode_bayar_check";
+ALTER TABLE public."adnan_Pembayaran" DROP CONSTRAINT IF EXISTS "adnan_Pembayaran_status_check";
+ALTER TABLE public."adnan_Pembayaran" ADD COLUMN IF NOT EXISTS periode_arisan TEXT;
 ALTER TABLE public."adnan_Pembayaran" ADD COLUMN IF NOT EXISTS user_id TEXT;
 ALTER TABLE public."adnan_Pembayaran" ADD COLUMN IF NOT EXISTS nama_group TEXT;
 ALTER TABLE public."adnan_Pembayaran" ADD COLUMN IF NOT EXISTS penanggung_jawab TEXT;
@@ -218,11 +223,14 @@ CREATE TABLE IF NOT EXISTS public."adnan_Pengeluaran" (
     nominal NUMERIC(15,2) NOT NULL DEFAULT 0,
     metode_bayar TEXT DEFAULT 'Tunai',
     nama_bank TEXT,
+    no_rekening TEXT,
     penerima TEXT,
     bukti_url TEXT,
     dicatat_oleh TEXT DEFAULT 'Admin',
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+ALTER TABLE public."adnan_Pengeluaran" ADD COLUMN IF NOT EXISTS no_rekening TEXT;
 
 -- 7. Tabel Pengumuman & Dokumen PDF (adnan_Pengumuman)
 CREATE TABLE IF NOT EXISTS public."adnan_Pengumuman" (
@@ -263,7 +271,21 @@ GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated;
 DO $$
 DECLARE
     tbl TEXT;
+    chk RECORD;
 BEGIN
+    -- Hapus seluruh CHECK constraint yang membatasi nilai jenis_bayar, metode_bayar, status, atau kategori
+    FOR chk IN
+        SELECT con.conname, rel.relname
+        FROM pg_constraint con
+        JOIN pg_class rel ON rel.oid = con.conrelid
+        JOIN pg_namespace nsp ON nsp.oid = rel.relnamespace
+        WHERE nsp.nspname = 'public'
+          AND rel.relname IN ('adnan_Pembayaran', 'adnan_Pengeluaran', 'adnan_Pengumuman', 'adnan_Arisan', 'adnan_PeriodeArisan')
+          AND con.contype = 'c'
+    LOOP
+        EXECUTE format('ALTER TABLE public.%I DROP CONSTRAINT IF EXISTS %I;', chk.relname, chk.conname);
+    END LOOP;
+
     FOREACH tbl IN ARRAY ARRAY[
         'adnan_User',
         'adnan_DataAnggota',

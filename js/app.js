@@ -18,13 +18,18 @@ const TABLES = {
 };
 
 const SESSION_KEY = 'adnan_logged_in_user';
-const GROUP_STORAGE_KEY = 'adnan_groups_backup_v1';
 
-// Konstanta Default Split Iuran Arisan per Orang (Total Rp 170.000)
+// Perincian Uang Arisan:
+// a. Uang Arisan: Rp 100.000
+// b. Konsumsi:    Rp 30.000
+// c. Kas:         Rp 40.000
+// Total:          Rp 170.000
+// Dibayarkan ke Pemenang = Uang Arisan (100.000) + Konsumsi (30.000) = Rp 130.000 (sisanya Rp 40.000 masuk Kas)
 const DEFAULT_SPLIT_ARISAN = 100000;
-const DEFAULT_SPLIT_KAS = 40000;
 const DEFAULT_SPLIT_KONSUMSI = 30000;
-const DEFAULT_TOTAL_IURAN = DEFAULT_SPLIT_ARISAN + DEFAULT_SPLIT_KAS + DEFAULT_SPLIT_KONSUMSI;
+const DEFAULT_SPLIT_KAS = 40000;
+const DEFAULT_TOTAL_IURAN = 170000;
+const DEFAULT_DIBAYARKAN_PEMENANG = 130000;
 
 const supabaseHeaders = {
   'apikey': SUPABASE_ANON_KEY,
@@ -144,6 +149,7 @@ let cachedAnggotaList = [];
 let cachedPeriodeList = [];
 let cachedPemenangList = [];
 let cachedPembayaranList = [];
+let cachedPengeluaranList = [];
 let cachedGroupList = [];
 
 // State untuk Group Arisan pada Form Pembayaran & Modal Konfirmasi
@@ -163,7 +169,13 @@ let activeCameraStream = null;
 let currentCameraFacingMode = 'user';
 
 // ============================================================================
-// HELPER EKSTRAKSI SPLIT IURAN ARISAN (Rp 100.000 Arisan, Rp 40.000 Kas, Rp 30.000 Konsumsi)
+// HELPER EKSTRAKSI NILAI PERIODE ARISAN
+// Perincian Uang Arisan:
+// a. Uang Arisan = 100.000
+// b. Konsumsi    = 30.000
+// c. Kas         = 40.000
+// Total          = 170.000
+// Dibayarkan ke Pemenang = Uang Arisan (100.000) + Konsumsi (30.000) = 130.000, sisanya (40.000) masuk Kas
 // ============================================================================
 function getArisanSplitValues(periodeRow) {
   if (!periodeRow) {
@@ -171,38 +183,57 @@ function getArisanSplitValues(periodeRow) {
       uang_arisan: DEFAULT_SPLIT_ARISAN,
       uang_kas: DEFAULT_SPLIT_KAS,
       uang_konsumsi: DEFAULT_SPLIT_KONSUMSI,
+      nominal_arisan_konsumsi: DEFAULT_DIBAYARKAN_PEMENANG,
       total: DEFAULT_TOTAL_IURAN
     };
   }
   const ket = String(periodeRow.keterangan || '');
   const metaMatch = ket.match(/\[SPLIT:(\d+),(\d+),(\d+)\]/);
 
-  const uang_arisan =
-    periodeRow.uang_arisan != null
-      ? Number(periodeRow.uang_arisan)
-      : metaMatch
-      ? Number(metaMatch[1])
-      : DEFAULT_SPLIT_ARISAN;
-  const uang_kas =
-    periodeRow.uang_kas != null
-      ? Number(periodeRow.uang_kas)
-      : metaMatch
-      ? Number(metaMatch[2])
-      : DEFAULT_SPLIT_KAS;
-  const uang_konsumsi =
-    periodeRow.uang_konsumsi != null
-      ? Number(periodeRow.uang_konsumsi)
-      : metaMatch
-      ? Number(metaMatch[3])
-      : DEFAULT_SPLIT_KONSUMSI;
+  const rawArisan =
+    periodeRow.uang_arisan ??
+    periodeRow.nominal_arisan ??
+    periodeRow.dana_arisan ??
+    periodeRow.arisan ??
+    (metaMatch ? metaMatch[1] : null);
+  const rawKas =
+    periodeRow.uang_kas ??
+    periodeRow.dana_kas ??
+    periodeRow.kas ??
+    (metaMatch ? metaMatch[2] : null);
+  const rawKonsumsi =
+    periodeRow.uang_konsumsi ??
+    periodeRow.dana_konsumsi ??
+    periodeRow.konsumsi ??
+    periodeRow.biaya_konsumsi ??
+    (metaMatch ? metaMatch[3] : null);
 
-  const total = uang_arisan + uang_kas + uang_konsumsi;
-  return { uang_arisan, uang_kas, uang_konsumsi, total };
+  let uang_arisan = rawArisan != null && Number(rawArisan) > 0 ? Number(rawArisan) : DEFAULT_SPLIT_ARISAN;
+  let uang_konsumsi = rawKonsumsi != null && Number(rawKonsumsi) > 0 ? Number(rawKonsumsi) : DEFAULT_SPLIT_KONSUMSI;
+  let uang_kas = rawKas != null && Number(rawKas) > 0 ? Number(rawKas) : DEFAULT_SPLIT_KAS;
+
+  // Dibayarkan ke pemenang: Uang Arisan (100.000) + Uang Konsumsi (30.000) = 130.000
+  const nominal_arisan_konsumsi = uang_arisan + uang_konsumsi;
+  // Total rincian uang arisan: Arisan (100.000) + Konsumsi (30.000) + Kas (40.000) = 170.000
+  const total = uang_arisan + uang_konsumsi + uang_kas;
+
+  return { uang_arisan, uang_kas, uang_konsumsi, nominal_arisan_konsumsi, total };
+}
+
+function getEffectiveJenisBayar(payRow) {
+  if (!payRow) return 'Uang Arisan';
+  if (typeof payRow === 'string') return payRow.trim() || 'Uang Arisan';
+  const ket = String(payRow.keterangan || '');
+  const jenisMatch = ket.match(/\[JENIS:([^\]]+)\]/);
+  if (jenisMatch && jenisMatch[1]) {
+    return jenisMatch[1].trim();
+  }
+  return String(payRow.jenis_bayar || 'Uang Arisan').trim();
 }
 
 function getPaymentSplitValues(payRow) {
   const nominal = Number((payRow && payRow.nominal) || 0);
-  const jenis = String((payRow && payRow.jenis_bayar) || '');
+  const jenis = getEffectiveJenisBayar(payRow);
   const isArisan = jenis.toLowerCase().includes('arisan');
 
   if (!isArisan) {
@@ -210,68 +241,120 @@ function getPaymentSplitValues(payRow) {
       uang_arisan: 0,
       uang_kas: 0,
       uang_konsumsi: 0,
+      dibayarkan_pemenang: nominal,
+      total_rincian: nominal,
       total: nominal
     };
+  }
+
+  // Cek periode terkait terlebih dahulu untuk referensi rate dasar
+  let baseRates = getArisanSplitValues(null);
+  if (payRow && payRow.arisan_id && Array.isArray(cachedPeriodeList) && cachedPeriodeList.length > 0) {
+    const relPeriode = cachedPeriodeList.find((p) => String(p.id) === String(payRow.arisan_id));
+    if (relPeriode) {
+      baseRates = getArisanSplitValues(relPeriode);
+    }
   }
 
   const ket = String((payRow && payRow.keterangan) || '');
   const metaMatch = ket.match(/\[SPLIT:(\d+),(\d+),(\d+)\]/);
 
-  if (payRow && payRow.uang_arisan != null && (Number(payRow.uang_arisan) > 0 || Number(payRow.uang_kas) > 0 || Number(payRow.uang_konsumsi) > 0)) {
-    const ua = Number(payRow.uang_arisan || 0);
-    const uk = Number(payRow.uang_kas || 0);
-    const uko = Number(payRow.uang_konsumsi || 0);
+  if (
+    payRow &&
+    (payRow.uang_arisan != null || payRow.uang_kas != null || payRow.uang_konsumsi != null) &&
+    (Number(payRow.uang_arisan) > 0 || Number(payRow.uang_kas) > 0 || Number(payRow.uang_konsumsi) > 0)
+  ) {
+    const ua = Number(payRow.uang_arisan || 0) || baseRates.uang_arisan;
+    const uko = Number(payRow.uang_konsumsi || 0) || baseRates.uang_konsumsi;
+    const mult = baseRates.uang_arisan > 0 ? Math.max(1, Math.round(ua / baseRates.uang_arisan)) : 1;
+    const uk = Number(payRow.uang_kas || 0) > 0 ? Number(payRow.uang_kas) : mult * baseRates.uang_kas;
+    const dibayarkan_pemenang = ua + uko;
+    const total_rincian = ua + uko + uk;
     return {
       uang_arisan: ua,
       uang_kas: uk,
       uang_konsumsi: uko,
-      total: nominal || ua + uk + uko
+      dibayarkan_pemenang,
+      total_rincian,
+      total: nominal || dibayarkan_pemenang
     };
   }
 
   if (metaMatch) {
-    const ua = Number(metaMatch[1] || 0);
-    const uk = Number(metaMatch[2] || 0);
-    const uko = Number(metaMatch[3] || 0);
+    const ua = Number(metaMatch[1] || 0) || baseRates.uang_arisan;
+    const uko = Number(metaMatch[3] || 0) || baseRates.uang_konsumsi;
+    const mult = baseRates.uang_arisan > 0 ? Math.max(1, Math.round(ua / baseRates.uang_arisan)) : 1;
+    const uk = Number(metaMatch[2] || 0) > 0 ? Number(metaMatch[2]) : mult * baseRates.uang_kas;
+    const dibayarkan_pemenang = ua + uko;
+    const total_rincian = ua + uko + uk;
     return {
       uang_arisan: ua,
       uang_kas: uk,
       uang_konsumsi: uko,
-      total: nominal || ua + uk + uko
+      dibayarkan_pemenang,
+      total_rincian,
+      total: nominal || dibayarkan_pemenang
     };
   }
 
-  // Fallback untuk transaksi arisan lama yang belum memiliki kolom split eksplisit
-  if (nominal > 0 && nominal % DEFAULT_TOTAL_IURAN === 0) {
-    const mult = nominal / DEFAULT_TOTAL_IURAN;
-    return {
-      uang_arisan: mult * DEFAULT_SPLIT_ARISAN,
-      uang_kas: mult * DEFAULT_SPLIT_KAS,
-      uang_konsumsi: mult * DEFAULT_SPLIT_KONSUMSI,
-      total: nominal
-    };
-  }
-
-  if (nominal >= DEFAULT_TOTAL_IURAN) {
-    return {
-      uang_arisan: nominal - (DEFAULT_SPLIT_KAS + DEFAULT_SPLIT_KONSUMSI),
-      uang_kas: DEFAULT_SPLIT_KAS,
-      uang_konsumsi: DEFAULT_SPLIT_KONSUMSI,
-      total: nominal
-    };
-  }
+  // Fallback ke rincian standar (a. Arisan 100.000, b. Konsumsi 30.000, c. Kas 40.000 = Total 170.000; Dibayarkan Pemenang = 130.000)
+  const ua = baseRates.uang_arisan;
+  const uko = baseRates.uang_konsumsi;
+  const uk = baseRates.uang_kas;
+  const dibayarkan_pemenang = ua + uko;
+  const total_rincian = ua + uko + uk;
 
   return {
-    uang_arisan: nominal,
-    uang_kas: 0,
-    uang_konsumsi: 0,
-    total: nominal
+    uang_arisan: ua,
+    uang_kas: uk,
+    uang_konsumsi: uko,
+    dibayarkan_pemenang,
+    total_rincian,
+    total: nominal || dibayarkan_pemenang
   };
+}
+
+function isPeriodeArisanAktif(p) {
+  if (!p) return false;
+  const st = String(p.status || 'aktif').trim().toLowerCase();
+  return st === 'aktif' || st === 'active';
+}
+
+function getActivePeriodeList() {
+  return (cachedPeriodeList || []).filter((p) => isPeriodeArisanAktif(p));
+}
+
+function formatPeriodeArisanLabel(p) {
+  if (!p) return '';
+  const bulanText = p.bulan_tahun ? ` (${p.bulan_tahun})` : '';
+  return `Periode Ke-${p.periode_ke}${bulanText}`;
+}
+
+function getPaymentPeriodeArisanLabel(payRow) {
+  if (!payRow) return '-';
+  if (payRow.periode_arisan) return String(payRow.periode_arisan).trim();
+  if (payRow['Periode Arisan']) return String(payRow['Periode Arisan']).trim();
+  if (payRow.nama_periode) return String(payRow.nama_periode).trim();
+  const ket = String(payRow.keterangan || '');
+  const perMatch = ket.match(/\[PERIODE:([^\]]+)\]/);
+  if (perMatch && perMatch[1]) return perMatch[1].trim();
+  if (payRow.arisan_id && Array.isArray(cachedPeriodeList) && cachedPeriodeList.length > 0) {
+    const relPeriode = cachedPeriodeList.find((p) => String(p.id) === String(payRow.arisan_id));
+    if (relPeriode) return formatPeriodeArisanLabel(relPeriode);
+  }
+  if (isJenisArisan(payRow)) {
+    const activePer = getActivePeriodeList()[0];
+    if (activePer) return formatPeriodeArisanLabel(activePer);
+  }
+  return '-';
 }
 
 function stripInternalMetaFromKeterangan(ket) {
   return String(ket || '')
     .replace(/\s*\[SPLIT:\d+,\d+,\d+\]\s*/g, '')
+    .replace(/\s*\[JENIS:[^\]]*\]\s*/g, '')
+    .replace(/\s*\[PERIODE:[^\]]*\]\s*/g, '')
+    .replace(/\s*\[LIVESPINSTATE:[^\]]*\]\s*/g, '')
     .split('|')
     .map((part) => part.trim())
     .filter((part) => {
@@ -457,7 +540,7 @@ function convertDataUrlToBlobUrl(dataUrl) {
     if (activeModalBlobUrl) {
       try {
         URL.revokeObjectURL(activeModalBlobUrl);
-      } catch (_) {}
+      } catch (_) { }
     }
     activeModalBlobUrl = URL.createObjectURL(blob);
     return { url: activeModalBlobUrl, mime: mimeType };
@@ -528,12 +611,90 @@ if (closeModalBtn) {
 // ============================================================================
 // GENERIC ADAPTIVE SUPABASE POST / PATCH HELPER
 // ============================================================================
+function getJenisBayarFallbackCandidates(originalJenis) {
+  const orig = String(originalJenis || 'Uang Arisan').trim();
+  const lower = orig.toLowerCase();
+  const specific = [];
+
+  if (lower.includes('sumbangan')) {
+    specific.push('Sumbangan Keluarga', 'Sumbangan', 'Sumbangan Wajib', 'Sumbangan Sukarela', 'Donasi', 'sumbangan');
+  } else if (lower.includes('zakat')) {
+    specific.push('Zakat', 'Zakat Maal', 'Zakat Fitrah', 'Zakat & Infaq', 'zakat');
+  } else if (lower.includes('infaq') || lower.includes('sedekah') || lower.includes('infak')) {
+    specific.push('Infaq & Sedekah', 'Infaq', 'Infak', 'Sedekah', 'Infaq/Sedekah', 'infaq', 'sedekah');
+  } else if (lower.includes('sosial') || lower.includes('duka') || lower.includes('santunan')) {
+    specific.push('Dana Sosial / Duka', 'Dana Sosial', 'Santunan Duka', 'Santunan', 'Sosial', 'Duka', 'Sumbangan Keluarga', 'Sumbangan', 'sosial');
+  } else if (lower.includes('konsumsi') || lower.includes('kas')) {
+    specific.push('Uang Konsumsi', 'Konsumsi', 'Uang Kas', 'Kas', 'Iuran Kas', 'konsumsi', 'kas');
+  } else if (lower.includes('arisan')) {
+    specific.push('Uang Arisan', 'Arisan', 'Iuran Arisan', 'Setoran Arisan', 'arisan', 'iuran');
+  } else {
+    specific.push('Lainnya', 'Lain-lain', 'Umum', 'lainnya');
+  }
+
+  // Ambil nilai jenis_bayar yang sudah terbukti lolos constraint dari baris yang ada di tabel adnan_Pembayaran
+  const existingDbValues = [];
+  const existingArisanDbValues = [];
+  (cachedPembayaranList || []).forEach((r) => {
+    const dbVal = String(r.jenis_bayar_db || r.jenis_bayar || '').trim();
+    if (!dbVal) return;
+    if (dbVal.toLowerCase().includes('arisan')) {
+      if (!existingArisanDbValues.includes(dbVal)) existingArisanDbValues.push(dbVal);
+    } else {
+      if (!existingDbValues.includes(dbVal)) existingDbValues.push(dbVal);
+    }
+  });
+
+  const general = [
+    'Lainnya',
+    'Sumbangan Keluarga',
+    'Sumbangan',
+    'Zakat',
+    'Infaq & Sedekah',
+    'Infaq',
+    'Dana Sosial / Duka',
+    'Dana Sosial',
+    'Santunan',
+    'Uang Konsumsi',
+    'Konsumsi',
+    'Uang Kas',
+    'Kas',
+    ...existingDbValues,
+    'Uang Arisan',
+    'Arisan',
+    'Iuran Arisan',
+    ...existingArisanDbValues,
+    'lainnya',
+    'sumbangan',
+    'zakat',
+    'infaq',
+    'arisan',
+    'iuran',
+    'kas',
+    'konsumsi'
+  ];
+
+  const unique = [];
+  [...specific, ...general].forEach((val) => {
+    if (val && !unique.includes(val)) {
+      unique.push(val);
+    }
+  });
+  return unique;
+}
+
 async function adaptiveSupabaseWrite(tableName, payloadObj, queryFilter = '') {
   let payload = { ...payloadObj };
   const method = queryFilter ? 'PATCH' : 'POST';
   const url = `${SUPABASE_REST_URL}/${tableName}${queryFilter}`;
 
-  for (let attempt = 0; attempt < 12; attempt++) {
+  const originalJenisBayar = payload.jenis_bayar ? String(payload.jenis_bayar).trim() : null;
+  const triedJenisBayar = new Set(originalJenisBayar ? [originalJenisBayar] : []);
+  const triedMetodeBayar = new Set(payload.metode_bayar ? [String(payload.metode_bayar)] : []);
+  const triedStatus = new Set(payload.status ? [String(payload.status)] : []);
+  const triedKategori = new Set(payload.kategori ? [String(payload.kategori)] : []);
+
+  for (let attempt = 0; attempt < 30; attempt++) {
     const response = await fetch(url, {
       method,
       headers: {
@@ -566,14 +727,61 @@ async function adaptiveSupabaseWrite(tableName, payloadObj, queryFilter = '') {
       continue;
     }
 
-    // Jika ada check constraint pada kolom status (23514) misal 'Pending' -> 'pending' atau 'menunggu'
-    if (errData.code === '23514' && payload.status) {
-      if (payload.status === 'Pending') {
-        payload.status = 'pending';
-        continue;
-      } else if (payload.status === 'pending') {
-        payload.status = 'menunggu';
-        continue;
+    // Jika terjadi pelanggaran CHECK CONSTRAINT (Error 23514) pada jenis_bayar, metode_bayar, status, atau kategori
+    if (errData.code === '23514') {
+      const errText = `${errData.message || ''} ${errData.details || ''} ${errData.hint || ''}`.toLowerCase();
+
+      // 1. Check constraint pada jenis_bayar (contoh: "adnan_Pembayaran_jenis_bayar_check")
+      if (errText.includes('jenis_bayar') && originalJenisBayar) {
+        // Pastikan jenis pembayaran asli yang dipilih user tersimpan utuh di metadata keterangan [JENIS:...]
+        const currentKet = String(payload.keterangan || '');
+        if (!currentKet.includes('[JENIS:')) {
+          payload.keterangan = [currentKet, `[JENIS:${originalJenisBayar}]`].filter(Boolean).join(' | ');
+        }
+
+        const candidates = getJenisBayarFallbackCandidates(originalJenisBayar);
+        const nextJenis = candidates.find((c) => !triedJenisBayar.has(c));
+        if (nextJenis) {
+          triedJenisBayar.add(nextJenis);
+          payload.jenis_bayar = nextJenis;
+          continue;
+        }
+      }
+
+      // 2. Check constraint pada metode_bayar (contoh: "adnan_Pembayaran_metode_bayar_check")
+      if (errText.includes('metode') && payload.metode_bayar != null) {
+        const isTransfer = String(payload.metode_bayar).toLowerCase().includes('transfer');
+        const metodeCandidates = isTransfer
+          ? ['Transfer Bank', 'Transfer', 'transfer', 'Bank Transfer', 'Tunai', 'tunai']
+          : ['Tunai', 'tunai', 'Cash', 'cash', 'Transfer Bank', 'Transfer'];
+        const nextMetode = metodeCandidates.find((m) => !triedMetodeBayar.has(m));
+        if (nextMetode) {
+          triedMetodeBayar.add(nextMetode);
+          payload.metode_bayar = nextMetode;
+          continue;
+        }
+      }
+
+      // 3. Check constraint pada kategori (misal adnan_Pengeluaran / adnan_Pengumuman)
+      if (errText.includes('kategori') && payload.kategori != null) {
+        const kategoriCandidates = ['Lainnya', 'Operasional', 'Konsumsi', 'Santunan', 'Arisan', 'Umum', 'lainnya', 'umum'];
+        const nextKat = kategoriCandidates.find((k) => !triedKategori.has(k));
+        if (nextKat) {
+          triedKategori.add(nextKat);
+          payload.kategori = nextKat;
+          continue;
+        }
+      }
+
+      // 4. Check constraint pada kolom status (misal 'Pending' -> 'pending' / 'menunggu' / 'disetujui' / 'lunas')
+      if (payload.status != null && (errText.includes('status') || !errText.includes('jenis_bayar'))) {
+        const statusCandidates = ['Pending', 'pending', 'menunggu', 'Menunggu', 'belum_lunas', 'disetujui', 'Disetujui', 'lunas', 'Lunas', 'verified', 'aktif'];
+        const nextStatus = statusCandidates.find((s) => !triedStatus.has(s));
+        if (nextStatus) {
+          triedStatus.add(nextStatus);
+          payload.status = nextStatus;
+          continue;
+        }
       }
     }
 
@@ -604,13 +812,20 @@ async function adaptiveSupabaseWrite(tableName, payloadObj, queryFilter = '') {
 // ============================================================================
 function isUserAdmin() {
   if (!currentLoggedUser) return false;
-  const role = String(currentLoggedUser.role || '').toLowerCase();
-  const uid = String(currentLoggedUser.user_id || currentLoggedUser.username || '').toLowerCase();
-  return role === 'admin' || uid === 'admin';
+  const role = String(currentLoggedUser.role || '').trim().toLowerCase();
+  if (role) return role === 'admin';
+  const uid = String(currentLoggedUser.user_id || currentLoggedUser.username || '').trim().toLowerCase();
+  return uid === 'admin';
 }
 
 function switchMainView(targetViewId) {
   stopCameraStream();
+
+  // Proteksi Tab Pengaturan: Hanya bisa dibuka oleh User yang memiliki Role Admin
+  if (targetViewId === 'viewPeriode' && !isUserAdmin()) {
+    showGlobalAlert('Menu Pengaturan hanya dapat diakses oleh User yang memiliki Role Admin.', 'error');
+    return;
+  }
 
   // Proteksi Tab Pengeluaran: Hanya bisa dibuka oleh User Admin
   if (targetViewId === 'viewPengeluaran' && !isUserAdmin()) {
@@ -635,6 +850,10 @@ function switchMainView(targetViewId) {
     panel.classList.toggle('active', panel.id === targetViewId);
   });
 
+  if (targetViewId === 'viewLiveUndian' && typeof refreshLiveUndianUI === 'function') {
+    refreshLiveUndianUI();
+  }
+
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -658,6 +877,10 @@ function switchBioSubTab(targetTabId) {
 }
 
 function switchPeriodeSubTab(targetSubTabId) {
+  if (!isUserAdmin()) {
+    showGlobalAlert('Menu Pengaturan hanya dapat diakses oleh User yang memiliki Role Admin.', 'error');
+    return;
+  }
   document.querySelectorAll('[data-periode-subtab]').forEach((btn) => {
     btn.classList.toggle('active', btn.getAttribute('data-periode-subtab') === targetSubTabId);
   });
@@ -668,6 +891,12 @@ function switchPeriodeSubTab(targetSubTabId) {
 
   if (targetSubTabId === 'subTabDaftarUser') {
     loadRegisteredUsersData();
+  } else if (targetSubTabId === 'subTabDatabaseManager') {
+    const selector = document.getElementById('dbTableSelector');
+    if (selector && !selector.value) {
+      selector.value = 'adnan_User';
+      fetchDbTableData('adnan_User');
+    }
   }
 }
 
@@ -1006,6 +1235,10 @@ function renderBiodataSummary(bio) {
 let totalPemasukanArisan = 0;
 let totalPemasukanLain = 0;
 let totalPengeluaranKas = 0;
+let totalPengeluaranPembayaran = 0;
+let totalSplitArisanPeriode = 0;
+let totalSplitKasPeriode = 0;
+let totalSplitKonsumsiPeriode = 0;
 
 async function loadAllDashboardModules() {
   await Promise.all([
@@ -1020,38 +1253,89 @@ async function loadAllDashboardModules() {
   ]);
   populateAdminPesertaDropdowns();
   populateGroupAnggotaDropdowns();
+  populatePengeluaranAnggotaDropdown();
   syncPayGroupSplitUI();
   renderPembayaranTableRows();
   renderMemberGallery();
   updateQuickStatsBar();
+  if (typeof initOrRefreshLiveUndian === 'function') {
+    await initOrRefreshLiveUndian();
+  }
 }
 
-function isJenisArisan(jenisBayar) {
-  return String(jenisBayar || '').toLowerCase().includes('arisan');
+function isJenisArisan(jenisBayarOrRow) {
+  const effectiveJenis = getEffectiveJenisBayar(jenisBayarOrRow);
+  return String(effectiveJenis || '').toLowerCase().includes('arisan');
+}
+
+function computePeriodeArisanPemasukanTotals() {
+  let sumTotal = 0;
+  let sumArisan = 0;
+  let sumKas = 0;
+  let sumKonsumsi = 0;
+  // Hanya menghitung Periode Arisan yang Aktif; yang Tidak Aktif diabaikan jumlahnya
+  const activePeriods = getActivePeriodeList();
+  activePeriods.forEach((p) => {
+    const sp = getArisanSplitValues(p);
+    sumArisan += Number(sp.uang_arisan || 0);
+    sumKas += Number(sp.uang_kas || 0);
+    sumKonsumsi += Number(sp.uang_konsumsi || 0);
+    sumTotal += Number(sp.total || 0);
+  });
+  totalSplitArisanPeriode = sumArisan;
+  totalSplitKasPeriode = sumKas;
+  totalSplitKonsumsiPeriode = sumKonsumsi;
+  totalPemasukanArisan = sumTotal;
+  return {
+    total: sumTotal,
+    uang_arisan: sumArisan,
+    uang_kas: sumKas,
+    uang_konsumsi: sumKonsumsi
+  };
 }
 
 function updateQuickStatsBar() {
+  computePeriodeArisanPemasukanTotals();
+  const activePeriods = getActivePeriodeList();
+
   const elMasukArisan = document.getElementById('statTotalMasukArisan');
+  const elSubMasukArisan = document.getElementById('statSubMasukArisan');
   const elMasukLain = document.getElementById('statTotalMasukLain');
   const elKeluar = document.getElementById('statTotalKeluar');
+  const elSubKeluar = document.getElementById('statSubTotalKeluar');
   const elSaldo = document.getElementById('statSaldoKas');
   const elPeriode = document.getElementById('statPeriodeAktif');
   const elTglPeriode = document.getElementById('statTanggalPeriode');
   const elPemenang = document.getElementById('statPemenangTerakhir');
 
   if (elMasukArisan) elMasukArisan.textContent = formatRupiah(totalPemasukanArisan);
+  if (elSubMasukArisan) {
+    if (activePeriods.length > 0) {
+      // elSubMasukArisan.textContent = `🔍 Klik Rincian Setoran Arisan (Arisan: ${formatRupiah(totalSplitArisanPeriode)} • Kas: ${formatRupiah(totalSplitKasPeriode)} • Konsumsi: ${formatRupiah(totalSplitKonsumsiPeriode)})`;
+    } else {
+      elSubMasukArisan.textContent = '';
+    }
+  }
   if (elMasukLain) elMasukLain.textContent = formatRupiah(totalPemasukanLain);
-  if (elKeluar) elKeluar.textContent = formatRupiah(totalPengeluaranKas);
-  if (elSaldo) elSaldo.textContent = formatRupiah(totalPemasukanArisan + totalPemasukanLain - totalPengeluaranKas);
 
-  const activePeriode =
-    cachedPeriodeList.find((p) => p.status === 'aktif') || cachedPeriodeList[0] || null;
+  // Total Pengeluaran murni bersumber dari adnan_Pengeluaran
+  const combinedPengeluaran = totalPengeluaranKas;
+  if (elKeluar) elKeluar.textContent = formatRupiah(combinedPengeluaran);
+  if (elSubKeluar) {
+    elSubKeluar.textContent = '';
+  }
+
+  // Saldo Akhir = Total Penerimaan (Arisan + Pemasukan Lain) - Total Pengeluaran Kas
+  const saldoAkhir = totalPemasukanArisan + totalPemasukanLain - combinedPengeluaran;
+  if (elSaldo) elSaldo.textContent = formatRupiah(saldoAkhir);
+
+  const activePeriode = activePeriods[0] || null;
   if (activePeriode) {
     elPeriode.textContent = `Periode #${activePeriode.periode_ke} (${activePeriode.bulan_tahun})`;
     elTglPeriode.textContent = `${activePeriode.tanggal_arisan || '-'} • ${activePeriode.tempat_arisan || ''}`;
   } else {
-    elPeriode.textContent = 'Belum Disetting';
-    elTglPeriode.textContent = 'Klik Menu 5 (Pengaturan) untuk setting';
+    elPeriode.textContent = 'Belum Ada Periode Aktif';
+    elTglPeriode.textContent = '';
   }
 
   const lastWinner =
@@ -1066,48 +1350,409 @@ function updateQuickStatsBar() {
 }
 
 // ============================================================================
-// MODAL TRANSPARANSI PEMASUKAN PER JENIS PEMBAYARAN (LAMPIRAN 2)
+// MODAL TRANSPARANSI: PEMASUKAN PERIODE ARISAN, LAINNYA, TOTAL PENGELUARAN & SALDO KAS
 // ============================================================================
-function openTransparencyModal(initialFilter = 'ALL') {
+let activeTransparencyMode = 'Uang Arisan';
+
+function openTransparencyModal(initialFilter = 'Uang Arisan') {
   const modal = document.getElementById('transparencyModal');
   if (!modal) return;
+  activeTransparencyMode = initialFilter;
   modal.classList.remove('hidden');
   renderTransparencyBreakdown(initialFilter);
 }
 
-function renderTransparencyBreakdown(activeFilter = 'ALL') {
+function renderTransparencyBreakdown(activeFilter = 'Uang Arisan') {
   const gridEl = document.getElementById('transparencyBreakdownGrid');
+  const theadEl = document.getElementById('transparencyTableHead');
   const tbodyEl = document.getElementById('transparencyTableBody');
   const titleEl = document.getElementById('transparencyModalTitle');
+  const subtitleEl = document.getElementById('transparencyModalSubtitle');
   if (!gridEl || !tbodyEl) return;
 
-  // Hitung rekap per jenis_bayar & split arisan dari cachedPembayaranList
+  // MODE 1: PEMASUKAN UANG ARISAN (Sesuai Pemasukan Periode Arisan Aktif dari adnan_Arisan)
+  if (
+    activeFilter === 'Uang Arisan' ||
+    activeFilter === 'PEMASUKAN_PERIODE_ARISAN' ||
+    String(activeFilter).startsWith('PERIODE_KE_')
+  ) {
+    computePeriodeArisanPemasukanTotals();
+    const activePeriods = getActivePeriodeList();
+    if (titleEl) {
+      titleEl.textContent = '📊 Rincian Pemasukan Uang Arisan (Periode Arisan Aktif)';
+    }
+    if (subtitleEl) {
+      subtitleEl.innerHTML =
+        'Menampilkan rincian pemasukan berdasarkan data <strong>Periode Arisan Aktif (adnan_Arisan)</strong> di Supabase (Periode tidak aktif diabaikan jumlahnya).';
+    }
+    if (theadEl) {
+      theadEl.innerHTML = `
+        <tr>
+          <th>Periode Ke</th>
+          <th>Bulan / Tahun</th>
+          <th>Tanggal & Tempat</th>
+          <th>Uang Arisan</th>
+          <th>Uang Kas</th>
+          <th>Uang Konsumsi</th>
+          <th>Total Pemasukan Periode</th>
+          <th>Status</th>
+        </tr>
+      `;
+    }
+
+    const periodCards = [
+      {
+        key: 'Uang Arisan',
+        title: '💰 Total Pemasukan Periode Arisan Aktif',
+        amount: totalPemasukanArisan,
+        count: `${activePeriods.length} Periode Aktif • Arisan: ${formatRupiah(totalSplitArisanPeriode)} | Kas: ${formatRupiah(totalSplitKasPeriode)} | Konsumsi: ${formatRupiah(totalSplitKonsumsiPeriode)}`
+      },
+      ...activePeriods.map((p) => {
+        const sp = getArisanSplitValues(p);
+        return {
+          key: `PERIODE_KE_${p.periode_ke}`,
+          title: `📅 Periode Ke-${p.periode_ke} (${p.bulan_tahun || '-'})`,
+          amount: sp.total,
+          count: `Arisan: ${formatRupiah(sp.uang_arisan)} • Kas: ${formatRupiah(sp.uang_kas)} • Konsumsi: ${formatRupiah(sp.uang_konsumsi)}`
+        };
+      })
+    ];
+
+    gridEl.innerHTML = periodCards
+      .map(
+        (c) => `
+        <div class="jenis-filter-card ${activeFilter === c.key ? 'active' : ''}" onclick="renderTransparencyBreakdown('${c.key}')">
+          <div class="jf-title">${c.title}</div>
+          <div class="jf-amount">${formatRupiah(c.amount)}</div>
+          <div class="jf-count">${c.count}</div>
+        </div>
+      `
+      )
+      .join('');
+
+    const filteredPeriods = activePeriods.filter((p) => {
+      if (String(activeFilter).startsWith('PERIODE_KE_')) {
+        const num = String(activeFilter).replace('PERIODE_KE_', '');
+        return String(p.periode_ke) === num;
+      }
+      return true;
+    });
+
+    if (filteredPeriods.length === 0) {
+      tbodyEl.innerHTML = `<tr><td colspan="8" style="text-align:center; color:var(--text-muted);">Belum ada Periode Arisan berstatus Aktif pada tabel Supabase (adnan_Arisan).</td></tr>`;
+      return;
+    }
+
+    tbodyEl.innerHTML = filteredPeriods
+      .map((p) => {
+        const sp = getArisanSplitValues(p);
+        return `
+          <tr>
+            <td><strong>Periode Ke-${p.periode_ke}</strong></td>
+            <td><strong>${p.bulan_tahun || '-'}</strong></td>
+            <td>${p.tanggal_arisan || '-'}<br><small style="color:#64748b;">${p.tempat_arisan || '-'}</small></td>
+            <td><span style="color:var(--primary); font-weight:700;">${formatRupiah(sp.uang_arisan)}</span></td>
+            <td><span style="color:#b45309; font-weight:700;">${formatRupiah(sp.uang_kas)}</span></td>
+            <td><span style="color:#0284c7; font-weight:700;">${formatRupiah(sp.uang_konsumsi)}</span></td>
+            <td><strong style="color:var(--primary);">${formatRupiah(sp.total)}</strong></td>
+            <td><span class="status-pill complete">${p.status || 'aktif'}</span></td>
+          </tr>
+        `;
+      })
+      .join('');
+    return;
+  }
+
+    // MODE 2: TOTAL PENGELUARAN (Murni dari adnan_Pengeluaran)
+  if (
+    activeFilter === 'TOTAL_PENGELUARAN' ||
+    String(activeFilter).startsWith('EXP_KAT_')
+  ) {
+    const totalKeluar = totalPengeluaranKas;
+    if (titleEl) {
+      titleEl.textContent = '📉 Rincian Total Pengeluaran Kas (adnan_Pengeluaran)';
+    }
+    if (subtitleEl) {
+      subtitleEl.innerHTML =
+        'Menampilkan seluruh data pengeluaran kas resmi dari tabel <strong>adnan_Pengeluaran</strong>.';
+    }
+    if (theadEl) {
+      theadEl.innerHTML = `
+        <tr>
+          <th>Tanggal</th>
+          <th>Kode</th>
+          <th>Kategori</th>
+          <th>Penerima</th>
+          <th>Uraian / Deskripsi</th>
+          <th>Metode, Bank & Rekening</th>
+          <th>Nominal Pengeluaran</th>
+          <th>Bukti / Nota</th>
+          <th>Dicatat Oleh</th>
+        </tr>
+      `;
+    }
+
+    const expenseRows = (cachedPengeluaranList || []).map((r, idx) => ({
+      id: r.id || idx,
+      tanggal: r.tanggal_pengeluaran || r.tanggal || '-',
+      kode: r.kode_pengeluaran || `EXP-${idx + 1}`,
+      kategori: r.kategori || 'Pengeluaran Kas',
+      penerima: r.penerima || '-',
+      deskripsi: stripInternalMetaFromKeterangan(r.deskripsi || r.nama_pengeluaran || '-'),
+      metode: r.metode_bayar || 'Tunai',
+      bank: r.nama_bank || '',
+      rekening: extractNoRekeningPengeluaran(r),
+      nominal: Number(r.nominal || 0),
+      bukti_url: r.bukti_url || r.nota_url || null,
+      pencatat: r.dicatat_oleh || 'Admin'
+    }));
+
+    const katMap = {};
+    expenseRows.forEach((item) => {
+      if (!katMap[item.kategori]) katMap[item.kategori] = { total: 0, count: 0 };
+      katMap[item.kategori].total += item.nominal;
+      katMap[item.kategori].count += 1;
+    });
+
+    const expCards = [
+      {
+        key: 'TOTAL_PENGELUARAN',
+        title: '📊 Total Seluruh Pengeluaran',
+        amount: totalKeluar,
+        count: `${expenseRows.length} Transaksi Pengeluaran`
+      },
+      ...Object.keys(katMap).map((k) => ({
+        key: `EXP_KAT_${k}`,
+        title: `📁 ${k}`,
+        amount: katMap[k].total,
+        count: `${katMap[k].count} Transaksi`
+      }))
+    ];
+
+    gridEl.innerHTML = expCards
+      .map(
+        (c) => `
+        <div class="jenis-filter-card ${activeFilter === c.key ? 'active' : ''}" onclick="renderTransparencyBreakdown('${c.key}')">
+          <div class="jf-title">${c.title}</div>
+          <div class="jf-amount" style="color:#dc2626;">${formatRupiah(c.amount)}</div>
+          <div class="jf-count">${c.count}</div>
+        </div>
+      `
+      )
+      .join('');
+
+    const filteredExp = expenseRows.filter((item) => {
+      if (String(activeFilter).startsWith('EXP_KAT_')) {
+        const kat = String(activeFilter).replace('EXP_KAT_', '');
+        return item.kategori === kat;
+      }
+      return true;
+    });
+
+    if (filteredExp.length === 0) {
+      tbodyEl.innerHTML = `<tr><td colspan="9" style="text-align:center; color:var(--text-muted);">Belum ada data pengeluaran kas yang tercatat.</td></tr>`;
+      return;
+    }
+
+    tbodyEl.innerHTML = filteredExp
+      .map((item, idx) => {
+        const mediaKey = `trans_exp_${item.id || idx}`;
+        if (item.bukti_url) {
+          registerMediaPreview(mediaKey, `Nota Pengeluaran - ${item.penerima}`, item.bukti_url);
+        }
+        const buktiBtn = item.bukti_url
+          ? `<button type="button" class="btn-secondary btn-sm" onclick="openMediaByKey('${mediaKey}')">🔍 Lihat Nota</button>`
+          : `<span style="color:#94a3b8; font-size:0.8rem;">-</span>`;
+
+        const bankRekText = [
+          item.metode,
+          item.bank ? `(${item.bank})` : '',
+          item.rekening ? `<br><small style="color:var(--primary); font-weight:600;">No. Rek: ${item.rekening}</small>` : ''
+        ]
+          .filter(Boolean)
+          .join(' ');
+
+        return `
+          <tr>
+            <td>${item.tanggal}</td>
+            <td><code>${item.kode}</code></td>
+            <td><strong>${item.kategori}</strong></td>
+            <td><strong>${item.penerima}</strong></td>
+            <td>${item.deskripsi}</td>
+            <td>${bankRekText}</td>
+            <td><strong style="color:#dc2626;">${formatRupiah(item.nominal)}</strong></td>
+            <td>${buktiBtn}</td>
+            <td><span class="status-pill complete">${item.pencatat}</span></td>
+          </tr>
+        `;
+      })
+      .join('');
+    return;
+  }
+
+  // MODE 3: SALDO KAS KELUARGA (Penerimaan adnan_Pembayaran vs Pengeluaran adnan_Pengeluaran)
+  if (
+    activeFilter === 'SALDO_KAS' ||
+    activeFilter === 'MUTASI_MASUK' ||
+    activeFilter === 'MUTASI_KELUAR'
+  ) {
+    computePeriodeArisanPemasukanTotals();
+    const totalMasukAll = totalPemasukanArisan + totalPemasukanLain;
+    const totalKeluarAll = totalPengeluaranKas; // Hanya adnan_Pengeluaran
+    const saldoAkhir = totalMasukAll - totalKeluarAll;
+
+    if (titleEl) {
+      titleEl.textContent = '⚖️ Rincian Saldo Kas Keluarga (Penerimaan vs Pengeluaran)';
+    }
+    if (subtitleEl) {
+      subtitleEl.innerHTML =
+        'Rekapitulasi <strong>Penerimaan (adnan_Pembayaran & Jadwal Periode)</strong> dikurangi <strong>Pengeluaran Kas (adnan_Pengeluaran)</strong>.';
+    }
+    if (theadEl) {
+      theadEl.innerHTML = `
+        <tr>
+          <th>Tanggal</th>
+          <th>Arus Kas</th>
+          <th>Tabel Sumber</th>
+          <th>Keterangan / Nama</th>
+          <th>Penerimaan (+)</th>
+          <th>Pengeluaran (-)</th>
+          <th>Status</th>
+        </tr>
+      `;
+    }
+
+    const saldoCards = [
+      {
+        key: 'SALDO_KAS',
+        title: '💰 Saldo Akhir Kas',
+        amount: saldoAkhir,
+        count: `Penerimaan (${formatRupiah(totalMasukAll)}) - Pengeluaran (${formatRupiah(totalKeluarAll)})`
+      },
+      {
+        key: 'MUTASI_MASUK',
+        title: '📥 Total Penerimaan (+)',
+        amount: totalMasukAll,
+        count: `adnan_Pembayaran & Periode Aktif`
+      },
+      {
+        key: 'MUTASI_KELUAR',
+        title: '📤 Total Pengeluaran (-)',
+        amount: totalKeluarAll,
+        count: `adnan_Pengeluaran (${(cachedPengeluaranList || []).length} Data)`
+      }
+    ];
+
+    gridEl.innerHTML = saldoCards
+      .map(
+        (c) => `
+        <div class="jenis-filter-card ${activeFilter === c.key ? 'active' : ''}" onclick="renderTransparencyBreakdown('${c.key}')">
+          <div class="jf-title">${c.title}</div>
+          <div class="jf-amount" style="${c.key === 'MUTASI_KELUAR' ? 'color:#dc2626;' : ''}">${formatRupiah(c.amount)}</div>
+          <div class="jf-count">${c.count}</div>
+        </div>
+      `
+      )
+      .join('');
+
+    const mutasiRows = [
+      // Sisi Penerimaan 1: Periode Arisan Aktif
+      ...getActivePeriodeList().map((p) => {
+        const sp = getArisanSplitValues(p);
+        return {
+          tipe: 'MASUK',
+          tanggal: p.tanggal_arisan || '-',
+          sumber: 'adnan_Arisan (Periode)',
+          keterangan: `Periode Ke-${p.periode_ke} (${p.bulan_tahun || '-'})`,
+          masuk: sp.total,
+          keluar: 0,
+          status: p.status || 'aktif'
+        };
+      }),
+      // Sisi Penerimaan 2: adnan_Pembayaran (Penerimaan Lainnya: Sumbangan, Zakat, dll.)
+      ...(cachedPembayaranList || []).filter((r) => !isJenisArisan(r)).map((r) => ({
+        tipe: 'MASUK',
+        tanggal: r.tanggal_bayar || '-',
+        sumber: 'adnan_Pembayaran',
+        keterangan: `${r.jenis_bayar} - a.n ${r.nama_pembayar || '-'}`,
+        masuk: Number(r.nominal || 0),
+        keluar: 0,
+        status: r.status || 'Pending'
+      })),
+      // Sisi Pengeluaran: Murni dari adnan_Pengeluaran
+      ...(cachedPengeluaranList || []).map((r) => ({
+        tipe: 'KELUAR',
+        tanggal: r.tanggal_pengeluaran || r.tanggal || '-',
+        sumber: 'adnan_Pengeluaran',
+        keterangan: `${r.kategori}: ${r.penerima ? 'Untuk ' + r.penerima + ' - ' : ''}${stripExpInternalMeta(r.deskripsi || r.nama_pengeluaran || '-')}`,
+        masuk: 0,
+        keluar: Number(r.nominal || 0),
+        status: 'Tercatat'
+      }))
+    ].filter((m) => {
+      if (activeFilter === 'MUTASI_MASUK') return m.tipe === 'MASUK';
+      if (activeFilter === 'MUTASI_KELUAR') return m.tipe === 'KELUAR';
+      return true;
+    });
+
+    if (mutasiRows.length === 0) {
+      tbodyEl.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--text-muted);">Belum ada data mutasi kas.</td></tr>`;
+      return;
+    }
+
+    tbodyEl.innerHTML = mutasiRows
+      .map(
+        (m) => `
+        <tr>
+          <td>${m.tanggal}</td>
+          <td>
+            <span class="status-pill ${m.tipe === 'MASUK' ? 'complete' : 'incomplete'}">
+              ${m.tipe === 'MASUK' ? '+ PENERIMAAN' : '- PENGELUARAN'}
+            </span>
+          </td>
+          <td><code>${m.sumber}</code></td>
+          <td>${m.keterangan}</td>
+          <td><strong style="color:var(--primary);">${m.masuk > 0 ? '+ ' + formatRupiah(m.masuk) : '-'}</strong></td>
+          <td><strong style="color:#dc2626;">${m.keluar > 0 ? '- ' + formatRupiah(m.keluar) : '-'}</strong></td>
+          <td><span class="status-pill complete">${m.status}</span></td>
+        </tr>
+      `
+      )
+      .join('');
+    return;
+  }
+
+  // MODE 4: PEMASUKAN LAINNYA / RINCIAN PER JENIS BAYAR
+  if (theadEl) {
+    theadEl.innerHTML = `
+      <tr>
+        <th>Tanggal</th>
+        <th>Nama Pembayar</th>
+        <th>Jenis Pembayaran</th>
+        <th>Metode & Bank</th>
+        <th>Uang Arisan</th>
+        <th>Uang Kas</th>
+        <th>Uang Konsumsi</th>
+        <th>Total Nominal</th>
+        <th>Bukti Bayar</th>
+        <th>Status</th>
+      </tr>
+    `;
+  }
+
   const summaryMap = {};
-  let sumArisanTotal = 0;
-  let sumSplitArisan = 0;
-  let sumSplitKas = 0;
-  let sumSplitKonsumsi = 0;
-  let countArisan = 0;
   let sumNonArisan = 0;
   let countNonArisan = 0;
 
   (cachedPembayaranList || []).forEach((row) => {
     const jenis = row.jenis_bayar || 'Lainnya';
     const nom = Number(row.nominal || 0);
-    if (!summaryMap[jenis]) {
-      summaryMap[jenis] = { total: 0, count: 0 };
-    }
-    summaryMap[jenis].total += nom;
-    summaryMap[jenis].count += 1;
-
-    if (isJenisArisan(jenis)) {
-      const sp = getPaymentSplitValues(row);
-      sumArisanTotal += nom;
-      sumSplitArisan += sp.uang_arisan;
-      sumSplitKas += sp.uang_kas;
-      sumSplitKonsumsi += sp.uang_konsumsi;
-      countArisan += 1;
-    } else {
+    if (!isJenisArisan(jenis)) {
+      if (!summaryMap[jenis]) {
+        summaryMap[jenis] = { total: 0, count: 0 };
+      }
+      summaryMap[jenis].total += nom;
+      summaryMap[jenis].count += 1;
       sumNonArisan += nom;
       countNonArisan += 1;
     }
@@ -1115,31 +1760,17 @@ function renderTransparencyBreakdown(activeFilter = 'ALL') {
 
   const filterCards = [
     {
-      key: 'Uang Arisan',
-      title: '💰 Total Iuran Arisan (Split)',
-      amount: sumArisanTotal,
-      count: `${countArisan} Tx • Arisan: ${formatRupiah(sumSplitArisan)} | Kas: ${formatRupiah(sumSplitKas)} | Konsumsi: ${formatRupiah(sumSplitKonsumsi)}`
-    },
-    {
       key: 'NON_ARISAN',
       title: '🤝 Semua Pemasukan Lainnya',
       amount: sumNonArisan,
       count: `${countNonArisan} Transaksi`
     },
-    ...Object.keys(summaryMap)
-      .filter((k) => k !== 'Uang Arisan')
-      .map((k) => ({
-        key: k,
-        title: `📌 ${k}`,
-        amount: summaryMap[k].total,
-        count: `${summaryMap[k].count} Transaksi`
-      })),
-    {
-      key: 'ALL',
-      title: '📊 Total Seluruh Pemasukan',
-      amount: sumArisanTotal + sumNonArisan,
-      count: `${(cachedPembayaranList || []).length} Transaksi`
-    }
+    ...Object.keys(summaryMap).map((k) => ({
+      key: k,
+      title: `📌 ${k}`,
+      amount: summaryMap[k].total,
+      count: `${summaryMap[k].count} Transaksi`
+    }))
   ];
 
   gridEl.innerHTML = filterCards
@@ -1154,26 +1785,21 @@ function renderTransparencyBreakdown(activeFilter = 'ALL') {
     )
     .join('');
 
-  // Filter baris transaksi sesuai pilihan
   const filteredRows = (cachedPembayaranList || []).filter((r) => {
-    if (activeFilter === 'ALL') return true;
     if (activeFilter === 'NON_ARISAN') return !isJenisArisan(r.jenis_bayar);
-    if (activeFilter === 'Uang Arisan') return isJenisArisan(r.jenis_bayar);
     return String(r.jenis_bayar || '') === activeFilter;
   });
 
   if (titleEl) {
     const labelFilter =
-      activeFilter === 'ALL'
-        ? 'Seluruh Pemasukan'
-        : activeFilter === 'NON_ARISAN'
+      activeFilter === 'NON_ARISAN'
         ? 'Pemasukan Lainnya (Zakat, Sumbangan, Infaq, dll)'
         : activeFilter;
     titleEl.textContent = `📊 Transparansi Pemasukan: ${labelFilter}`;
   }
 
   if (filteredRows.length === 0) {
-    tbodyEl.innerHTML = `<tr><td colspan="10" style="text-align:center; color:var(--text-muted);">Belum ada data pembayaran pada kategori ini.</td></tr>`;
+    tbodyEl.innerHTML = `<tr><td colspan="10" style="text-align:center; color:var(--text-muted);">Belum ada data pada kategori ini.</td></tr>`;
     return;
   }
 
@@ -1232,6 +1858,16 @@ if (statCardPemasukanLain) {
   statCardPemasukanLain.addEventListener('click', () => openTransparencyModal('NON_ARISAN'));
 }
 
+const statCardTotalPengeluaran = document.getElementById('statCardTotalPengeluaran');
+if (statCardTotalPengeluaran) {
+  statCardTotalPengeluaran.addEventListener('click', () => openTransparencyModal('TOTAL_PENGELUARAN'));
+}
+
+const statCardSaldoKas = document.getElementById('statCardSaldoKas');
+if (statCardSaldoKas) {
+  statCardSaldoKas.addEventListener('click', () => openTransparencyModal('SALDO_KAS'));
+}
+
 const closeTransparencyModalBtn = document.getElementById('closeTransparencyModalBtn');
 if (closeTransparencyModalBtn) {
   closeTransparencyModalBtn.addEventListener('click', () => {
@@ -1270,12 +1906,19 @@ function isPaymentOwnedByCurrentUser(row) {
 
 function getActivePeriodeSplitRates() {
   const payPeriode = document.getElementById('payPeriode');
-  const selectedId = payPeriode ? payPeriode.value : '';
-  const foundPeriode =
-    (selectedId && cachedPeriodeList.find((p) => String(p.id) === String(selectedId))) ||
-    cachedPeriodeList.find((p) => p.status === 'aktif') ||
-    cachedPeriodeList[0] ||
-    null;
+  const activeList = getActivePeriodeList();
+  if (payPeriode && payPeriode.options && payPeriode.options.length > 1) {
+    const selectedId = payPeriode.value;
+    const foundBySelect = selectedId
+      ? activeList.find((p) => String(p.id) === String(selectedId)) ||
+      cachedPeriodeList.find((p) => String(p.id) === String(selectedId)) ||
+      null
+      : null;
+    if (foundBySelect && isPeriodeArisanAktif(foundBySelect)) {
+      return getArisanSplitValues(foundBySelect);
+    }
+  }
+  const foundPeriode = activeList[0] || null;
   return getArisanSplitValues(foundPeriode);
 }
 
@@ -1326,9 +1969,9 @@ function syncPayGroupSplitUI() {
   const payJenis = document.getElementById('payJenis');
   const payNama = document.getElementById('payNama');
   const wrapper = document.getElementById('payGroupSplitWrapper');
-  const titleEl = document.getElementById('payGroupSplitTitle');
-  const subtitleEl = document.getElementById('payGroupSplitSubtitle');
-  const selectAllLabel = document.getElementById('paySelectAllGroupLabel');
+  const titleEl = document.getElementById('payGroupTitleText') || document.getElementById('payGroupSplitTitle');
+  const subtitleEl = document.getElementById('payGroupSubtitleText') || document.getElementById('payGroupSplitSubtitle');
+  const selectAllLabel = document.getElementById('payGroupSelectAllLabel') || document.getElementById('paySelectAllGroupLabel');
   const chkSelectAll = document.getElementById('chkSelectAllGroupPay');
   const memberListContainer = document.getElementById('payGroupMemberListContainer');
   const payNominal = document.getElementById('payNominal');
@@ -1348,13 +1991,14 @@ function syncPayGroupSplitUI() {
   const payerName = String((payNama && payNama.value) || '').trim();
   const matchedGroup = findGroupForMemberName(payerName);
   const rates = getActivePeriodeSplitRates();
+  const nominalArisanDanKonsumsi = rates.nominal_arisan_konsumsi;
 
   if (matchedGroup) {
     const members = extractGroupMembersArray(matchedGroup);
     const isSameGroup =
       activeDetectedGroupForPay &&
       String(activeDetectedGroupForPay.id || activeDetectedGroupForPay.nama_group) ===
-        String(matchedGroup.id || matchedGroup.nama_group);
+      String(matchedGroup.id || matchedGroup.nama_group);
 
     activeDetectedGroupForPay = matchedGroup;
     if (!isSameGroup || Object.keys(checkedGroupMembersMap).length === 0) {
@@ -1368,7 +2012,7 @@ function syncPayGroupSplitUI() {
       titleEl.innerHTML = `👨‍👩‍👧‍👦 Group Arisan Ditemukan: <span style="text-decoration:underline;">${matchedGroup.nama_group}</span> (${members.length} Orang)`;
     }
     if (subtitleEl) {
-      subtitleEl.innerHTML = `Penanggung Jawab: <strong>${matchedGroup.penanggung_jawab}</strong> • Pembayaran akan di-split ke anggota group untuk <strong>Uang Arisan (${formatRupiah(rates.uang_arisan)})</strong>, <strong>Uang Kas (${formatRupiah(rates.uang_kas)})</strong> & <strong>Konsumsi (${formatRupiah(rates.uang_konsumsi)})</strong>.`;
+      subtitleEl.innerHTML = `Penanggung Jawab: <strong>${matchedGroup.penanggung_jawab}</strong> • Rincian per orang: <strong>a. Uang Arisan (${formatRupiah(rates.uang_arisan)}) + b. Konsumsi (${formatRupiah(rates.uang_konsumsi)}) + c. Kas (${formatRupiah(rates.uang_kas)}) = ${formatRupiah(rates.total)}</strong> • Dibayarkan ke Pemenang: <strong>${formatRupiah(nominalArisanDanKonsumsi)}</strong> (Sisa <strong>${formatRupiah(rates.uang_kas)}</strong> masuk Kas).`;
     }
     if (selectAllLabel) selectAllLabel.classList.remove('hidden');
 
@@ -1392,10 +2036,11 @@ function syncPayGroupSplitUI() {
                 </span>
               </div>
               <div style="font-size:0.78rem; font-weight:700; color:var(--text-secondary);">
-                Arisan: <span style="color:var(--primary);">${formatRupiah(rates.uang_arisan)}</span> •
-                Kas: <span style="color:#b45309;">${formatRupiah(rates.uang_kas)}</span> •
-                Konsumsi: <span style="color:#0284c7;">${formatRupiah(rates.uang_konsumsi)}</span> =
-                <strong style="color:var(--primary);">${formatRupiah(rates.total)}</strong>
+                a. Arisan: <span style="color:var(--primary);">${formatRupiah(rates.uang_arisan)}</span> +
+                b. Konsumsi: <span style="color:#0284c7;">${formatRupiah(rates.uang_konsumsi)}</span> +
+                c. Kas: <span style="color:#b45309;">${formatRupiah(rates.uang_kas)}</span> =
+                <strong>${formatRupiah(rates.total)}</strong> •
+                Pemenang: <strong style="color:#15803d;">${formatRupiah(nominalArisanDanKonsumsi)}</strong>
               </div>
             </label>
           `;
@@ -1421,26 +2066,29 @@ function syncPayGroupSplitUI() {
     const sumArisan = activeCount * rates.uang_arisan;
     const sumKas = activeCount * rates.uang_kas;
     const sumKonsumsi = activeCount * rates.uang_konsumsi;
-    const sumTotal = activeCount * rates.total;
+    const sumTotalRincian = activeCount * rates.total;
+    const sumDibayarkanPemenang = activeCount * nominalArisanDanKonsumsi;
 
     document.getElementById('splitPreviewArisan').textContent = formatRupiah(sumArisan);
     document.getElementById('splitPreviewKas').textContent = formatRupiah(sumKas);
     document.getElementById('splitPreviewKonsumsi').textContent = formatRupiah(sumKonsumsi);
-    document.getElementById('splitPreviewTotal').textContent = formatRupiah(sumTotal);
+    const elTotalIuran = document.getElementById('splitPreviewTotalIuran');
+    if (elTotalIuran) elTotalIuran.textContent = formatRupiah(sumTotalRincian);
+    document.getElementById('splitPreviewTotal').textContent = formatRupiah(sumDibayarkanPemenang);
 
-    if (payNominal) payNominal.value = sumTotal;
+    if (payNominal) payNominal.value = sumDibayarkanPemenang > 0 ? sumDibayarkanPemenang : '';
     if (payNominalHint) {
-      payNominalHint.textContent = `(${activeCount} Orang Group × ${formatRupiah(rates.total)})`;
+      payNominalHint.textContent = `(${activeCount} Orang × [Arisan ${formatRupiah(rates.uang_arisan)} + Konsumsi ${formatRupiah(rates.uang_konsumsi)} = ${formatRupiah(nominalArisanDanKonsumsi)}]; Sisa Kas ${formatRupiah(sumKas)} masuk Kas)`;
     }
   } else {
     activeDetectedGroupForPay = null;
     checkedGroupMembersMap = {};
 
     if (titleEl) {
-      titleEl.textContent = `📋 Rincian Split Iuran Arisan Per Orang (1 Peserta)`;
+      titleEl.textContent = `📋 Perincian Uang Arisan (a. Uang Arisan ${formatRupiah(rates.uang_arisan)} + b. Konsumsi ${formatRupiah(rates.uang_konsumsi)} + c. Kas ${formatRupiah(rates.uang_kas)} = ${formatRupiah(rates.total)})`;
     }
     if (subtitleEl) {
-      subtitleEl.innerHTML = `Iuran Arisan otomatis di-split menjadi: <strong>Uang Arisan ${formatRupiah(rates.uang_arisan)}</strong> + <strong>Uang Kas ${formatRupiah(rates.uang_kas)}</strong> + <strong>Uang Konsumsi ${formatRupiah(rates.uang_konsumsi)}</strong> = <strong>${formatRupiah(rates.total)} / orang</strong>.`;
+      subtitleEl.innerHTML = `Dibayarkan ke Pemenang: <strong>Uang Arisan (${formatRupiah(rates.uang_arisan)}) + Uang Konsumsi (${formatRupiah(rates.uang_konsumsi)}) = ${formatRupiah(nominalArisanDanKonsumsi)}</strong> • Sisanya <strong>${formatRupiah(rates.uang_kas)} masuk Kas</strong>.`;
     }
     if (selectAllLabel) selectAllLabel.classList.add('hidden');
     if (memberListContainer) {
@@ -1450,11 +2098,13 @@ function syncPayGroupSplitUI() {
     document.getElementById('splitPreviewArisan').textContent = formatRupiah(rates.uang_arisan);
     document.getElementById('splitPreviewKas').textContent = formatRupiah(rates.uang_kas);
     document.getElementById('splitPreviewKonsumsi').textContent = formatRupiah(rates.uang_konsumsi);
-    document.getElementById('splitPreviewTotal').textContent = formatRupiah(rates.total);
+    const elTotalIuran = document.getElementById('splitPreviewTotalIuran');
+    if (elTotalIuran) elTotalIuran.textContent = formatRupiah(rates.total);
+    document.getElementById('splitPreviewTotal').textContent = formatRupiah(nominalArisanDanKonsumsi);
 
-    if (payNominal) payNominal.value = rates.total;
+    if (payNominal) payNominal.value = nominalArisanDanKonsumsi > 0 ? nominalArisanDanKonsumsi : '';
     if (payNominalHint) {
-      payNominalHint.textContent = `(1 Orang × ${formatRupiah(rates.total)})`;
+      payNominalHint.textContent = `(Dibayarkan Pemenang: Arisan ${formatRupiah(rates.uang_arisan)} + Konsumsi ${formatRupiah(rates.uang_konsumsi)} = ${formatRupiah(nominalArisanDanKonsumsi)}; Sisa ${formatRupiah(rates.uang_kas)} masuk Kas dari Total ${formatRupiah(rates.total)})`;
     }
   }
 }
@@ -1494,9 +2144,9 @@ function syncPayPeriodeByJenis() {
       payPeriodeHint.style.color = '#64748b';
     }
   } else {
-    if (!payPeriode.value && cachedPeriodeList.length > 0) {
-      const activePer = cachedPeriodeList.find((p) => p.status === 'aktif') || cachedPeriodeList[0];
-      if (activePer) payPeriode.value = activePer.id;
+    const activePeriods = getActivePeriodeList();
+    if (!payPeriode.value && activePeriods.length > 0) {
+      payPeriode.value = activePeriods[0].id;
     }
     if (payPeriodeHint) {
       payPeriodeHint.textContent = '(Aktif untuk Uang Arisan)';
@@ -1729,7 +2379,7 @@ function renderPembayaranTableRows() {
     const emptyMsg = adminFlag
       ? 'Belum ada transaksi pembayaran untuk filter peserta yang dipilih.'
       : 'Belum ada riwayat pembayaran atas nama akun Anda.';
-    tbody.innerHTML = `<tr><td colspan="11" style="text-align:center; color:var(--text-muted);">${emptyMsg}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="13" style="text-align:center; color:var(--text-muted);">${emptyMsg}</td></tr>`;
     return;
   }
 
@@ -1758,22 +2408,23 @@ function renderPembayaranTableRows() {
           <span class="status-pill ${isPending ? 'incomplete' : 'complete'}">
             ${isPending ? '⏳ Pending' : '✓ ' + statusRaw}
           </span>
-          ${
-            adminFlag && isPending
-              ? `<button type="button" class="btn-primary btn-sm" onclick="approvePaymentStatus('${r.id}')">✓ Setujui</button>`
-              : ''
-          }
-          ${
-            adminFlag && !isPending
-              ? `<button type="button" class="btn-secondary btn-sm" style="padding:4px 8px; font-size:0.74rem;" onclick="updatePaymentStatusByAdmin('${r.id}', 'Pending')" title="Kembalikan status ke Pending">↺ Pending</button>`
-              : ''
-          }
+          ${adminFlag && isPending
+          ? `<button type="button" class="btn-primary btn-sm" onclick="approvePaymentStatus('${r.id}')">✓ Setujui</button>`
+          : ''
+        }
+          ${adminFlag && !isPending
+          ? `<button type="button" class="btn-secondary btn-sm" style="padding:4px 8px; font-size:0.74rem;" onclick="updatePaymentStatusByAdmin('${r.id}', 'Pending')" title="Kembalikan status ke Pending">↺ Pending</button>`
+          : ''
+        }
         </div>
       `;
 
       const sp = getPaymentSplitValues(r);
       const isArs = isJenisArisan(r.jenis_bayar);
       const cleanKet = stripInternalMetaFromKeterangan(r.keterangan);
+      const periodeArisanLabel = getPaymentPeriodeArisanLabel(r);
+      const dibayarkanVal = isArs ? sp.dibayarkan_pemenang : Number(r.nominal || 0);
+      const totalRincianVal = isArs ? sp.total_rincian : Number(r.nominal || 0);
 
       return `
         <tr>
@@ -1784,10 +2435,15 @@ function renderPembayaranTableRows() {
             ${cleanKet ? `<br><small style="color:#64748b;">${cleanKet}</small>` : ''}
           </td>
           <td>${r.jenis_bayar || 'Uang Arisan'}</td>
+          <td><strong>${periodeArisanLabel}</strong></td>
           <td>${isArs ? `<span style="color:var(--primary); font-weight:700;">${formatRupiah(sp.uang_arisan)}</span>` : '<span style="color:#94a3b8;">-</span>'}</td>
-          <td>${isArs ? `<span style="color:#b45309; font-weight:700;">${formatRupiah(sp.uang_kas)}</span>` : '<span style="color:#94a3b8;">-</span>'}</td>
           <td>${isArs ? `<span style="color:#0284c7; font-weight:700;">${formatRupiah(sp.uang_konsumsi)}</span>` : '<span style="color:#94a3b8;">-</span>'}</td>
-          <td><strong>${formatRupiah(r.nominal)}</strong></td>
+          <td>${isArs ? `<span style="color:#b45309; font-weight:700;">${formatRupiah(sp.uang_kas)}</span><br><small style="color:#b45309; font-size:0.7rem;">(Masuk Kas)</small>` : '<span style="color:#94a3b8;">-</span>'}</td>
+          <td><strong>${formatRupiah(totalRincianVal)}</strong></td>
+          <td>
+            <strong style="color:#15803d;">${formatRupiah(dibayarkanVal)}</strong>
+            ${isArs ? `<br><small style="color:#15803d; font-size:0.7rem;">Arisan + Konsumsi</small>` : ''}
+          </td>
           <td>${metodeText}</td>
           <td>${buktiBtn}</td>
           <td>${statusCell}</td>
@@ -1808,24 +2464,28 @@ async function loadPembayaranData() {
     });
     if (!res.ok) throw new Error('Gagal memuat data pembayaran.');
     const rows = await res.json();
-    cachedPembayaranList = rows || [];
+    cachedPembayaranList = (rows || []).map((r) => ({
+      ...r,
+      jenis_bayar_db: r.jenis_bayar,
+      jenis_bayar: getEffectiveJenisBayar(r)
+    }));
 
-    // Hitung terpisah untuk Transparansi Kas Keluarga: Pemasukan Uang Arisan vs Pemasukan Lainnya
-    totalPemasukanArisan = 0;
+    // adnan_Pembayaran MURNI sebagai Penerimaan / Pemasukan:
+    totalPengeluaranPembayaran = 0;
     totalPemasukanLain = 0;
     cachedPembayaranList.forEach((r) => {
-      const nom = Number(r.nominal || 0);
-      if (isJenisArisan(r.jenis_bayar)) {
-        totalPemasukanArisan += nom;
-      } else {
-        totalPemasukanLain += nom;
+      // Jika bukan Uang Arisan (misal Zakat, Sumbangan, Infaq), masuk ke Pemasukan Lainnya
+      if (!isJenisArisan(r)) {
+        totalPemasukanLain += Number(r.nominal || 0);
       }
     });
+    computePeriodeArisanPemasukanTotals();
 
     populateAdminPesertaDropdowns();
     renderPembayaranTableRows();
+    updateQuickStatsBar();
   } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="11" style="text-align:center; color:#dc2626;">${err.message}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="13" style="text-align:center; color:#dc2626;">${err.message}</td></tr>`;
   }
 }
 
@@ -1877,6 +2537,7 @@ function renderGroupModalContents() {
   if (!activeDetectedGroupForPay) return;
   const members = extractGroupMembersArray(activeDetectedGroupForPay);
   const rates = getActivePeriodeSplitRates();
+  const nominalArisanDanKonsumsi = rates.nominal_arisan_konsumsi;
 
   const titleEl = document.getElementById('modalGroupNameTitle');
   const pjEl = document.getElementById('modalGroupPJInfo');
@@ -1911,9 +2572,10 @@ function renderGroupModalContents() {
               </span>
             </td>
             <td><strong style="color:var(--primary);">${checked ? formatRupiah(rates.uang_arisan) : 'Rp 0'}</strong></td>
-            <td><strong style="color:#b45309;">${checked ? formatRupiah(rates.uang_kas) : 'Rp 0'}</strong></td>
             <td><strong style="color:#0284c7;">${checked ? formatRupiah(rates.uang_konsumsi) : 'Rp 0'}</strong></td>
+            <td><strong style="color:#b45309;">${checked ? formatRupiah(rates.uang_kas) : 'Rp 0'}</strong></td>
             <td><strong>${checked ? formatRupiah(rates.total) : 'Rp 0'}</strong></td>
+            <td><strong style="color:#15803d;">${checked ? formatRupiah(nominalArisanDanKonsumsi) : 'Rp 0'}</strong></td>
           </tr>
         `;
       })
@@ -1939,7 +2601,9 @@ function renderGroupModalContents() {
   document.getElementById('modalSumArisan').textContent = formatRupiah(activeCount * rates.uang_arisan);
   document.getElementById('modalSumKas').textContent = formatRupiah(activeCount * rates.uang_kas);
   document.getElementById('modalSumKonsumsi').textContent = formatRupiah(activeCount * rates.uang_konsumsi);
-  document.getElementById('modalSumGrandTotal').textContent = formatRupiah(activeCount * rates.total);
+  const elModalTotalRincian = document.getElementById('modalSumTotalRincian');
+  if (elModalTotalRincian) elModalTotalRincian.textContent = formatRupiah(activeCount * rates.total);
+  document.getElementById('modalSumGrandTotal').textContent = formatRupiah(activeCount * nominalArisanDanKonsumsi);
 }
 
 function openGroupConfirmModal() {
@@ -2012,6 +2676,15 @@ async function executeSavePembayaran(confirmedFromGroupModal = false) {
   try {
     const selectedPeriodeId =
       jenisBayar === 'Uang Arisan' ? document.getElementById('payPeriode').value || null : null;
+    const selectedPeriodeObj =
+      jenisBayar === 'Uang Arisan'
+        ? (selectedPeriodeId &&
+          (getActivePeriodeList().find((p) => String(p.id) === String(selectedPeriodeId)) ||
+            cachedPeriodeList.find((p) => String(p.id) === String(selectedPeriodeId)))) ||
+        getActivePeriodeList()[0] ||
+        null
+        : null;
+    const selectedPeriodeLabel = selectedPeriodeObj ? formatPeriodeArisanLabel(selectedPeriodeObj) : null;
     const tanggalBayar = document.getElementById('payTanggal').value || todayISO();
     const noRek = document.getElementById('payNoRekening').value.trim();
     const ketInput = document.getElementById('payKeterangan').value.trim();
@@ -2022,23 +2695,26 @@ async function executeSavePembayaran(confirmedFromGroupModal = false) {
       const allMembers = extractGroupMembersArray(activeDetectedGroupForPay);
       const selectedMembers = allMembers.filter((m) => checkedGroupMembersMap[m] !== false);
       const groupBatchCode = 'GRP-' + Math.floor(1000 + Math.random() * 9000);
+      const nominalPerMember = rates.nominal_arisan_konsumsi;
 
       for (let i = 0; i < selectedMembers.length; i++) {
         const memberName = selectedMembers[i];
-        const isPJ =
-          memberName.toLowerCase() ===
-          String(activeDetectedGroupForPay.penanggung_jawab || '').trim().toLowerCase();
         const matchedAnggota = (cachedAnggotaList || []).find(
           (a) => String(a.nama_lengkap || '').trim().toLowerCase() === memberName.toLowerCase()
         );
 
         const kode = `${groupBatchCode}-${i + 1}`;
         const splitMeta = `[SPLIT:${rates.uang_arisan},${rates.uang_kas},${rates.uang_konsumsi}]`;
+        const jenisMeta = `[JENIS:${jenisBayar}]`;
+        const periodeMeta = selectedPeriodeLabel ? `[PERIODE:${selectedPeriodeLabel}]` : '';
         const fullKeterangan = [
+          `Dibayarkan Pemenang: Arisan ${formatRupiah(rates.uang_arisan)} + Konsumsi ${formatRupiah(rates.uang_konsumsi)} = ${formatRupiah(nominalPerMember)} (Sisa Kas ${formatRupiah(rates.uang_kas)} masuk Kas dari Total ${formatRupiah(rates.total)})`,
           ketInput,
           metode === 'Transfer Bank' && namaBank ? `Bank: ${namaBank}` : '',
           noRek ? `Rek: ${noRek}` : '',
-          splitMeta
+          splitMeta,
+          jenisMeta,
+          periodeMeta
         ]
           .filter(Boolean)
           .join(' | ');
@@ -2046,7 +2722,8 @@ async function executeSavePembayaran(confirmedFromGroupModal = false) {
         await adaptiveSupabaseWrite(TABLES.PEMBAYARAN, {
           kode_transaksi: kode,
           anggota_id: (matchedAnggota && matchedAnggota.id) || null,
-          arisan_id: selectedPeriodeId,
+          arisan_id: selectedPeriodeId || (selectedPeriodeObj && selectedPeriodeObj.id) || null,
+          periode_arisan: selectedPeriodeLabel,
           user_id: (matchedAnggota && matchedAnggota.user_id) || null,
           nama_pembayar: memberName,
           nama_group: activeDetectedGroupForPay.nama_group,
@@ -2056,7 +2733,7 @@ async function executeSavePembayaran(confirmedFromGroupModal = false) {
           uang_arisan: rates.uang_arisan,
           uang_kas: rates.uang_kas,
           uang_konsumsi: rates.uang_konsumsi,
-          nominal: rates.total,
+          nominal: nominalPerMember,
           metode_bayar: metode === 'Transfer Bank' ? 'Transfer' : 'Tunai',
           nama_bank: metode === 'Transfer Bank' ? namaBank : null,
           no_rekening_pengirim: metode === 'Transfer Bank' ? noRek : null,
@@ -2067,29 +2744,32 @@ async function executeSavePembayaran(confirmedFromGroupModal = false) {
       }
 
       showGlobalAlert(
-        `✅ Pembayaran Group <b>${activeDetectedGroupForPay.nama_group}</b> berhasil di-split kepada <b>${selectedMembers.length} anggota</b> (@${formatRupiah(rates.total)}: Arisan ${formatRupiah(rates.uang_arisan)}, Kas ${formatRupiah(rates.uang_kas)}, Konsumsi ${formatRupiah(rates.uang_konsumsi)}) dengan status <b>Pending</b>!`,
+        `✅ Pembayaran Group <b>${activeDetectedGroupForPay.nama_group}</b> berhasil disimpan untuk <b>${selectedMembers.length} anggota</b> (@${formatRupiah(nominalPerMember)} dibayarkan ke pemenang: Arisan ${formatRupiah(rates.uang_arisan)} + Konsumsi ${formatRupiah(rates.uang_konsumsi)}, dan Kas ${formatRupiah(rates.uang_kas)} masuk Kas) pada <b>${selectedPeriodeLabel || 'Periode Aktif'}</b> dengan status <b>Pending</b>!`,
         'success'
       );
     } else {
       // Pembayaran Perorangan (Single Member)
       const kode = 'TX-ARS-' + Math.floor(1000 + Math.random() * 9000);
       const inputNamaPembayar = document.getElementById('payNama').value.trim();
-      const inputNominal = Number(document.getElementById('payNominal').value || 0);
-
       const isArs = jenisBayar === 'Uang Arisan';
       const ua = isArs ? rates.uang_arisan : 0;
       const uk = isArs ? rates.uang_kas : 0;
       const uko = isArs ? rates.uang_konsumsi : 0;
+      const inputNominal = Number(
+        document.getElementById('payNominal').value || (isArs ? rates.nominal_arisan_konsumsi : 0)
+      );
       const splitMeta = isArs ? `[SPLIT:${ua},${uk},${uko}]` : '';
+      const jenisMeta = `[JENIS:${jenisBayar}]`;
+      const periodeMeta = isArs && selectedPeriodeLabel ? `[PERIODE:${selectedPeriodeLabel}]` : '';
 
       const fullKeterangan = [
-        isArs
-          ? `Split Arisan ${formatRupiah(ua)}, Kas ${formatRupiah(uk)}, Konsumsi ${formatRupiah(uko)}`
-          : '',
+        isArs ? `Dibayarkan Pemenang: Arisan ${formatRupiah(ua)} + Konsumsi ${formatRupiah(uko)} = ${formatRupiah(ua + uko)} (Sisa Kas ${formatRupiah(uk)} masuk Kas dari Total ${formatRupiah(ua + uko + uk)})` : '',
         ketInput,
         metode === 'Transfer Bank' && namaBank ? `Bank: ${namaBank}` : '',
         noRek ? `Rek: ${noRek}` : '',
-        splitMeta
+        splitMeta,
+        jenisMeta,
+        periodeMeta
       ]
         .filter(Boolean)
         .join(' | ');
@@ -2100,18 +2780,19 @@ async function executeSavePembayaran(confirmedFromGroupModal = false) {
       const targetUserId = isUserAdmin()
         ? (matchedAnggota && matchedAnggota.user_id) || (currentLoggedUser ? currentLoggedUser.user_id : null)
         : currentLoggedUser
-        ? currentLoggedUser.user_id
-        : null;
+          ? currentLoggedUser.user_id
+          : null;
       const targetAnggotaId = isUserAdmin()
         ? (matchedAnggota && matchedAnggota.id) || null
         : currentBiodataRecord && currentBiodataRecord.id
-        ? currentBiodataRecord.id
-        : null;
+          ? currentBiodataRecord.id
+          : null;
 
       await adaptiveSupabaseWrite(TABLES.PEMBAYARAN, {
         kode_transaksi: kode,
         anggota_id: targetAnggotaId,
-        arisan_id: selectedPeriodeId,
+        arisan_id: isArs ? selectedPeriodeId || (selectedPeriodeObj && selectedPeriodeObj.id) || null : null,
+        periode_arisan: isArs ? selectedPeriodeLabel : null,
         user_id: targetUserId,
         nama_pembayar: inputNamaPembayar,
         tanggal_bayar: tanggalBayar,
@@ -2163,6 +2844,212 @@ if (formPembayaran) {
 // ============================================================================
 // MODUL PENGELUARAN / AKUNTANSI (HANYA MUNCUL UNTUK USER ADMIN)
 // ============================================================================
+function extractNoRekeningPengeluaran(row) {
+  if (!row) return '';
+  if (row.no_rekening) return String(row.no_rekening).trim();
+  if (row.no_rekening_penerima) return String(row.no_rekening_penerima).trim();
+  const desc = String(row.deskripsi || '');
+  const match = desc.match(/\[REK:([^\]]+)\]/i) || desc.match(/No\.?\s*Rek(?:ening)?\s*:\s*([0-9A-Za-z\- ]+)/i);
+  return match ? String(match[1]).trim() : '';
+}
+
+function stripExpInternalMeta(text) {
+  return stripInternalMetaFromKeterangan(String(text || '').replace(/\s*\[REK:[^\]]+\]/gi, '').trim());
+}
+
+function populatePengeluaranAnggotaDropdown(searchQuery = '') {
+  const selectEl = document.getElementById('expSelectAnggota');
+  const datalistEl = document.getElementById('expAnggotaDatalist');
+  const filterTableEl = document.getElementById('filterPengeluaranAnggota');
+  const q = String(searchQuery || '').trim().toLowerCase();
+
+  const allMembers = (cachedAnggotaList || []).filter((a) => a && a.nama_lengkap);
+
+  // Filter berdasarkan pencarian nama atau atribut header di adnan_DataAnggota
+  const filteredMembers = allMembers.filter((a) => {
+    if (!q) return true;
+    const searchableText = [
+      a.nama_lengkap,
+      a.panggilan,
+      a.user_id,
+      a.no_hp,
+      a.nama_bank,
+      a.no_rekening,
+      a.alamat
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
+    return searchableText.includes(q);
+  });
+
+  if (selectEl) {
+    const currentVal = selectEl.value;
+    selectEl.innerHTML = [
+      `<option value="">-- Pilih Nama dari adnan_DataAnggota (${filteredMembers.length} ditemukan) --</option>`,
+      ...filteredMembers.map((a) => {
+        const infoPanggilan = a.panggilan ? ` (${a.panggilan})` : '';
+        const infoBank = a.nama_bank ? ` • ${a.nama_bank}${a.no_rekening ? ' - ' + a.no_rekening : ''}` : '';
+        return `<option value="${a.nama_lengkap}" data-bank="${a.nama_bank || ''}" data-rekening="${a.no_rekening || ''}">${a.nama_lengkap}${infoPanggilan}${infoBank}</option>`;
+      })
+    ].join('');
+    if (currentVal && filteredMembers.some((a) => a.nama_lengkap === currentVal)) {
+      selectEl.value = currentVal;
+    } else if (q && filteredMembers.length === 1) {
+      // Jika hasil pencarian tepat 1 anggota, langsung pilih otomatis
+      selectEl.value = filteredMembers[0].nama_lengkap;
+      applySelectedAnggotaToPengeluaranForm(filteredMembers[0].nama_lengkap);
+    }
+  }
+
+  if (datalistEl) {
+    datalistEl.innerHTML = allMembers
+      .map((a) => {
+        const infoBank = a.nama_bank ? `${a.nama_bank} ${a.no_rekening || ''}` : a.panggilan || '';
+        return `<option value="${a.nama_lengkap}">${infoBank}</option>`;
+      })
+      .join('');
+  }
+
+  if (filterTableEl && !q) {
+    const curFilter = filterTableEl.value || 'ALL';
+    filterTableEl.innerHTML = [
+      '<option value="ALL">-- Semua Anggota (adnan_DataAnggota) --</option>',
+      ...allMembers.map((a) => `<option value="${a.nama_lengkap}">${a.nama_lengkap}</option>`)
+    ].join('');
+    filterTableEl.value = curFilter;
+  }
+}
+
+function applySelectedAnggotaToPengeluaranForm(namaAnggota) {
+  const penerimaInput = document.getElementById('expPenerima');
+  if (!namaAnggota) return;
+  if (penerimaInput) {
+    penerimaInput.value = namaAnggota;
+  }
+
+  const matched = (cachedAnggotaList || []).find(
+    (a) => String(a.nama_lengkap || '').trim().toLowerCase() === String(namaAnggota).trim().toLowerCase()
+  );
+  if (matched) {
+    const expBank = document.getElementById('expNamaBank');
+    const expNoRek = document.getElementById('expNoRekening');
+    if (matched.nama_bank && expBank && !expBank.value) {
+      expBank.value = matched.nama_bank;
+    }
+    if (matched.no_rekening && expNoRek && !expNoRek.value) {
+      expNoRek.value = matched.no_rekening;
+    }
+  }
+}
+
+const expSearchAnggotaInput = document.getElementById('expSearchAnggota');
+if (expSearchAnggotaInput) {
+  expSearchAnggotaInput.addEventListener('input', () => {
+    populatePengeluaranAnggotaDropdown(expSearchAnggotaInput.value);
+  });
+}
+
+const expSelectAnggotaEl = document.getElementById('expSelectAnggota');
+if (expSelectAnggotaEl) {
+  expSelectAnggotaEl.addEventListener('change', () => {
+    if (expSelectAnggotaEl.value) {
+      applySelectedAnggotaToPengeluaranForm(expSelectAnggotaEl.value);
+    }
+  });
+}
+
+const expPenerimaInputEl = document.getElementById('expPenerima');
+if (expPenerimaInputEl) {
+  expPenerimaInputEl.addEventListener('change', () => {
+    applySelectedAnggotaToPengeluaranForm(expPenerimaInputEl.value);
+  });
+}
+
+function renderPengeluaranTableRows() {
+  const tbody = document.getElementById('tableBodyPengeluaran');
+  if (!tbody) return;
+
+  const searchQ = String((document.getElementById('searchPengeluaranNama') && document.getElementById('searchPengeluaranNama').value) || '')
+    .trim()
+    .toLowerCase();
+  const filterAnggota = String(
+    (document.getElementById('filterPengeluaranAnggota') && document.getElementById('filterPengeluaranAnggota').value) || 'ALL'
+  ).trim();
+
+  const filteredRows = (cachedPengeluaranList || []).filter((r) => {
+    if (filterAnggota !== 'ALL') {
+      const pName = String(r.penerima || '').trim().toLowerCase();
+      const dText = String(r.deskripsi || '').toLowerCase();
+      const target = filterAnggota.toLowerCase();
+      if (pName !== target && !dText.includes(target)) return false;
+    }
+    if (searchQ) {
+      const combined = [
+        r.penerima,
+        r.kategori,
+        r.deskripsi,
+        r.nama_pengeluaran,
+        r.kode_pengeluaran,
+        r.nama_bank,
+        extractNoRekeningPengeluaran(r)
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .toLowerCase();
+      if (!combined.includes(searchQ)) return false;
+    }
+    return true;
+  });
+
+  if (filteredRows.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;">Belum ada pencatatan pengeluaran kas yang sesuai filter.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = filteredRows
+    .map((r, idx) => {
+      const notaUrl = r.bukti_url || r.nota_url || null;
+      const mediaKey = `exp_${r.id || idx}`;
+      if (notaUrl) {
+        registerMediaPreview(mediaKey, `Nota Pengeluaran - ${r.kategori || ''}`, notaUrl);
+      }
+      const notaBtn = notaUrl
+        ? `<button type="button" class="btn-secondary btn-sm" onclick="openMediaByKey('${mediaKey}')">🧾 Lihat Nota</button>`
+        : `<span style="color:#94a3b8; font-size:0.8rem;">-</span>`;
+
+      const noRek = extractNoRekeningPengeluaran(r);
+      const cleanDesc = stripExpInternalMeta(r.deskripsi || r.nama_pengeluaran || '-');
+
+      return `
+        <tr>
+          <td>${r.tanggal_pengeluaran || r.tanggal || '-'}</td>
+          <td><code>${r.kode_pengeluaran || 'EXP-' + (idx + 1)}</code></td>
+          <td><strong>${r.kategori || 'Pengeluaran'}</strong></td>
+          <td>${cleanDesc} ${r.penerima ? '<br><small><strong>Penerima:</strong> ' + r.penerima + '</small>' : ''}</td>
+          <td>
+            ${r.metode_bayar || 'Tunai'} ${r.nama_bank ? '(' + r.nama_bank + ')' : ''}
+            ${noRek ? `<br><small style="color:var(--primary); font-weight:700;">No. Rek: ${noRek}</small>` : ''}
+          </td>
+          <td><strong style="color:#dc2626;">${formatRupiah(r.nominal)}</strong></td>
+          <td>${notaBtn}</td>
+          <td>${r.dicatat_oleh || 'Admin'}</td>
+        </tr>
+      `;
+    })
+    .join('');
+}
+
+const searchPengeluaranNamaEl = document.getElementById('searchPengeluaranNama');
+if (searchPengeluaranNamaEl) {
+  searchPengeluaranNamaEl.addEventListener('input', renderPengeluaranTableRows);
+}
+
+const filterPengeluaranAnggotaEl = document.getElementById('filterPengeluaranAnggota');
+if (filterPengeluaranAnggotaEl) {
+  filterPengeluaranAnggotaEl.addEventListener('change', renderPengeluaranTableRows);
+}
+
 async function loadPengeluaranData() {
   const tbody = document.getElementById('tableBodyPengeluaran');
   if (!tbody) return;
@@ -2174,49 +3061,42 @@ async function loadPengeluaranData() {
     });
     if (!res.ok) throw new Error('Gagal memuat data pengeluaran.');
     const rows = await res.json();
+    cachedPengeluaranList = Array.isArray(rows) ? rows : [];
 
-    totalPengeluaranKas = (rows || []).reduce((acc, r) => acc + Number(r.nominal || 0), 0);
+    totalPengeluaranKas = cachedPengeluaranList.reduce((acc, r) => acc + Number(r.nominal || 0), 0);
 
-    if (!rows || rows.length === 0) {
-      tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;">Belum ada pencatatan pengeluaran kas.</td></tr>`;
-      return;
-    }
-
-    tbody.innerHTML = rows
-      .map((r, idx) => {
-        const notaUrl = r.bukti_url || r.nota_url || null;
-        const mediaKey = `exp_${r.id || idx}`;
-        if (notaUrl) {
-          registerMediaPreview(mediaKey, `Nota Pengeluaran - ${r.kategori || ''}`, notaUrl);
-        }
-        const notaBtn = notaUrl
-          ? `<button type="button" class="btn-secondary btn-sm" onclick="openMediaByKey('${mediaKey}')">🧾 Lihat Nota</button>`
-          : `<span style="color:#94a3b8; font-size:0.8rem;">-</span>`;
-
-        return `
-          <tr>
-            <td>${r.tanggal_pengeluaran || r.tanggal || '-'}</td>
-            <td><code>${r.kode_pengeluaran || 'EXP-' + (idx + 1)}</code></td>
-            <td><strong>${r.kategori || 'Pengeluaran'}</strong></td>
-            <td>${r.deskripsi || r.nama_pengeluaran || '-'} ${r.penerima ? '<br><small>Penerima: ' + r.penerima + '</small>' : ''}</td>
-            <td>${r.metode_bayar || 'Tunai'} ${r.nama_bank ? '(' + r.nama_bank + ')' : ''}</td>
-            <td><strong style="color:#dc2626;">${formatRupiah(r.nominal)}</strong></td>
-            <td>${notaBtn}</td>
-            <td>${r.dicatat_oleh || 'Admin'}</td>
-          </tr>
-        `;
-      })
-      .join('');
+    populatePengeluaranAnggotaDropdown();
+    renderPengeluaranTableRows();
+    updateQuickStatsBar();
   } catch (err) {
     tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:#dc2626;">${err.message}</td></tr>`;
   }
 }
 
+function syncExpTransferFieldsUI() {
+  const expMetode = document.getElementById('expMetode');
+  const expBankGroup = document.getElementById('expBankGroup');
+  const expRekeningGroup = document.getElementById('expRekeningGroup');
+  if (!expMetode) return;
+  const isTransfer = expMetode.value === 'Transfer Bank';
+  if (expBankGroup) expBankGroup.classList.toggle('hidden', !isTransfer);
+  if (expRekeningGroup) expRekeningGroup.classList.toggle('hidden', !isTransfer);
+}
+
 const expMetodeSelect = document.getElementById('expMetode');
 if (expMetodeSelect) {
-  expMetodeSelect.addEventListener('change', () => {
-    const isTransfer = expMetodeSelect.value === 'Transfer Bank';
-    document.getElementById('expBankGroup').classList.toggle('hidden', !isTransfer);
+  expMetodeSelect.addEventListener('change', syncExpTransferFieldsUI);
+}
+
+const expNamaBankSelect = document.getElementById('expNamaBank');
+if (expNamaBankSelect) {
+  expNamaBankSelect.addEventListener('change', () => {
+    const expRekeningGroup = document.getElementById('expRekeningGroup');
+    if (expRekeningGroup && expNamaBankSelect.value) {
+      expRekeningGroup.classList.remove('hidden');
+      const expNoRekInput = document.getElementById('expNoRekening');
+      if (expNoRekInput) expNoRekInput.focus();
+    }
   });
 }
 
@@ -2248,6 +3128,15 @@ if (formPengeluaran) {
       return;
     }
 
+    const metode = document.getElementById('expMetode').value;
+    const namaBank = document.getElementById('expNamaBank').value;
+    const noRekening = (document.getElementById('expNoRekening') && document.getElementById('expNoRekening').value.trim()) || '';
+
+    if (metode === 'Transfer Bank' && !namaBank) {
+      showGlobalAlert('Silakan pilih Bank Pencairan / Transfer terlebih dahulu.', 'error');
+      return;
+    }
+
     const btn = document.getElementById('btnSubmitPengeluaran');
     btn.disabled = true;
     btn.textContent = 'Menyimpan Pengeluaran...';
@@ -2255,24 +3144,37 @@ if (formPengeluaran) {
     try {
       const kode = 'EXP-' + Math.floor(1000 + Math.random() * 9000);
       const kategori = document.getElementById('expKategori').value;
-      const deskripsi = document.getElementById('expDeskripsi').value.trim();
+      const deskripsiInput = document.getElementById('expDeskripsi').value.trim();
+      const penerimaVal =
+        document.getElementById('expPenerima').value.trim() ||
+        (document.getElementById('expSelectAnggota') && document.getElementById('expSelectAnggota').value) ||
+        null;
+
+      const deskripsiWithMeta = [
+        deskripsiInput,
+        metode === 'Transfer Bank' && noRekening ? `[REK:${noRekening}]` : ''
+      ]
+        .filter(Boolean)
+        .join(' ');
 
       await adaptiveSupabaseWrite(TABLES.PENGELUARAN, {
         kode_pengeluaran: kode,
         tanggal_pengeluaran: document.getElementById('expTanggal').value || todayISO(),
         kategori: kategori,
         nama_pengeluaran: kategori,
-        deskripsi: deskripsi,
+        deskripsi: deskripsiWithMeta,
         nominal: Number(document.getElementById('expNominal').value || 0),
-        penerima: document.getElementById('expPenerima').value.trim() || null,
-        metode_bayar: document.getElementById('expMetode').value,
-        nama_bank: document.getElementById('expMetode').value === 'Transfer Bank' ? document.getElementById('expNamaBank').value : null,
+        penerima: penerimaVal,
+        metode_bayar: metode,
+        nama_bank: metode === 'Transfer Bank' ? namaBank : null,
+        no_rekening: metode === 'Transfer Bank' ? noRekening || null : null,
         bukti_url: uploadedExpBuktiDataUrl,
         dicatat_oleh: currentLoggedUser ? currentLoggedUser.nama_lengkap || currentLoggedUser.user_id : 'Admin'
       });
 
       formPengeluaran.reset();
       document.getElementById('expTanggal').value = todayISO();
+      syncExpTransferFieldsUI();
       uploadedExpBuktiDataUrl = null;
       document.getElementById('expBuktiPreview').innerHTML = '';
 
@@ -2301,7 +3203,10 @@ async function loadPengumumanData() {
       headers: supabaseHeaders
     });
     if (!res.ok) throw new Error('Gagal memuat pengumuman.');
-    const rows = await res.json();
+    const rawRows = await res.json();
+    const rows = (rawRows || []).filter(
+      (r) => String(r.kategori || '') !== 'LIVE_SPIN_STATE' && String(r.judul || '') !== '__LIVE_SPIN_STATE__'
+    );
 
     if (!rows || rows.length === 0) {
       container.innerHTML = `<p style="text-align:center; color:var(--text-muted);">Belum ada pengumuman yang diterbitkan.</p>`;
@@ -2541,18 +3446,50 @@ async function loadPeriodeAndPemenangData() {
       method: 'GET',
       headers: supabaseHeaders
     });
-    cachedPeriodeList = resPeriode.ok ? await resPeriode.json() : [];
+    let rowsArisan = resPeriode.ok ? await resPeriode.json() : [];
 
-    const periodeOptions = [
-      '<option value="">-- Pilih Periode Arisan --</option>',
-      ...cachedPeriodeList.map((p) => {
-        const sp = getArisanSplitValues(p);
-        return `<option value="${p.id}">Periode Ke-${p.periode_ke} (${p.bulan_tahun}) - ${formatRupiah(sp.total)}/Orang</option>`;
-      })
+    // Jika adnan_Arisan kosong atau ada data tambahan di adnan_PeriodeArisan di Supabase, sinkronkan dari Supabase
+    try {
+      const resPeriodeAlt = await fetch(`${SUPABASE_REST_URL}/${TABLES.PERIODE}?select=*&order=periode_ke.asc`, {
+        method: 'GET',
+        headers: supabaseHeaders
+      });
+      if (resPeriodeAlt.ok) {
+        const rowsAlt = await resPeriodeAlt.json();
+        if ((!rowsArisan || rowsArisan.length === 0) && Array.isArray(rowsAlt) && rowsAlt.length > 0) {
+          rowsArisan = rowsAlt;
+        } else if (Array.isArray(rowsArisan) && Array.isArray(rowsAlt) && rowsAlt.length > 0) {
+          rowsArisan = rowsArisan.map((p) => {
+            const matchAlt = rowsAlt.find((a) => Number(a.periode_ke) === Number(p.periode_ke));
+            if (!matchAlt) return p;
+            return {
+              ...matchAlt,
+              ...p,
+              uang_arisan: p.uang_arisan ?? matchAlt.uang_arisan,
+              uang_kas: p.uang_kas ?? matchAlt.uang_kas,
+              uang_konsumsi: p.uang_konsumsi ?? matchAlt.uang_konsumsi
+            };
+          });
+        }
+      }
+    } catch (_) { }
+
+    cachedPeriodeList = Array.isArray(rowsArisan) ? rowsArisan : [];
+    const activePeriods = getActivePeriodeList();
+
+    // Pada Form Pembayaran (#payPeriode), hanya tampilkan Periode Arisan yang Aktif
+    const payPeriodeOptions = [
+      '<option value="">-- Pilih Periode Arisan Aktif --</option>',
+      ...activePeriods.map((p) => `<option value="${p.id}">${formatPeriodeArisanLabel(p)}</option>`)
     ].join('');
 
-    if (payPeriodeSelect) payPeriodeSelect.innerHTML = periodeOptions;
-    if (winPeriodeSelect) winPeriodeSelect.innerHTML = periodeOptions;
+    const allPeriodeOptions = [
+      '<option value="">-- Pilih Periode Arisan --</option>',
+      ...cachedPeriodeList.map((p) => `<option value="${p.id}">${formatPeriodeArisanLabel(p)}</option>`)
+    ].join('');
+
+    if (payPeriodeSelect) payPeriodeSelect.innerHTML = payPeriodeOptions;
+    if (winPeriodeSelect) winPeriodeSelect.innerHTML = allPeriodeOptions;
     syncPayPeriodeByJenis();
 
     const nextPeriodeNum =
@@ -2564,11 +3501,13 @@ async function loadPeriodeAndPemenangData() {
 
     if (tbodyPeriode) {
       if (cachedPeriodeList.length === 0) {
-        tbodyPeriode.innerHTML = `<tr><td colspan="10" style="text-align:center;">Belum ada jadwal periode arisan.</td></tr>`;
+        tbodyPeriode.innerHTML = `<tr><td colspan="11" style="text-align:center;">Belum ada jadwal periode arisan.</td></tr>`;
       } else {
         tbodyPeriode.innerHTML = cachedPeriodeList
           .map((p) => {
             const sp = getArisanSplitValues(p);
+            const perId = p.id || '';
+            const perKe = Number(p.periode_ke || 0);
             return `
             <tr>
               <td><strong>Periode Ke-${p.periode_ke}</strong></td>
@@ -2581,6 +3520,11 @@ async function loadPeriodeAndPemenangData() {
               <td><strong>${formatRupiah(sp.total)}</strong></td>
               <td>${p.pemenang_nama ? '🏆 <strong>' + p.pemenang_nama + '</strong>' : '<span style="color:#64748b;">Belum diundi</span>'}</td>
               <td><span class="status-pill ${p.status === 'aktif' ? 'complete' : 'incomplete'}">${p.status || 'aktif'}</span></td>
+              <td>
+                <button type="button" class="btn-secondary btn-sm" style="color:#dc2626; border-color:#fecaca;" onclick="deletePeriodeArisan('${perId}', ${perKe})">
+                  🗑️ Hapus
+                </button>
+              </td>
             </tr>`;
           })
           .join('');
@@ -2624,7 +3568,7 @@ async function loadPeriodeAndPemenangData() {
 
     if (tbodyPemenang) {
       if (winnerRows.length === 0) {
-        tbodyPemenang.innerHTML = `<tr><td colspan="7" style="text-align:center;">Belum ada pemenang arisan yang ditetapkan.</td></tr>`;
+        tbodyPemenang.innerHTML = `<tr><td colspan="8" style="text-align:center;">Belum ada pemenang arisan yang ditetapkan.</td></tr>`;
       } else {
         tbodyPemenang.innerHTML = winnerRows
           .map(
@@ -2637,6 +3581,11 @@ async function loadPeriodeAndPemenangData() {
               <td><strong>${formatRupiah(w.nominal_diterima)}</strong></td>
               <td>${w.metode_pencairan || '-'} ${w.nama_bank ? '(' + w.nama_bank + ')' : ''}</td>
               <td>${stripInternalMetaFromKeterangan(w.keterangan) || '-'}</td>
+              <td>
+                <button type="button" class="btn-secondary btn-sm" style="color:#dc2626; border-color:#fecaca;" onclick="deletePemenangArisan('${w.id || ''}', ${Number(w.periode_ke || 0)})">
+                  🗑️ Hapus
+                </button>
+              </td>
             </tr>`
           )
           .join('');
@@ -2646,6 +3595,96 @@ async function loadPeriodeAndPemenangData() {
     console.error(err);
   }
 }
+
+async function deletePeriodeArisan(periodeId, periodeKe) {
+  if (!isUserAdmin()) {
+    showGlobalAlert('Hanya Role Admin yang dapat menghapus data Periode Arisan.', 'error');
+    return;
+  }
+  const target = (cachedPeriodeList || []).find(
+    (p) => (periodeId && String(p.id) === String(periodeId)) || Number(p.periode_ke) === Number(periodeKe)
+  );
+  const labelPeriode = target
+    ? `Periode Ke-${target.periode_ke} (${target.bulan_tahun || '-'})`
+    : `Periode Ke-${periodeKe}`;
+
+  if (!window.confirm(`Apakah Anda yakin ingin menghapus data ${labelPeriode} dari tabel adnan_Arisan?`)) {
+    return;
+  }
+
+  try {
+    if (periodeId) {
+      await fetch(`${SUPABASE_REST_URL}/${TABLES.ARISAN}?id=eq.${encodeURIComponent(periodeId)}`, {
+        method: 'DELETE',
+        headers: supabaseHeaders
+      });
+    }
+    if (periodeKe) {
+      await fetch(`${SUPABASE_REST_URL}/${TABLES.ARISAN}?periode_ke=eq.${encodeURIComponent(periodeKe)}`, {
+        method: 'DELETE',
+        headers: supabaseHeaders
+      });
+      try {
+        await fetch(`${SUPABASE_REST_URL}/${TABLES.PERIODE}?periode_ke=eq.${encodeURIComponent(periodeKe)}`, {
+          method: 'DELETE',
+          headers: supabaseHeaders
+        });
+      } catch (_) { }
+    }
+
+    await loadPeriodeAndPemenangData();
+    syncPayGroupSplitUI();
+    updateQuickStatsBar();
+    showGlobalAlert(`🗑️ Data <b>${labelPeriode}</b> berhasil dihapus dari Supabase!`, 'success');
+  } catch (err) {
+    showGlobalAlert(err.message || 'Gagal menghapus data Periode Arisan.', 'error');
+  }
+}
+
+async function deletePemenangArisan(winnerId, periodeKe) {
+  if (!isUserAdmin()) {
+    showGlobalAlert('Hanya Role Admin yang dapat menghapus data Pemenang Arisan.', 'error');
+    return;
+  }
+  if (!window.confirm(`Apakah Anda yakin ingin menghapus data Pemenang Periode Ke-${periodeKe || '-'}?`)) {
+    return;
+  }
+
+  try {
+    if (winnerId) {
+      await fetch(`${SUPABASE_REST_URL}/${TABLES.PEMENANG}?id=eq.${encodeURIComponent(winnerId)}`, {
+        method: 'DELETE',
+        headers: supabaseHeaders
+      });
+    }
+    if (periodeKe) {
+      await fetch(`${SUPABASE_REST_URL}/${TABLES.PEMENANG}?periode_ke=eq.${encodeURIComponent(periodeKe)}`, {
+        method: 'DELETE',
+        headers: supabaseHeaders
+      });
+      // Kosongkan juga kolom pemenang_nama pada adnan_Arisan bila tercatat di sana
+      const matchPer = (cachedPeriodeList || []).find((p) => Number(p.periode_ke) === Number(periodeKe));
+      if (matchPer && matchPer.id && matchPer.pemenang_nama) {
+        try {
+          await adaptiveSupabaseWrite(
+            TABLES.ARISAN,
+            { pemenang_nama: null, pemenang_id: null },
+            `?id=eq.${encodeURIComponent(matchPer.id)}`
+          );
+        } catch (_) { }
+      }
+    }
+
+    await loadPeriodeAndPemenangData();
+    updateQuickStatsBar();
+    showGlobalAlert(`🗑️ Data Pemenang <b>Periode Ke-${periodeKe}</b> berhasil dihapus!`, 'success');
+  } catch (err) {
+    showGlobalAlert(err.message || 'Gagal menghapus data Pemenang Arisan.', 'error');
+  }
+}
+
+window.deletePeriodeArisan = deletePeriodeArisan;
+window.deletePemenangArisan = deletePemenangArisan;
 
 const formPeriodeArisan = document.getElementById('formPeriodeArisan');
 if (formPeriodeArisan) {
@@ -2663,9 +3702,9 @@ if (formPeriodeArisan) {
       const periodeKe = Number(document.getElementById('perNomor').value || 1);
       const bulanTahun = document.getElementById('perBulanTahun').value.trim();
       const tanggalArisan = document.getElementById('perTanggal').value;
-      const ua = Number(document.getElementById('perIuranArisan').value || DEFAULT_SPLIT_ARISAN);
-      const uk = Number(document.getElementById('perIuranKas').value || DEFAULT_SPLIT_KAS);
-      const uko = Number(document.getElementById('perIuranKonsumsi').value || DEFAULT_SPLIT_KONSUMSI);
+      const ua = Number(document.getElementById('perIuranArisan').value || 0);
+      const uk = Number(document.getElementById('perIuranKas').value || 0);
+      const uko = Number(document.getElementById('perIuranKonsumsi').value || 0);
       const iuran = ua + uk + uko;
       const tempat = document.getElementById('perTempat').value.trim();
       const status = document.getElementById('perStatus').value;
@@ -2704,14 +3743,14 @@ if (formPeriodeArisan) {
 
       formPeriodeArisan.reset();
       document.getElementById('perIuranArisan').value = DEFAULT_SPLIT_ARISAN;
-      document.getElementById('perIuranKas').value = DEFAULT_SPLIT_KAS;
       document.getElementById('perIuranKonsumsi').value = DEFAULT_SPLIT_KONSUMSI;
+      document.getElementById('perIuranKas').value = DEFAULT_SPLIT_KAS;
       document.getElementById('perIuran').value = DEFAULT_TOTAL_IURAN;
 
       await loadPeriodeAndPemenangData();
       updateQuickStatsBar();
       showGlobalAlert(
-        `✅ Setting Periode Ke-${periodeKe} (${bulanTahun}) berhasil disimpan dengan Split Iuran: Arisan ${formatRupiah(ua)}, Kas ${formatRupiah(uk)}, Konsumsi ${formatRupiah(uko)} (Total ${formatRupiah(iuran)})!`,
+        `✅ Setting Periode Ke-${periodeKe} (${bulanTahun}) berhasil disimpan dengan Rincian: a. Arisan ${formatRupiah(ua)}, b. Konsumsi ${formatRupiah(uko)}, c. Kas ${formatRupiah(uk)} (Total ${formatRupiah(iuran)}; Dibayarkan Pemenang ${formatRupiah(ua + uko)}, Sisa ${formatRupiah(uk)} masuk Kas)!`,
         'success'
       );
     } catch (err) {
@@ -2725,23 +3764,8 @@ if (formPeriodeArisan) {
 
 // ============================================================================
 // SUB-TAB 3 DI PENGATURAN: ENTRY GROUP ARISAN (MAKS 5 ORANG TERMASUK PJ)
+// Hanya menampilkan data dari tabel adnan_GroupArisan di Supabase (tanpa data lokal/dummy)
 // ============================================================================
-function getLocalBackupGroups() {
-  try {
-    const raw = localStorage.getItem(GROUP_STORAGE_KEY);
-    const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch (_) {
-    return [];
-  }
-}
-
-function saveLocalBackupGroups(groups) {
-  try {
-    localStorage.setItem(GROUP_STORAGE_KEY, JSON.stringify(groups || []));
-  } catch (_) {}
-}
-
 function populateGroupAnggotaDropdowns() {
   const pjSelect = document.getElementById('grpPenanggungJawab');
   const memberSelectIds = ['grpAnggota2', 'grpAnggota3', 'grpAnggota4', 'grpAnggota5'];
@@ -2787,31 +3811,22 @@ function populateGroupAnggotaDropdowns() {
 async function loadGroupArisanData() {
   let remoteGroups = [];
   try {
-    const res = await fetch(`${SUPABASE_REST_URL}/${TABLES.GROUP}?select=*&order=created_at.desc`, {
+    let res = await fetch(`${SUPABASE_REST_URL}/${TABLES.GROUP}?select=*&order=created_at.desc`, {
       method: 'GET',
       headers: supabaseHeaders
     });
+    if (!res.ok) {
+      res = await fetch(`${SUPABASE_REST_URL}/${TABLES.GROUP}?select=*`, {
+        method: 'GET',
+        headers: supabaseHeaders
+      });
+    }
     if (res.ok) {
       remoteGroups = await res.json();
     }
-  } catch (_) {}
+  } catch (_) { }
 
-  const localGroups = getLocalBackupGroups();
-  const mergedMap = new Map();
-
-  (remoteGroups || []).forEach((g) => {
-    const key = String(g.kode_group || g.nama_group || g.id).toLowerCase();
-    mergedMap.set(key, g);
-  });
-  (localGroups || []).forEach((g) => {
-    const key = String(g.kode_group || g.nama_group || g.id).toLowerCase();
-    if (!mergedMap.has(key)) {
-      mergedMap.set(key, g);
-    }
-  });
-
-  cachedGroupList = Array.from(mergedMap.values());
-  saveLocalBackupGroups(cachedGroupList);
+  cachedGroupList = Array.isArray(remoteGroups) ? remoteGroups : [];
   renderGroupArisanTable();
   syncPayGroupSplitUI();
 }
@@ -2821,7 +3836,7 @@ function renderGroupArisanTable() {
   if (!tbody) return;
 
   if (!cachedGroupList || cachedGroupList.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--text-muted);">Belum ada Group Arisan terdaftar. Silakan isi form Entry Group Arisan di atas.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--text-muted);">Belum ada Group Arisan terdaftar di Supabase. Silakan isi form Entry Group Arisan di atas.</td></tr>`;
     return;
   }
 
@@ -2831,12 +3846,14 @@ function renderGroupArisanTable() {
     .map((g, idx) => {
       const members = extractGroupMembersArray(g);
       const count = members.length;
-      const totalTagihan = count * rates.total;
+      const totalTagihan = count * rates.nominal_arisan_konsumsi;
+      const totalRincianGroup = count * rates.total;
       const grpKey = g.id || g.kode_group || idx;
+      const pjDisplay = g.penanggung_jawab || g.penanggung_jawab_nama || '-';
 
       const memberBadges = members
         .map((m, i) => {
-          const isPJ = m.toLowerCase() === String(g.penanggung_jawab || '').trim().toLowerCase();
+          const isPJ = m.toLowerCase() === String(pjDisplay).trim().toLowerCase();
           return `<span class="gallery-badge" style="margin:2px; display:inline-block; ${isPJ ? 'background:#fef3c7; color:#b45309; border:1px solid #f59e0b;' : 'background:#f1f5f9; color:#334155;'}">
             ${i + 1}. ${m}${isPJ ? ' (👑 PJ)' : ''}
           </span>`;
@@ -2850,12 +3867,12 @@ function renderGroupArisanTable() {
             <strong>${g.nama_group || '-'}</strong>
             ${g.keterangan ? `<br><small style="color:#64748b;">${g.keterangan}</small>` : ''}
           </td>
-          <td><strong>👑 ${g.penanggung_jawab || '-'}</strong></td>
+          <td><strong>👑 ${pjDisplay}</strong></td>
           <td>${memberBadges}</td>
           <td><strong>${count} / 5 Orang</strong></td>
           <td>
-            <strong style="color:var(--primary);">${formatRupiah(totalTagihan)}</strong>
-            <br><small style="color:#64748b;">Arisan ${formatRupiah(count * rates.uang_arisan)} | Kas ${formatRupiah(count * rates.uang_kas)} | Konsumsi ${formatRupiah(count * rates.uang_konsumsi)}</small>
+            <strong style="color:#15803d;">Dibayarkan Pemenang: ${formatRupiah(totalTagihan)}</strong>
+            <br><small style="color:#64748b;">a. Arisan ${formatRupiah(count * rates.uang_arisan)} + b. Konsumsi ${formatRupiah(count * rates.uang_konsumsi)} + c. Kas ${formatRupiah(count * rates.uang_kas)} (Total Rincian: ${formatRupiah(totalRincianGroup)})</small>
           </td>
           <td>
             <button type="button" class="btn-secondary btn-sm" style="color:#dc2626; border-color:#fecaca;" onclick="deleteGroupArisan('${grpKey}')">
@@ -2869,6 +3886,10 @@ function renderGroupArisanTable() {
 }
 
 async function deleteGroupArisan(groupIdentifier) {
+  if (!isUserAdmin()) {
+    showGlobalAlert('Hanya Role Admin yang dapat menghapus Group Arisan.', 'error');
+    return;
+  }
   const target = (cachedGroupList || []).find(
     (g, idx) =>
       String(g.id) === String(groupIdentifier) ||
@@ -2884,14 +3905,13 @@ async function deleteGroupArisan(groupIdentifier) {
         headers: supabaseHeaders
       });
     }
-  } catch (_) {}
-
-  cachedGroupList = cachedGroupList.filter((g) => g !== target);
-  saveLocalBackupGroups(cachedGroupList);
-  renderGroupArisanTable();
-  populateAdminPesertaDropdowns();
-  syncPayGroupSplitUI();
-  showGlobalAlert(`🗑️ Group Arisan <b>${target.nama_group}</b> berhasil dihapus.`, 'success');
+    await loadGroupArisanData();
+    populateAdminPesertaDropdowns();
+    syncPayGroupSplitUI();
+    showGlobalAlert(`🗑️ Group Arisan <b>${target.nama_group}</b> berhasil dihapus dari Supabase.`, 'success');
+  } catch (err) {
+    showGlobalAlert(err.message || 'Gagal menghapus Group Arisan.', 'error');
+  }
 }
 
 window.deleteGroupArisan = deleteGroupArisan;
@@ -2900,6 +3920,10 @@ const formGroupArisan = document.getElementById('formGroupArisan');
 if (formGroupArisan) {
   formGroupArisan.addEventListener('submit', async (e) => {
     e.preventDefault();
+    if (!isUserAdmin()) {
+      showGlobalAlert('Hanya Role Admin yang dapat menambah atau mengatur Group Arisan.', 'error');
+      return;
+    }
     const btn = document.getElementById('btnSubmitGroupArisan');
     const namaGroup = document.getElementById('grpNama').value.trim();
     const pjName = document.getElementById('grpPenanggungJawab').value.trim();
@@ -2948,41 +3972,32 @@ if (formGroupArisan) {
         penanggung_jawab_id: (matchedPJ && matchedPJ.id) || null,
         penanggung_jawab_user_id: (matchedPJ && matchedPJ.user_id) || null,
         penanggung_jawab: pjName,
+        penanggung_jawab_nama: pjName,
         anggota_1: uniqueMembers[0] || pjName,
+        anggota_1_nama: uniqueMembers[0] || pjName,
         anggota_2: uniqueMembers[1] || null,
+        anggota_2_nama: uniqueMembers[1] || null,
         anggota_3: uniqueMembers[2] || null,
+        anggota_3_nama: uniqueMembers[2] || null,
         anggota_4: uniqueMembers[3] || null,
+        anggota_4_nama: uniqueMembers[3] || null,
         anggota_5: uniqueMembers[4] || null,
+        anggota_5_nama: uniqueMembers[4] || null,
         anggota_list: uniqueMembers,
         jumlah_anggota: uniqueMembers.length,
         keterangan: ket || null,
         status_aktif: true
       };
 
-      let savedRecord = null;
-      try {
-        savedRecord = await adaptiveSupabaseWrite(TABLES.GROUP, groupPayload);
-      } catch (_) {
-        // Fallback ke localStorage apabila tabel adnan_GroupArisan belum dieksekusi di SQL Editor
-        savedRecord = { ...groupPayload, id: 'local_' + Date.now() };
-      }
-
-      const finalGroup = savedRecord || { ...groupPayload, id: 'local_' + Date.now() };
-      cachedGroupList = [
-        finalGroup,
-        ...cachedGroupList.filter(
-          (g) => String(g.nama_group || '').toLowerCase() !== namaGroup.toLowerCase()
-        )
-      ];
-      saveLocalBackupGroups(cachedGroupList);
+      await adaptiveSupabaseWrite(TABLES.GROUP, groupPayload);
+      await loadGroupArisanData();
 
       formGroupArisan.reset();
-      renderGroupArisanTable();
       populateAdminPesertaDropdowns();
       syncPayGroupSplitUI();
 
       showGlobalAlert(
-        `✅ Group Arisan <b>${namaGroup}</b> (Penanggung Jawab: <b>${pjName}</b>, Total <b>${uniqueMembers.length} Orang</b>) berhasil disimpan!`,
+        `✅ Group Arisan <b>${namaGroup}</b> (Penanggung Jawab: <b>${pjName}</b>, Total <b>${uniqueMembers.length} Orang</b>) berhasil disimpan ke Supabase!`,
         'success'
       );
     } catch (err) {
@@ -3061,8 +4076,8 @@ function renderRegisteredUsersTable() {
   thead.innerHTML = `
     <tr>
       ${headerKeys
-        .map((col) => `<th>${col.replace(/_/g, ' ').toUpperCase()}</th>`)
-        .join('')}
+      .map((col) => `<th>${col.replace(/_/g, ' ').toUpperCase()}</th>`)
+      .join('')}
       ${adminFlag ? `<th style="text-align:center;">AKSI ADMIN (EDIT SEMUA & SIMPAN)</th>` : ''}
     </tr>
   `;
@@ -3214,6 +4229,13 @@ function renderRegisteredUsersTable() {
                 title="Simpan seluruh perubahan baris ini ke adnan_User"
                 onclick="saveUserPasswordAndRole(${idx})"
               >💾 Simpan</button>
+              <button
+                type="button"
+                class="btn-secondary btn-sm"
+                style="color:#dc2626; border-color:#fecaca;"
+                title="Hapus user ini dari tabel adnan_User"
+                onclick="deleteRegisteredUser(${idx})"
+              >🗑️ Hapus</button>
             </div>
           </td>
         `
@@ -3348,8 +4370,40 @@ async function saveUserPasswordAndRole(idx) {
   }
 }
 
+async function deleteRegisteredUser(idx) {
+  if (!isUserAdmin()) {
+    showGlobalAlert('Hanya Role Admin yang dapat menghapus data User.', 'error');
+    return;
+  }
+  const userRow = cachedUserList[idx];
+  if (!userRow) return;
+
+  const labelUser = userRow.user_id || userRow.username || userRow.nama_lengkap || userRow.nama || `Baris #${idx + 1}`;
+  if (!window.confirm(`Apakah Anda yakin ingin menghapus User "${labelUser}" dari tabel adnan_User?`)) {
+    return;
+  }
+
+  try {
+    const queryFilter =
+      userRow.id != null
+        ? `?id=eq.${encodeURIComponent(userRow.id)}`
+        : `?user_id=eq.${encodeURIComponent(userRow.user_id)}`;
+
+    await fetch(`${SUPABASE_REST_URL}/${TABLES.USER}${queryFilter}`, {
+      method: 'DELETE',
+      headers: supabaseHeaders
+    });
+
+    await loadRegisteredUsersData();
+    showGlobalAlert(`🗑️ Data User <b>${labelUser}</b> berhasil dihapus dari <code>adnan_User</code>!`, 'success');
+  } catch (err) {
+    showGlobalAlert(err.message || 'Gagal menghapus data User.', 'error');
+  }
+}
+
 window.unlockUserField = unlockUserField;
 window.saveUserPasswordAndRole = saveUserPasswordAndRole;
+window.deleteRegisteredUser = deleteRegisteredUser;
 
 const btnRefreshDaftarUser = document.getElementById('btnRefreshDaftarUser');
 if (btnRefreshDaftarUser) {
@@ -3377,6 +4431,18 @@ if (btnKocokUndian) {
   });
 }
 
+const winPeriodeEl = document.getElementById('winPeriode');
+if (winPeriodeEl) {
+  winPeriodeEl.addEventListener('change', () => {
+    const selectedPeriode = (cachedPeriodeList || []).find((p) => String(p.id) === String(winPeriodeEl.value));
+    const winNominalEl = document.getElementById('winNominal');
+    if (winNominalEl) {
+      const sp = getArisanSplitValues(selectedPeriode || null);
+      winNominalEl.value = sp.nominal_arisan_konsumsi || DEFAULT_DIBAYARKAN_PEMENANG;
+    }
+  });
+}
+
 const formPemenangArisan = document.getElementById('formPemenangArisan');
 if (formPemenangArisan) {
   formPemenangArisan.addEventListener('submit', async (e) => {
@@ -3401,7 +4467,8 @@ if (formPemenangArisan) {
     btn.textContent = 'Menyimpan Pemenang...';
 
     try {
-      const nominalDiterima = Number(document.getElementById('winNominal').value || 0);
+      const spWin = getArisanSplitValues(selectedPeriode);
+      const nominalDiterima = Number(document.getElementById('winNominal').value || spWin.nominal_arisan_konsumsi || DEFAULT_DIBAYARKAN_PEMENANG);
       const tanggalUndi = document.getElementById('winTanggal').value || todayISO();
       const metode = document.getElementById('winMetode').value;
       const bank = document.getElementById('winBank').value;
@@ -3550,6 +4617,1178 @@ if (btnResetSearchAnggota) {
 }
 
 // ============================================================================
+// MODUL LIVE UNDIAN ARISAN (SPIN WHEEL REAL-TIME MULTI-CLIENT + HISTORY PUTARAN)
+// ============================================================================
+const LIVE_SPIN_STORAGE_KEY = 'adnan_live_spin_state_v1';
+const LIVE_SPIN_CHANNEL_NAME = 'adnan_live_spin_channel';
+const WHEEL_PALETTE = [
+  '#0f766e',
+  '#b45309',
+  '#1d4ed8',
+  '#7e22ce',
+  '#be123c',
+  '#047857',
+  '#c2410c',
+  '#4338ca',
+  '#0369a1',
+  '#a21caf'
+];
+
+let liveSpinBroadcastChannel = null;
+try {
+  if (typeof BroadcastChannel !== 'undefined') {
+    liveSpinBroadcastChannel = new BroadcastChannel(LIVE_SPIN_CHANNEL_NAME);
+  }
+} catch (_) { }
+
+let liveSpinSupabaseRecordId = null;
+let liveSpinPollerTimer = null;
+let isWheelCurrentlySpinning = false;
+let activeSpinRafId = null;
+let currentWheelAngleRad = 0;
+let lastProcessedSpinId = 0;
+let hasInitializedSpinBoot = false;
+let checkedSpinCandidatesMap = {};
+
+let liveSpinState = {
+  spin_id: 0,
+  updated_at_ms: 0,
+  status: 'IDLE', // 'IDLE' | 'SPINNING' | 'FINISHED'
+  putaran_ke: 0,
+  periode_id: '',
+  periode_ke: 1,
+  periode_label: '-',
+  nominal_diterima: 0,
+  candidates: [],
+  winner_id: '',
+  winner_user_id: '',
+  winner_name: '',
+  target_angle: 0,
+  duration_ms: 6500,
+  started_at: 0,
+  triggered_by: 'Admin',
+  official_history_id: null,
+  history: []
+};
+
+function getEligibleWheelMembers() {
+  const includeWonEl = document.getElementById('chkIncludeAlreadyWon');
+  const includeWon = includeWonEl ? includeWonEl.checked : false;
+
+  return (cachedAnggotaList || []).filter((a) => {
+    const uid = String(a.user_id || '').trim().toLowerCase();
+    const nama = String(a.nama_lengkap || '').trim();
+    if (!nama) return false;
+    if (uid === 'admin' && nama.toLowerCase().includes('admin arisan')) return false;
+    if (!includeWon && a.sudah_menang === true) return false;
+    return true;
+  });
+}
+
+function getActiveWheelCandidateNames() {
+  if (!isUserAdmin() && Array.isArray(liveSpinState.candidates) && liveSpinState.candidates.length > 0) {
+    return liveSpinState.candidates;
+  }
+  const eligible = getEligibleWheelMembers();
+  const selected = eligible
+    .map((a) => String(a.nama_lengkap || '').trim())
+    .filter((nama) => checkedSpinCandidatesMap[nama] !== false);
+
+  if (selected.length > 0) return selected;
+  if (Array.isArray(liveSpinState.candidates) && liveSpinState.candidates.length > 0) {
+    return liveSpinState.candidates;
+  }
+  return eligible.map((a) => String(a.nama_lengkap || '').trim());
+}
+
+function findAnggotaByNameOrId(nameOrId, userId) {
+  const targetName = String(nameOrId || '').trim().toLowerCase();
+  const targetUid = String(userId || '').trim().toLowerCase();
+  return (
+    (cachedAnggotaList || []).find((a) => {
+      if (String(a.id || '') === String(nameOrId || '')) return true;
+      if (targetUid && String(a.user_id || '').trim().toLowerCase() === targetUid) return true;
+      if (targetName && String(a.nama_lengkap || '').trim().toLowerCase() === targetName) return true;
+      return false;
+    }) || null
+  );
+}
+
+function formatSpinTimestamp(dateObj = new Date()) {
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+  const d = String(dateObj.getDate()).padStart(2, '0');
+  const m = months[dateObj.getMonth()];
+  const y = dateObj.getFullYear();
+  const hh = String(dateObj.getHours()).padStart(2, '0');
+  const mm = String(dateObj.getMinutes()).padStart(2, '0');
+  const ss = String(dateObj.getSeconds()).padStart(2, '0');
+  return `${d} ${m} ${y}, ${hh}:${mm}:${ss}`;
+}
+
+function populateLiveSpinPeriodeDropdown() {
+  const selectEl = document.getElementById('liveSpinPeriodeSelect');
+  const nominalEl = document.getElementById('liveSpinNominalInput');
+  if (!selectEl) return;
+
+  const list = cachedPeriodeList || [];
+  if (list.length === 0) {
+    selectEl.innerHTML = `<option value="">-- Belum Ada Data Periode di Supabase --</option>`;
+    if (nominalEl) nominalEl.value = '';
+    return;
+  }
+
+  const prevVal = selectEl.value;
+  selectEl.innerHTML = list
+    .map((p) => {
+      const sp = getArisanSplitValues(p);
+      const nom = Number(p.total_dana_arisan || p.total_diterima || sp.nominal_arisan_konsumsi || 0);
+      return `<option value="${p.id}" data-periode-ke="${p.periode_ke}" data-nominal="${nom}">Periode #${p.periode_ke}${p.bulan_tahun ? ' - ' + p.bulan_tahun : ''} (${p.status || 'aktif'})</option>`;
+    })
+    .join('');
+
+  if (prevVal && list.some((p) => String(p.id) === String(prevVal))) {
+    selectEl.value = prevVal;
+  } else {
+    const activeP = list.find((p) => p.status === 'aktif') || list[0];
+    if (activeP) selectEl.value = activeP.id;
+  }
+
+  const chosen = list.find((p) => String(p.id) === String(selectEl.value)) || list[0];
+  if (chosen && nominalEl) {
+    const sp = getArisanSplitValues(chosen);
+    const calcPot = Number(chosen.total_dana_arisan || chosen.total_diterima || sp.nominal_arisan_konsumsi || 0);
+    nominalEl.value = calcPot > 0 ? calcPot : '';
+  }
+}
+
+function renderLiveSpinCandidateChecklist() {
+  const container = document.getElementById('liveSpinCandidateList');
+  const countEl = document.getElementById('liveCandidateCountText');
+  const chkAll = document.getElementById('chkAllSpinCandidates');
+  if (!container) return;
+
+  const eligible = getEligibleWheelMembers();
+  if (Object.keys(checkedSpinCandidatesMap).length === 0) {
+    eligible.forEach((a) => {
+      checkedSpinCandidatesMap[a.nama_lengkap] = true;
+    });
+  }
+
+  const activeNames = eligible
+    .map((a) => a.nama_lengkap)
+    .filter((nama) => checkedSpinCandidatesMap[nama] !== false);
+
+  if (countEl) countEl.textContent = activeNames.length;
+  if (chkAll) {
+    chkAll.checked = eligible.length > 0 && activeNames.length === eligible.length;
+  }
+
+  if (eligible.length === 0) {
+    container.innerHTML = `<div style="grid-column:1/-1; text-align:center; color:var(--text-muted); padding:14px;">Tidak ada kandidat yang belum menang. Centang "Sertakan yang Sudah Menang" untuk menampilkan semua anggota.</div>`;
+    drawArisanWheel(currentWheelAngleRad, []);
+    return;
+  }
+
+  container.innerHTML = eligible
+    .map((a) => {
+      const nama = a.nama_lengkap;
+      const isChecked = checkedSpinCandidatesMap[nama] !== false;
+      const wonBadge = a.sudah_menang
+        ? `<small style="color:#d97706; font-weight:700;">(Sudah Menang #${a.periode_menang_ke || ''})</small>`
+        : '';
+      return `
+        <label class="candidate-check-item">
+          <input type="checkbox" class="chk-spin-candidate-item" data-candidate-name="${nama}" ${isChecked ? 'checked' : ''} />
+          <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${nama}">
+            ${nama} ${wonBadge}
+          </span>
+        </label>
+      `;
+    })
+    .join('');
+
+  container.querySelectorAll('.chk-spin-candidate-item').forEach((cb) => {
+    cb.addEventListener('change', () => {
+      const cName = cb.getAttribute('data-candidate-name');
+      checkedSpinCandidatesMap[cName] = cb.checked;
+      renderLiveSpinCandidateChecklist();
+    });
+  });
+
+  if (!isWheelCurrentlySpinning) {
+    if (isUserAdmin() || !Array.isArray(liveSpinState.candidates) || liveSpinState.candidates.length === 0) {
+      liveSpinState.candidates = activeNames;
+    }
+    drawArisanWheel(currentWheelAngleRad, liveSpinState.candidates);
+  }
+}
+
+function drawArisanWheel(angleRad = 0, candidatesInput = null) {
+  const canvas = document.getElementById('arisanWheelCanvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const width = canvas.width;
+  const height = canvas.height;
+  const cx = width / 2;
+  const cy = height / 2;
+  const radius = Math.min(cx, cy) - 10;
+
+  const candidates =
+    Array.isArray(candidatesInput) && candidatesInput.length > 0
+      ? candidatesInput
+      : getActiveWheelCandidateNames();
+
+  ctx.clearRect(0, 0, width, height);
+
+  if (!candidates || candidates.length === 0) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    ctx.fillStyle = '#1e293b';
+    ctx.fill();
+    ctx.fillStyle = '#cbd5e1';
+    ctx.font = 'bold 16px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('Pilih Kandidat Peserta Undian', cx, cy - 45);
+    ctx.restore();
+    return;
+  }
+
+  const count = candidates.length;
+  const sliceAngle = (Math.PI * 2) / count;
+
+  for (let i = 0; i < count; i++) {
+    const startAngle = angleRad + i * sliceAngle;
+    const endAngle = startAngle + sliceAngle;
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.arc(cx, cy, radius, startAngle, endAngle);
+    ctx.closePath();
+
+    ctx.fillStyle = WHEEL_PALETTE[i % WHEEL_PALETTE.length];
+    ctx.fill();
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+    ctx.stroke();
+
+    // Tulis nama peserta pada potongan juring roda
+    ctx.translate(cx, cy);
+    ctx.rotate(startAngle + sliceAngle / 2);
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#ffffff';
+    const fontSize = count > 18 ? 11 : count > 12 ? 12.5 : 14;
+    ctx.font = `700 ${fontSize}px Inter, sans-serif`;
+
+    const rawName = String(candidates[i] || '');
+    const shortName = rawName.length > 20 ? rawName.slice(0, 19) + '…' : rawName;
+    ctx.shadowColor = 'rgba(0,0,0,0.45)';
+    ctx.shadowBlur = 3;
+    ctx.fillText(shortName, radius - 18, 0);
+    ctx.restore();
+  }
+
+  // Lingkaran luar dekoratif emas
+  ctx.save();
+  ctx.beginPath();
+  ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+  ctx.lineWidth = 5;
+  ctx.strokeStyle = '#fbbf24';
+  ctx.stroke();
+  ctx.restore();
+}
+
+function getSliceIndexAtTopPointer(angleRad, count) {
+  if (!count || count <= 0) return 0;
+  const sliceAngle = (Math.PI * 2) / count;
+  const pointerAngle = -Math.PI / 2; // Posisi jarum di puncak atas (jam 12)
+  let relative = (pointerAngle - angleRad) % (Math.PI * 2);
+  if (relative < 0) relative += Math.PI * 2;
+  return Math.floor(relative / sliceAngle) % count;
+}
+
+function updateSpinSpotlightUI(state) {
+  const badgeText = document.getElementById('liveSpinStatusText');
+  const titleEl = document.getElementById('liveSpinPeriodeTitle');
+  const avatarEl = document.getElementById('spinSpotlightAvatar');
+  const labelEl = document.getElementById('spinSpotlightLabel');
+  const nameEl = document.getElementById('spinSpotlightName');
+  const metaEl = document.getElementById('spinSpotlightMeta');
+  const centerHub = document.getElementById('wheelCenterHub');
+
+  if (!state) return;
+
+  if (titleEl && state.periode_label) {
+    titleEl.textContent = `Undian Pemenang Arisan • ${state.periode_label}`;
+  }
+
+  // Cek apakah sudah ada history yang disahkan sebagai pemenang resmi
+  const officialEntry = (state.history || []).find((h) => h.is_official === true);
+
+  if (isWheelCurrentlySpinning) {
+    if (badgeText) {
+      badgeText.textContent = `🔴 LIVE SPIN BERJALAN • Putaran Ke-${state.putaran_ke || 1} Sedang Berputar...`;
+    }
+    if (labelEl) labelEl.textContent = `🎡 MENGUNDI PUTARAN KE-${state.putaran_ke || 1}...`;
+    return;
+  }
+
+  if (officialEntry) {
+    const member = findAnggotaByNameOrId(officialEntry.winner_name, officialEntry.winner_user_id);
+    const photoUrl = member && (member.foto_url || member.foto);
+    if (badgeText) {
+      badgeText.textContent = `🏆 PEMENANG RESMI DISAHKAN • Putaran Ke-${officialEntry.putaran_ke} (${officialEntry.winner_name})`;
+    }
+    if (labelEl) {
+      labelEl.textContent = `🏆 PEMENANG RESMI TERPILIH (DARI HISTORY PUTARAN KE-${officialEntry.putaran_ke})`;
+    }
+    if (nameEl) nameEl.textContent = officialEntry.winner_name;
+    if (metaEl) {
+      metaEl.innerHTML = `${officialEntry.periode_label || 'Periode Aktif'} • Dana Diterima: <strong>${formatRupiah(officialEntry.nominal_diterima || state.nominal_diterima || 0)}</strong> • Disahkan oleh ${officialEntry.disahkan_oleh || 'Admin'}`;
+    }
+    if (avatarEl) {
+      avatarEl.innerHTML = photoUrl ? `<img src="${photoUrl}" alt="${officialEntry.winner_name}" />` : '🏆';
+    }
+    if (centerHub) {
+      centerHub.innerHTML = photoUrl ? `<img src="${photoUrl}" alt="${officialEntry.winner_name}" />` : '🏆';
+    }
+    return;
+  }
+
+  if (state.winner_name && state.putaran_ke > 0) {
+    const member = findAnggotaByNameOrId(state.winner_name, state.winner_user_id);
+    const photoUrl = member && (member.foto_url || member.foto);
+    if (badgeText) {
+      badgeText.textContent = `🟢 HASIL PUTARAN KE-${state.putaran_ke}: ${state.winner_name} (Menunggu Pengesahan Admin)`;
+    }
+    if (labelEl) {
+      labelEl.textContent = `🎯 TERPILIH PADA PUTARAN KE-${state.putaran_ke}`;
+    }
+    if (nameEl) nameEl.textContent = state.winner_name;
+    if (metaEl) {
+      metaEl.innerHTML = `Tercatat di History Putaran #${state.putaran_ke} • Nominal: <strong>${formatRupiah(state.nominal_diterima || 0)}</strong>. Admin dapat memutar lagi atau memilih putaran ini sebagai Pemenang Resmi.`;
+    }
+    if (avatarEl) {
+      avatarEl.innerHTML = photoUrl ? `<img src="${photoUrl}" alt="${state.winner_name}" />` : '🎉';
+    }
+    if (centerHub) {
+      centerHub.innerHTML = photoUrl ? `<img src="${photoUrl}" alt="${state.winner_name}" />` : '🎡';
+    }
+  } else {
+    if (badgeText) badgeText.textContent = '🟢 LIVE SYNC AKTIF • Menunggu Putaran Undian Admin';
+    if (labelEl) labelEl.textContent = 'HASIL PUTARAN UNDIAN';
+    if (nameEl) nameEl.textContent = 'Belum Ada Putaran';
+    if (metaEl) {
+      metaEl.textContent = 'Setiap hasil putaran ke-1, ke-2, dst. akan tercatat di Tabel History di bawah.';
+    }
+    if (avatarEl) avatarEl.innerHTML = '🎯';
+    if (centerHub) centerHub.innerHTML = '🎡';
+  }
+}
+
+function renderSpinHistoryTable() {
+  const tbody = document.getElementById('tableBodySpinHistory');
+  const badge = document.getElementById('spinHistoryCountBadge');
+  const thAction = document.getElementById('thActionSpinHistory');
+  if (!tbody) return;
+
+  const adminFlag = isUserAdmin();
+  if (thAction) {
+    thAction.textContent = adminFlag ? 'Aksi Pengesahan (Admin)' : 'Keterangan Pengesahan';
+  }
+
+  const historyList = Array.isArray(liveSpinState.history) ? liveSpinState.history : [];
+  if (badge) {
+    badge.textContent = `${historyList.length} Putaran Tercatat`;
+  }
+
+  if (historyList.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="7" style="text-align:center; color:var(--text-muted); padding:20px;">
+          Belum ada history putaran undian. Setiap kali roda diputar (Putaran Ke-1, Ke-2, dst.), hasilnya akan tampil di sini.
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  // Tampilkan berurutan dari Putaran terbaru di atas atau Putaran #1..#N
+  tbody.innerHTML = historyList
+    .map((item, idx) => {
+      const member = findAnggotaByNameOrId(item.winner_name, item.winner_user_id);
+      const photoUrl = member && (member.foto_url || member.foto);
+      const initials = String(item.winner_name || 'KA')
+        .split(' ')
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((p) => p[0].toUpperCase())
+        .join('');
+
+      const mediaKey = `spin_hist_photo_${item.history_id || idx}`;
+      if (photoUrl) {
+        registerMediaPreview(mediaKey, `Foto Terpilih Putaran Ke-${item.putaran_ke} - ${item.winner_name}`, photoUrl);
+      }
+
+      const avatarHtml = photoUrl
+        ? `<img src="${photoUrl}" alt="${item.winner_name}" onclick="openMediaByKey('${mediaKey}')" style="width:40px; height:40px; border-radius:50%; object-fit:cover; border:2px solid var(--primary); cursor:pointer; flex-shrink:0;" />`
+        : `<div style="width:40px; height:40px; border-radius:50%; background:var(--primary); color:#fff; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:0.82rem; flex-shrink:0;">${initials}</div>`;
+
+      const isOfficial = item.is_official === true;
+      const rowBg = isOfficial ? 'background:#f0fdf4;' : '';
+
+      const statusBadge = isOfficial
+        ? `<span class="status-pill complete" style="background:#16a34a; color:#ffffff; font-weight:800;">🏆 PEMENANG RESMI DISAHKAN</span>`
+        : `<span class="status-pill incomplete" style="background:#fef3c7; color:#b45309;">🎯 Hasil Putaran Ke-${item.putaran_ke}</span>`;
+
+      let actionHtml = '';
+      if (adminFlag) {
+        if (isOfficial) {
+          actionHtml = `
+            <span style="color:#15803d; font-weight:800; font-size:0.82rem;">
+              ✅ Terpilih Jadi Pemenang Resmi
+            </span>
+          `;
+        } else {
+          actionHtml = `
+            <button type="button" class="btn-primary btn-sm" onclick="selectSpinHistoryAsOfficialWinner('${item.history_id}')">
+              🏆 Pilih & Tetapkan Jadi Pemenang
+            </button>
+          `;
+        }
+      } else {
+        actionHtml = isOfficial
+          ? `<span style="color:#15803d; font-weight:700; font-size:0.82rem;">✅ Disahkan oleh ${item.disahkan_oleh || 'Admin'}</span>`
+          : `<span style="color:var(--text-muted); font-size:0.8rem;">Kandidat History Putaran #${item.putaran_ke}</span>`;
+      }
+
+      return `
+        <tr style="${rowBg}">
+          <td>
+            <span class="gallery-badge" style="background:${isOfficial ? '#16a34a' : 'var(--primary-light)'}; color:${isOfficial ? '#ffffff' : 'var(--primary)'}; font-size:0.82rem; font-weight:800;">
+              Putaran #${item.putaran_ke}
+            </span>
+          </td>
+          <td style="font-size:0.82rem; color:var(--text-secondary);">${item.waktu || '-'}</td>
+          <td><strong>${item.periode_label || 'Periode #' + (item.periode_ke || 1)}</strong></td>
+          <td>
+            <div style="display:flex; align-items:center; gap:10px;">
+              ${avatarHtml}
+              <div>
+                <strong style="font-size:0.94rem; color:var(--text-main);">${item.winner_name || '-'}</strong>
+                ${isOfficial ? `<div style="font-size:0.74rem; color:#15803d; font-weight:700;">⭐ Pemenang Arisan Sah</div>` : ''}
+              </div>
+            </div>
+          </td>
+          <td><strong style="color:var(--primary);">${formatRupiah(item.nominal_diterima || 0)}</strong></td>
+          <td>${statusBadge}</td>
+          <td>${actionHtml}</td>
+        </tr>
+      `;
+    })
+    .join('');
+}
+
+function animateWheelSpinToState(stateObj) {
+  const candidates =
+    stateObj && Array.isArray(stateObj.candidates) && stateObj.candidates.length > 0
+      ? stateObj.candidates
+      : getActiveWheelCandidateNames();
+
+  if (!candidates || candidates.length === 0) return;
+
+  if (activeSpinRafId) {
+    cancelAnimationFrame(activeSpinRafId);
+    activeSpinRafId = null;
+  }
+
+  isWheelCurrentlySpinning = true;
+  const btnSpin = document.getElementById('btnTriggerLiveSpin');
+  const btnSpinText = document.getElementById('btnTriggerLiveSpinText');
+  if (btnSpin) btnSpin.disabled = true;
+  if (btnSpinText) {
+    btnSpinText.textContent = `🎡 SEDANG MEMUTAR PUTARAN KE-${stateObj.putaran_ke || 1}...`;
+  }
+
+  updateSpinSpotlightUI(stateObj);
+
+  const startAngle = currentWheelAngleRad % (Math.PI * 2);
+  let targetAngle = Number(stateObj.target_angle || Math.PI * 16);
+  if (targetAngle <= startAngle + Math.PI * 6) {
+    targetAngle += Math.PI * 16;
+  }
+  const duration = Number(stateObj.duration_ms || 6500);
+  let startTime = null;
+
+  const nameEl = document.getElementById('spinSpotlightName');
+  const metaEl = document.getElementById('spinSpotlightMeta');
+
+  function stepFrame(now) {
+    // Jika tab client sempat berada di background saat sinyal masuk, mulai hitungan animasi saat tab terlihat
+    if (document.hidden) {
+      activeSpinRafId = requestAnimationFrame(stepFrame);
+      return;
+    }
+
+    if (startTime === null) {
+      startTime = now;
+    }
+
+    const elapsed = Math.max(0, now - startTime);
+    const progress = Math.min(1, elapsed / duration);
+    // Cubic ease-out agar putaran melambat secara dramatis dan halus
+    const eased = 1 - Math.pow(1 - progress, 3);
+    const angle = startAngle + (targetAngle - startAngle) * eased;
+
+    currentWheelAngleRad = angle;
+    drawArisanWheel(angle, candidates);
+
+    const currentSliceIdx = getSliceIndexAtTopPointer(angle, candidates.length);
+    const passingName = candidates[currentSliceIdx] || '';
+    if (nameEl && progress < 0.99) {
+      nameEl.textContent = passingName;
+    }
+    if (metaEl && progress < 0.99) {
+      metaEl.textContent = `Roda sedang berputar serentak di seluruh layar client (${Math.round(progress * 100)}%)...`;
+    }
+
+    if (progress < 1) {
+      activeSpinRafId = requestAnimationFrame(stepFrame);
+    } else {
+      activeSpinRafId = null;
+      currentWheelAngleRad = targetAngle % (Math.PI * 2);
+      isWheelCurrentlySpinning = false;
+      liveSpinState.status = 'FINISHED';
+      if (btnSpin) btnSpin.disabled = false;
+      if (btnSpinText) {
+        btnSpinText.textContent = `🎡 PUTAR RODA UNDIAN LAGI (PUTARAN KE-${(liveSpinState.history.length || 0) + 1})`;
+      }
+      updateSpinSpotlightUI(liveSpinState);
+      renderSpinHistoryTable();
+      showGlobalAlert(
+        `🎉 <b>Hasil Putaran Ke-${stateObj.putaran_ke}:</b> Jarum berhenti pada <b>${stateObj.winner_name}</b>! Tercatat di Tabel History Putaran.`,
+        'success'
+      );
+    }
+  }
+
+  activeSpinRafId = requestAnimationFrame(stepFrame);
+}
+
+function encodeSpinStateMetaTag(stateObj) {
+  try {
+    return `[LIVESPINSTATE:${encodeURIComponent(JSON.stringify(stateObj))}]`;
+  } catch (_) {
+    return '';
+  }
+}
+
+function extractSpinStateFromText(rawText) {
+  if (!rawText) return null;
+  const str = String(rawText);
+  const tagMatch = str.match(/\[LIVESPINSTATE:([^\]]+)\]/);
+  if (tagMatch && tagMatch[1]) {
+    try {
+      return JSON.parse(decodeURIComponent(tagMatch[1]));
+    } catch (_) { }
+  }
+  if (str.trim().startsWith('{') && str.includes('"spin_id"')) {
+    try {
+      return JSON.parse(str.trim());
+    } catch (_) { }
+  }
+  return null;
+}
+
+async function broadcastLiveSpinStateToAllClients(newState) {
+  const stampedState = {
+    ...newState,
+    updated_at_ms: Date.now()
+  };
+  liveSpinState = stampedState;
+
+  // 1. Kanal Lokal Instan (Antar-Tab / Jendela pada Browser yang Sama)
+  try {
+    localStorage.setItem(LIVE_SPIN_STORAGE_KEY, JSON.stringify(stampedState));
+  } catch (_) { }
+
+  if (liveSpinBroadcastChannel) {
+    try {
+      liveSpinBroadcastChannel.postMessage(stampedState);
+    } catch (_) { }
+  }
+
+  const jsonStr = JSON.stringify(stampedState);
+  const metaTag = encodeSpinStateMetaTag(stampedState);
+
+  // 2. Kanal Supabase Utama #1: Simpan pada tabel adnan_Arisan (kolom keterangan periode aktif)
+  // Tabel adnan_Arisan pasti ada, memiliki kolom keterangan, dan dibaca oleh seluruh client!
+  const writeArisanPromise = (async () => {
+    try {
+      let targetPeriode =
+        (cachedPeriodeList || []).find((p) => String(p.id) === String(stampedState.periode_id)) ||
+        (cachedPeriodeList || []).find((p) => p.status === 'aktif') ||
+        (cachedPeriodeList || [])[0] ||
+        null;
+
+      if (!targetPeriode) {
+        const resP = await fetch(`${SUPABASE_REST_URL}/${TABLES.ARISAN}?select=*&limit=1`, {
+          method: 'GET',
+          headers: supabaseHeaders,
+          cache: 'no-store'
+        });
+        if (resP.ok) {
+          const rowsP = await resP.json();
+          if (rowsP && rowsP.length > 0) targetPeriode = rowsP[0];
+        }
+      }
+
+      if (targetPeriode && targetPeriode.id != null) {
+        const cleanExistingKet = String(targetPeriode.keterangan || '')
+          .replace(/\s*\[LIVESPINSTATE:[^\]]*\]\s*/g, '')
+          .trim();
+        const combinedKet = [cleanExistingKet, metaTag].filter(Boolean).join(' ');
+        await adaptiveSupabaseWrite(
+          TABLES.ARISAN,
+          { keterangan: combinedKet },
+          `?id=eq.${encodeURIComponent(targetPeriode.id)}`
+        );
+      }
+    } catch (_) { }
+  })();
+
+  // 3. Kanal Supabase Cadangan #2: Simpan pada tabel adnan_Pengumuman menggunakan select=* (tanpa kolom spesifik yang rawan error 400)
+  const writePengumumanPromise = (async () => {
+    try {
+      if (!liveSpinSupabaseRecordId) {
+        const checkRes = await fetch(`${SUPABASE_REST_URL}/${TABLES.PENGUMUMAN}?select=*`, {
+          method: 'GET',
+          headers: supabaseHeaders,
+          cache: 'no-store'
+        });
+        if (checkRes.ok) {
+          const allRows = await checkRes.json();
+          const foundRow = (allRows || []).find(
+            (r) =>
+              String(r.judul || '') === '__LIVE_SPIN_STATE__' ||
+              String(r.kategori || '') === 'LIVE_SPIN_STATE'
+          );
+          if (foundRow && foundRow.id != null) {
+            liveSpinSupabaseRecordId = foundRow.id;
+          }
+        }
+      }
+
+      const payload = {
+        judul: '__LIVE_SPIN_STATE__',
+        kategori: 'LIVE_SPIN_STATE',
+        isi: jsonStr,
+        isi_pengumuman: jsonStr,
+        tanggal_pengumuman: todayISO(),
+        dibuat_oleh: currentLoggedUser ? currentLoggedUser.nama_lengkap || currentLoggedUser.user_id : 'Admin',
+        status_aktif: true
+      };
+
+      if (liveSpinSupabaseRecordId) {
+        await adaptiveSupabaseWrite(
+          TABLES.PENGUMUMAN,
+          payload,
+          `?id=eq.${encodeURIComponent(liveSpinSupabaseRecordId)}`
+        );
+      } else {
+        const created = await adaptiveSupabaseWrite(TABLES.PENGUMUMAN, payload);
+        if (created && created.id != null) {
+          liveSpinSupabaseRecordId = created.id;
+        }
+      }
+    } catch (_) { }
+  })();
+
+  await Promise.all([writeArisanPromise, writePengumumanPromise]);
+}
+
+function applyIncomingSpinState(remoteState, isInitialBoot = false) {
+  if (!remoteState || typeof remoteState !== 'object') return;
+
+  const incomingSpinId = Number(remoteState.spin_id || 0);
+  const incomingUpdatedMs = Number(remoteState.updated_at_ms || incomingSpinId || 0);
+  const currentUpdatedMs = Number(liveSpinState.updated_at_ms || liveSpinState.spin_id || 0);
+
+  // Abaikan jika state yang masuk lebih lama dari state yang sudah aktif di layar
+  if (incomingSpinId < lastProcessedSpinId && incomingUpdatedMs < currentUpdatedMs) {
+    return;
+  }
+
+  const incomingHistory = Array.isArray(remoteState.history) ? remoteState.history : [];
+  const currentHistory = Array.isArray(liveSpinState.history) ? liveSpinState.history : [];
+  const historyChanged = incomingHistory.length !== currentHistory.length;
+  const officialChanged = remoteState.official_history_id !== liveSpinState.official_history_id;
+
+  liveSpinState = {
+    ...liveSpinState,
+    ...remoteState,
+    history: incomingHistory
+  };
+
+  const ageMs = Date.now() - Number(remoteState.started_at || incomingSpinId || 0);
+
+  // Saat baru pertama kali memuat halaman, jangan memutar ulang undian lama yang sudah lewat > 25 detik
+  if (isInitialBoot && (remoteState.status !== 'SPINNING' || ageMs > 25000)) {
+    lastProcessedSpinId = incomingSpinId;
+    currentWheelAngleRad = Number(remoteState.target_angle || 0) % (Math.PI * 2);
+    drawArisanWheel(currentWheelAngleRad, liveSpinState.candidates);
+    updateSpinSpotlightUI(liveSpinState);
+    renderSpinHistoryTable();
+    return;
+  }
+
+  // JIKA ADA PUTARAN BARU DARI ADMIN (spin_id baru): PUTAR RODA DI LAYAR CLIENT SEKARANG!
+  if (incomingSpinId > 0 && incomingSpinId !== lastProcessedSpinId) {
+    lastProcessedSpinId = incomingSpinId;
+
+    // Jika statusnya IDLE (misal Admin menekan tombol Reset History Putaran)
+    if (remoteState.status === 'IDLE' && incomingHistory.length === 0) {
+      if (activeSpinRafId) {
+        cancelAnimationFrame(activeSpinRafId);
+        activeSpinRafId = null;
+      }
+      isWheelCurrentlySpinning = false;
+      currentWheelAngleRad = 0;
+      drawArisanWheel(0, liveSpinState.candidates);
+      updateSpinSpotlightUI(liveSpinState);
+      renderSpinHistoryTable();
+      return;
+    }
+
+    // Jika putaran baru saja dipicu oleh Admin (dalam rentang 90 detik terakhir), jalankan animasi putaran roda!
+    if (ageMs < 90000) {
+      const liveSection = document.getElementById('viewLiveUndian');
+      if (liveSection && !liveSection.classList.contains('active') && currentBiodataRecord) {
+        switchMainView('viewLiveUndian');
+      }
+      animateWheelSpinToState(liveSpinState);
+      return;
+    } else {
+      currentWheelAngleRad = Number(remoteState.target_angle || 0) % (Math.PI * 2);
+    }
+  }
+
+  if (!isWheelCurrentlySpinning) {
+    drawArisanWheel(currentWheelAngleRad, liveSpinState.candidates);
+    updateSpinSpotlightUI(liveSpinState);
+    if (historyChanged || officialChanged) {
+      renderSpinHistoryTable();
+    }
+  }
+}
+
+async function pollLiveSpinStateFromSupabase(isInitialBoot = false) {
+  if (!currentLoggedUser) return;
+
+  const candidatesStates = [];
+
+  // 1. Cek dari tabel adnan_Arisan (kolom keterangan) dengan cache: 'no-store'
+  try {
+    const resArisan = await fetch(`${SUPABASE_REST_URL}/${TABLES.ARISAN}?select=*`, {
+      method: 'GET',
+      headers: supabaseHeaders,
+      cache: 'no-store'
+    });
+    if (resArisan.ok) {
+      const rowsArisan = await resArisan.json();
+      (rowsArisan || []).forEach((r) => {
+        const parsed = extractSpinStateFromText(r.keterangan);
+        if (parsed && parsed.spin_id) {
+          candidatesStates.push(parsed);
+        }
+      });
+    }
+  } catch (_) { }
+
+  // 2. Cek dari tabel adnan_Pengumuman dengan select=* dan cache: 'no-store'
+  try {
+    const resAnn = await fetch(`${SUPABASE_REST_URL}/${TABLES.PENGUMUMAN}?select=*`, {
+      method: 'GET',
+      headers: supabaseHeaders,
+      cache: 'no-store'
+    });
+    if (resAnn.ok) {
+      const rowsAnn = await resAnn.json();
+      (rowsAnn || []).forEach((r) => {
+        if (
+          String(r.judul || '') === '__LIVE_SPIN_STATE__' ||
+          String(r.kategori || '') === 'LIVE_SPIN_STATE'
+        ) {
+          if (r.id != null) liveSpinSupabaseRecordId = r.id;
+          const rawText = r.isi_pengumuman || r.isi || r.deskripsi || r.keterangan || '';
+          const parsed = extractSpinStateFromText(rawText);
+          if (parsed && parsed.spin_id) {
+            candidatesStates.push(parsed);
+          }
+        }
+      });
+    }
+  } catch (_) { }
+
+  if (candidatesStates.length === 0) {
+    try {
+      localStorage.removeItem(LIVE_SPIN_STORAGE_KEY);
+    } catch (_) { }
+    return;
+  }
+
+  // Pilih state terbaru berdasarkan updated_at_ms / spin_id tertinggi
+  candidatesStates.sort((a, b) => {
+    const timeB = Number(b.updated_at_ms || b.spin_id || 0);
+    const timeA = Number(a.updated_at_ms || a.spin_id || 0);
+    return timeB - timeA;
+  });
+
+  const newestState = candidatesStates[0];
+  applyIncomingSpinState(newestState, isInitialBoot);
+}
+
+function startLiveSpinPoller() {
+  if (liveSpinPollerTimer) clearInterval(liveSpinPollerTimer);
+  liveSpinPollerTimer = setInterval(() => {
+    pollLiveSpinStateFromSupabase(false);
+  }, 1200);
+}
+
+async function triggerAdminLiveSpin() {
+  if (!isUserAdmin()) {
+    showGlobalAlert('Hanya User Admin yang dapat menekan tombol Putar Roda Undian.', 'error');
+    return;
+  }
+  if (isWheelCurrentlySpinning) return;
+
+  const candidates = getActiveWheelCandidateNames();
+  if (!candidates || candidates.length < 2) {
+    showGlobalAlert('Pilih minimal 2 kandidat peserta pada daftar kandidat roda undian.', 'error');
+    return;
+  }
+
+  const periodeSelect = document.getElementById('liveSpinPeriodeSelect');
+  const nominalInput = document.getElementById('liveSpinNominalInput');
+  const selectedPeriodeId = periodeSelect ? periodeSelect.value : '';
+  const selectedPeriodeObj =
+    (cachedPeriodeList || []).find((p) => String(p.id) === String(selectedPeriodeId)) ||
+    cachedPeriodeList[0] ||
+    null;
+
+  const periodeKe = selectedPeriodeObj ? Number(selectedPeriodeObj.periode_ke || 1) : 1;
+  const periodeLabel = selectedPeriodeObj
+    ? `Periode #${selectedPeriodeObj.periode_ke} (${selectedPeriodeObj.bulan_tahun})`
+    : '-';
+  const spChosen = getArisanSplitValues(selectedPeriodeObj);
+  const nominalDiterima = Number((nominalInput && nominalInput.value) || spChosen.nominal_arisan_konsumsi || 0);
+
+  // Pilih pemenang acak menggunakan crypto.getRandomValues agar adil & acak murni
+  let randomIdx = Math.floor(Math.random() * candidates.length);
+  if (window.crypto && window.crypto.getRandomValues) {
+    const arr = new Uint32Array(1);
+    window.crypto.getRandomValues(arr);
+    randomIdx = arr[0] % candidates.length;
+  }
+
+  const winnerName = candidates[randomIdx];
+  const winnerMember = findAnggotaByNameOrId(winnerName, null);
+
+  // Hitung sudut berhenti (target_angle) agar juring `randomIdx` berhenti tepat di bawah jarum atas (-PI/2)
+  const sliceAngle = (Math.PI * 2) / candidates.length;
+  const jitterWithinSlice = (0.25 + Math.random() * 0.5) * sliceAngle;
+  const baseStopAngle = -Math.PI / 2 - (randomIdx * sliceAngle + jitterWithinSlice);
+  const extraFullRotations = (8 + Math.floor(Math.random() * 3)) * Math.PI * 2;
+  const targetAngle = baseStopAngle + extraFullRotations;
+
+  const existingHistory = Array.isArray(liveSpinState.history) ? [...liveSpinState.history] : [];
+  const nextPutaranKe = existingHistory.length + 1;
+  const spinTimestamp = Date.now();
+  const historyId = `spin_${spinTimestamp}_${nextPutaranKe}`;
+
+  const newHistoryEntry = {
+    history_id: historyId,
+    putaran_ke: nextPutaranKe,
+    waktu: formatSpinTimestamp(new Date()),
+    periode_id: selectedPeriodeObj ? selectedPeriodeObj.id : selectedPeriodeId,
+    periode_ke: periodeKe,
+    periode_label: periodeLabel,
+    winner_id: winnerMember ? winnerMember.id : '',
+    winner_user_id: winnerMember ? winnerMember.user_id || '' : '',
+    winner_name: winnerName,
+    nominal_diterima: nominalDiterima,
+    is_official: false,
+    disahkan_oleh: null,
+    disahkan_waktu: null
+  };
+
+  existingHistory.push(newHistoryEntry);
+
+  const nextState = {
+    spin_id: spinTimestamp,
+    updated_at_ms: spinTimestamp,
+    status: 'SPINNING',
+    putaran_ke: nextPutaranKe,
+    periode_id: selectedPeriodeObj ? selectedPeriodeObj.id : selectedPeriodeId,
+    periode_ke: periodeKe,
+    periode_label: periodeLabel,
+    nominal_diterima: nominalDiterima,
+    candidates: candidates,
+    winner_id: winnerMember ? winnerMember.id : '',
+    winner_user_id: winnerMember ? winnerMember.user_id || '' : '',
+    winner_name: winnerName,
+    target_angle: targetAngle,
+    duration_ms: 6500,
+    started_at: spinTimestamp,
+    triggered_by: currentLoggedUser ? currentLoggedUser.nama_lengkap || currentLoggedUser.user_id : 'Admin',
+    official_history_id: liveSpinState.official_history_id || null,
+    history: existingHistory
+  };
+
+  lastProcessedSpinId = spinTimestamp;
+  // Kirim sinyal ke seluruh client sekaligus mulai putaran roda
+  broadcastLiveSpinStateToAllClients(nextState);
+  animateWheelSpinToState(nextState);
+}
+
+async function selectSpinHistoryAsOfficialWinner(historyId) {
+  if (!isUserAdmin()) {
+    showGlobalAlert('Hanya User Admin yang dapat menetapkan pemenang resmi dari History Putaran.', 'error');
+    return;
+  }
+
+  const historyList = Array.isArray(liveSpinState.history) ? [...liveSpinState.history] : [];
+  const targetEntry = historyList.find((h) => String(h.history_id) === String(historyId));
+  if (!targetEntry) {
+    showGlobalAlert('Data putaran tidak ditemukan pada history.', 'error');
+    return;
+  }
+
+  const adminName = currentLoggedUser ? currentLoggedUser.nama_lengkap || currentLoggedUser.user_id : 'Admin';
+  const updatedHistory = historyList.map((h) => ({
+    ...h,
+    is_official: String(h.history_id) === String(historyId),
+    disahkan_oleh: String(h.history_id) === String(historyId) ? adminName : null,
+    disahkan_waktu: String(h.history_id) === String(historyId) ? formatSpinTimestamp(new Date()) : null
+  }));
+
+  const updatedState = {
+    ...liveSpinState,
+    updated_at_ms: Date.now(),
+    status: 'FINISHED',
+    official_history_id: historyId,
+    winner_name: targetEntry.winner_name,
+    winner_id: targetEntry.winner_id,
+    winner_user_id: targetEntry.winner_user_id,
+    putaran_ke: targetEntry.putaran_ke,
+    history: updatedHistory
+  };
+
+  try {
+    const member = findAnggotaByNameOrId(targetEntry.winner_name, targetEntry.winner_user_id);
+    const periodeObj =
+      (cachedPeriodeList || []).find((p) => String(p.id) === String(targetEntry.periode_id)) ||
+      (cachedPeriodeList || []).find((p) => Number(p.periode_ke) === Number(targetEntry.periode_ke)) ||
+      cachedPeriodeList[0] ||
+      null;
+
+    if (periodeObj && periodeObj.id) {
+      await adaptiveSupabaseWrite(
+        TABLES.ARISAN,
+        {
+          pemenang_id: member ? member.id : null,
+          pemenang_nama: targetEntry.winner_name,
+          total_diterima: Number(targetEntry.nominal_diterima || 0),
+          status: 'selesai'
+        },
+        `?id=eq.${encodeURIComponent(periodeObj.id)}`
+      );
+    }
+
+    if (member && member.id) {
+      await adaptiveSupabaseWrite(
+        TABLES.ANGGOTA,
+        {
+          sudah_menang: true,
+          periode_menang_ke: targetEntry.periode_ke || (periodeObj ? periodeObj.periode_ke : 1)
+        },
+        `?id=eq.${encodeURIComponent(member.id)}`
+      );
+    }
+
+    try {
+      await adaptiveSupabaseWrite(TABLES.PEMENANG, {
+        periode_id: periodeObj ? periodeObj.id : null,
+        periode_ke: targetEntry.periode_ke || (periodeObj ? periodeObj.periode_ke : 1),
+        bulan_tahun: periodeObj ? periodeObj.bulan_tahun : targetEntry.periode_label || '-',
+        anggota_id: member ? member.id : null,
+        user_id: member ? member.user_id || null : null,
+        nama_pemenang: targetEntry.winner_name,
+        tanggal_undi: todayISO(),
+        nominal_diterima: Number(targetEntry.nominal_diterima || 0),
+        metode_pencairan: 'Transfer Bank',
+        nama_bank: member ? member.nama_bank || null : null,
+        keterangan: `Disahkan dari Live Spin Undian Putaran Ke-${targetEntry.putaran_ke} (${targetEntry.waktu})`,
+        ditetapkan_oleh: adminName
+      });
+    } catch (_) { }
+
+    await broadcastLiveSpinStateToAllClients(updatedState);
+    updateSpinSpotlightUI(updatedState);
+    renderSpinHistoryTable();
+    await fetchAllAnggota();
+    await loadPeriodeAndPemenangData();
+    renderLiveSpinCandidateChecklist();
+    updateQuickStatsBar();
+
+    showGlobalAlert(
+      `🏆 <b>Pemenang Resmi Disahkan!</b> Hasil <b>Putaran Ke-${targetEntry.putaran_ke} (${targetEntry.winner_name})</b> telah ditetapkan sebagai Pemenang Resmi pada <code>adnan_Arisan</code> & <code>adnan_PemenangArisan</code>!`,
+      'success'
+    );
+  } catch (err) {
+    showGlobalAlert(err.message, 'error');
+  }
+}
+
+window.selectSpinHistoryAsOfficialWinner = selectSpinHistoryAsOfficialWinner;
+
+async function resetLiveSpinHistoryByAdmin() {
+  if (!isUserAdmin()) return;
+
+  const resetTs = Date.now();
+  const emptyState = {
+    spin_id: resetTs,
+    updated_at_ms: resetTs,
+    status: 'IDLE',
+    putaran_ke: 0,
+    periode_id: liveSpinState.periode_id || '',
+    periode_ke: liveSpinState.periode_ke || 1,
+    periode_label: liveSpinState.periode_label || '-',
+    nominal_diterima: liveSpinState.nominal_diterima || 0,
+    candidates: getActiveWheelCandidateNames(),
+    winner_id: '',
+    winner_user_id: '',
+    winner_name: '',
+    target_angle: 0,
+    duration_ms: 6500,
+    started_at: resetTs,
+    triggered_by: currentLoggedUser ? currentLoggedUser.nama_lengkap || currentLoggedUser.user_id : 'Admin',
+    official_history_id: null,
+    history: []
+  };
+
+  lastProcessedSpinId = emptyState.spin_id;
+  const btnSpinText = document.getElementById('btnTriggerLiveSpinText');
+  if (btnSpinText) {
+    btnSpinText.textContent = 'PUTAR RODA UNDIAN SEKARANG (LIVE KE SEMUA CLIENT)';
+  }
+
+  await broadcastLiveSpinStateToAllClients(emptyState);
+  updateSpinSpotlightUI(emptyState);
+  renderSpinHistoryTable();
+  drawArisanWheel(currentWheelAngleRad, emptyState.candidates);
+  showGlobalAlert('🔄 History putaran undian telah di-reset. Siap memulai Putaran Ke-1 baru.', 'success');
+}
+
+function refreshLiveUndianUI() {
+  const adminFlag = isUserAdmin();
+  const adminCard = document.getElementById('adminLiveSpinControlCard');
+  const viewerCard = document.getElementById('viewerLiveSpinInfoCard');
+  if (adminCard) adminCard.classList.toggle('hidden', !adminFlag);
+  if (viewerCard) viewerCard.classList.toggle('hidden', adminFlag);
+
+  populateLiveSpinPeriodeDropdown();
+  renderLiveSpinCandidateChecklist();
+  updateSpinSpotlightUI(liveSpinState);
+  renderSpinHistoryTable();
+  pollLiveSpinStateFromSupabase(false);
+}
+
+async function initOrRefreshLiveUndian() {
+  const isFirstBoot = !hasInitializedSpinBoot;
+  hasInitializedSpinBoot = true;
+
+  refreshLiveUndianUI();
+  await pollLiveSpinStateFromSupabase(isFirstBoot);
+}
+
+// Listener untuk perubahan antar-tab / jendela pada browser yang sama
+if (liveSpinBroadcastChannel) {
+  liveSpinBroadcastChannel.onmessage = (ev) => {
+    if (ev && ev.data) {
+      applyIncomingSpinState(ev.data);
+    }
+  };
+}
+
+window.addEventListener('storage', (ev) => {
+  if (ev.key === LIVE_SPIN_STORAGE_KEY && ev.newValue) {
+    try {
+      applyIncomingSpinState(JSON.parse(ev.newValue));
+    } catch (_) { }
+  }
+});
+
+const chkAllSpinCandidatesEl = document.getElementById('chkAllSpinCandidates');
+if (chkAllSpinCandidatesEl) {
+  chkAllSpinCandidatesEl.addEventListener('change', () => {
+    const eligible = getEligibleWheelMembers();
+    eligible.forEach((a) => {
+      checkedSpinCandidatesMap[a.nama_lengkap] = chkAllSpinCandidatesEl.checked;
+    });
+    renderLiveSpinCandidateChecklist();
+  });
+}
+
+const chkIncludeAlreadyWonEl = document.getElementById('chkIncludeAlreadyWon');
+if (chkIncludeAlreadyWonEl) {
+  chkIncludeAlreadyWonEl.addEventListener('change', () => {
+    checkedSpinCandidatesMap = {};
+    renderLiveSpinCandidateChecklist();
+  });
+}
+
+const liveSpinPeriodeSelectEl = document.getElementById('liveSpinPeriodeSelect');
+if (liveSpinPeriodeSelectEl) {
+  liveSpinPeriodeSelectEl.addEventListener('change', () => {
+    const chosen = (cachedPeriodeList || []).find(
+      (p) => String(p.id) === String(liveSpinPeriodeSelectEl.value)
+    );
+    const nominalEl = document.getElementById('liveSpinNominalInput');
+    if (chosen && nominalEl) {
+      const sp = getArisanSplitValues(chosen);
+      const val = Number(chosen.total_dana_arisan || chosen.total_diterima || sp.nominal_arisan_konsumsi || 0);
+      nominalEl.value = val > 0 ? val : '';
+    }
+  });
+}
+
+const btnTriggerLiveSpinEl = document.getElementById('btnTriggerLiveSpin');
+if (btnTriggerLiveSpinEl) {
+  btnTriggerLiveSpinEl.addEventListener('click', () => {
+    triggerAdminLiveSpin();
+  });
+}
+
+const btnResetLiveSpinHistoryEl = document.getElementById('btnResetLiveSpinHistory');
+if (btnResetLiveSpinHistoryEl) {
+  btnResetLiveSpinHistoryEl.addEventListener('click', () => {
+    resetLiveSpinHistoryByAdmin();
+  });
+}
+
+const btnManualSyncSpinEl = document.getElementById('btnManualSyncSpin');
+if (btnManualSyncSpinEl) {
+  btnManualSyncSpinEl.addEventListener('click', async () => {
+    await pollLiveSpinStateFromSupabase();
+    showGlobalAlert('🔄 Status Live Undian & History Putaran berhasil disinkronkan!', 'success');
+  });
+}
+
+// ============================================================================
 // ALUR SETELAH LOGIN: CEK adnan_DataAnggota & TAMPILKAN FOTO + HAK AKSES ADMIN
 // ============================================================================
 async function handlePostLoginFlow(user) {
@@ -3560,6 +5799,7 @@ async function handlePostLoginFlow(user) {
 
   if (!user) {
     stopCameraStream();
+    if (liveSpinPollerTimer) clearInterval(liveSpinPollerTimer);
     authView.classList.remove('hidden');
     memberAppView.classList.add('hidden');
     return;
@@ -3576,22 +5816,33 @@ async function handlePostLoginFlow(user) {
   document.getElementById('userDetailText').textContent = `User ID: ${displayUid} • Role: ${adminFlag ? 'Administrator' : 'Peserta Arisan'}`;
 
   // Tampilkan fitur-fitur Khusus Admin HANYA jika login menggunakan Role Admin:
-  // - Tab & Kartu Pengeluaran
+  // - Tab & Kartu Pengaturan (navBtnPeriode & galleryCardPeriode)
+  // - Tab & Kartu Pengeluaran (navBtnPengeluaran & galleryCardPengeluaran)
   // - Buat Pengumuman Baru / Unggah Dokumen PDF
   // - Unggah Foto Kegiatan Baru
-  // - Tambah / Setting Periode Arisan Baru & Penetapan Pemenang
+  // - Tambah / Setting Periode Arisan Baru, Penetapan Pemenang & Entry Group Arisan
+  // - Panel Kontrol Live Spin Undian Arisan
   [
     'roleBadgePill',
+    'navBtnPeriode',
+    'galleryCardPeriode',
     'navBtnPengeluaran',
     'galleryCardPengeluaran',
     'formPengumumanCard',
     'formGaleriCard',
     'formPeriodeCard',
-    'formPemenangCard'
+    'formPemenangCard',
+    'formGroupArisanCard',
+    'adminLiveSpinControlCard'
   ].forEach((id) => {
     const el = document.getElementById(id);
     if (el) el.classList.toggle('hidden', !adminFlag);
   });
+
+  const viewerSpinCard = document.getElementById('viewerLiveSpinInfoCard');
+  if (viewerSpinCard) viewerSpinCard.classList.toggle('hidden', adminFlag);
+
+  startLiveSpinPoller();
 
   // Set default tanggal hari ini di semua form
   ['payTanggal', 'expTanggal', 'galTanggal', 'winTanggal'].forEach((id) => {
@@ -3865,16 +6116,299 @@ if (logoutBtn) {
 }
 
 // Inisialisasi saat halaman dimuat
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+  try {
+    localStorage.removeItem('adnan_groups_backup_v1');
+  } catch (_) { }
   populateAllBankDropdowns();
   syncPayPeriodeByJenis();
   try {
     const saved = localStorage.getItem(SESSION_KEY);
     if (saved) {
-      handlePostLoginFlow(JSON.parse(saved));
+      const parsedUser = JSON.parse(saved);
+      const uid = parsedUser && (parsedUser.user_id || parsedUser.username);
+      if (uid) {
+        try {
+          const freshUser = await checkUserInSupabase(uid);
+          if (freshUser) {
+            localStorage.setItem(SESSION_KEY, JSON.stringify(freshUser));
+            handlePostLoginFlow(freshUser);
+            return;
+          }
+        } catch (_) { }
+      }
+      handlePostLoginFlow(parsedUser);
     }
   } catch (_) {
     localStorage.removeItem(SESSION_KEY);
   }
 });
 
+
+
+// ============================================================================
+// MODUL PENGATURAN: MANAJEMEN TABEL DATABASE SUPABASE (EDIT & DELETE)
+// ============================================================================
+
+const SUPABASE_REST = {
+  url: 'https://zufpuadipntstcnqxxpm.supabase.co/rest/v1',
+  key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp1ZnB1YWRpcG50c3RjbnF4eHBtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMwNjM2OTMsImV4cCI6MjEwODYzOTY5M30.gjXuVjWUjIaJX4JI6_d_fpq01fnsvDPedMuKD9SCYIA'
+};
+
+const supabaseFetchHeaders = {
+  'apikey': SUPABASE_REST.key,
+  'Authorization': `Bearer ${SUPABASE_REST.key}`,
+  'Content-Type': 'application/json',
+  'Prefer': 'return=representation'
+};
+
+let activeDbTable = '';
+let activeDbRows = [];
+let editingDbIndex = -1;
+
+// Pasang event listener saat DOM siap
+document.addEventListener('DOMContentLoaded', () => {
+  const selectEl = document.getElementById('dbTableSelector');
+  const btnRefresh = document.getElementById('btnRefreshDbTable');
+
+  if (selectEl) {
+    selectEl.addEventListener('change', (e) => {
+      activeDbTable = e.target.value;
+      if (activeDbTable) {
+        fetchDbTableData(activeDbTable);
+      } else {
+        clearDbTableView();
+      }
+    });
+  }
+
+  if (btnRefresh) {
+    btnRefresh.addEventListener('click', () => {
+      if (activeDbTable) {
+        fetchDbTableData(activeDbTable);
+      } else {
+        alert('Pilih tabel terlebih dahulu pada dropdown.');
+      }
+    });
+  }
+});
+
+function clearDbTableView() {
+  const head = document.getElementById('dbTableHeader');
+  const body = document.getElementById('dbTableBody');
+  const status = document.getElementById('dbTableStatus');
+  if (head) head.innerHTML = `<tr><th style="padding:12px; color:#64748b;">Silakan pilih salah satu tabel di dropdown atas</th></tr>`;
+  if (body) body.innerHTML = `<tr><td style="padding:24px; text-align:center; color:#94a3b8;">Belum ada tabel yang dipilih.</td></tr>`;
+  if (status) status.style.display = 'none';
+}
+
+// 1. Ambil data dari tabel yang dipilih
+async function fetchDbTableData(tableName) {
+  const head = document.getElementById('dbTableHeader');
+  const body = document.getElementById('dbTableBody');
+  const status = document.getElementById('dbTableStatus');
+
+  if (!body) return;
+  body.innerHTML = `<tr><td style="padding:24px; text-align:center; color:#2563eb;">Memuat data dari <strong>${tableName}</strong>...</td></tr>`;
+
+  try {
+    let res = await fetch(`${SUPABASE_REST.url}/${tableName}?select=*&order=id.desc`, {
+      headers: supabaseFetchHeaders
+    });
+
+    if (!res.ok) {
+      // Fallback jika tabel tidak memiliki kolom id untuk sorting
+      res = await fetch(`${SUPABASE_REST.url}/${tableName}?select=*`, {
+        headers: supabaseFetchHeaders
+      });
+    }
+
+    if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
+    activeDbRows = await res.json();
+
+    renderDbTableData(tableName, activeDbRows);
+
+    if (status) {
+      status.style.display = 'block';
+      status.innerHTML = `Menampilkan <strong>${activeDbRows.length}</strong> baris dari tabel <code>${tableName}</code>.`;
+    }
+  } catch (err) {
+    console.error('Database viewer error:', err);
+    body.innerHTML = `<tr><td style="padding:20px; text-align:center; color:#dc2626;">Gagal memuat tabel: ${err.message}</td></tr>`;
+  }
+}
+
+// 2. Render Header & Baris Tabel
+function renderDbTableData(tableName, rows) {
+  const head = document.getElementById('dbTableHeader');
+  const body = document.getElementById('dbTableBody');
+
+  if (!rows || rows.length === 0) {
+    head.innerHTML = `<tr><th style="padding:10px 12px;">Status</th></tr>`;
+    body.innerHTML = `<tr><td style="padding:24px; text-align:center; color:#64748b;">Tabel <strong>${tableName}</strong> masih kosong.</td></tr>`;
+    return;
+  }
+
+  const columns = Object.keys(rows[0]);
+
+  // Header
+  let headHtml = '<tr><th style="padding:10px 12px; background:#f1f5f9; border-bottom:1px solid #cbd5e1; text-align:center; width:110px;">Aksi</th>';
+  columns.forEach(col => {
+    headHtml += `<th style="padding:10px 12px; background:#f1f5f9; border-bottom:1px solid #cbd5e1; white-space:nowrap; color:#334155;">${col}</th>`;
+  });
+  headHtml += '</tr>';
+  head.innerHTML = headHtml;
+
+  // Body
+  let bodyHtml = '';
+  rows.forEach((row, idx) => {
+    bodyHtml += `<tr style="border-bottom:1px solid #e2e8f0;">`;
+    
+    // Tombol Edit & Hapus
+    bodyHtml += `
+      <td style="padding:6px 10px; text-align:center; white-space:nowrap;">
+        <button type="button" onclick="openEditDbModal(${idx})" style="padding:3px 8px; font-size:0.75rem; border:1px solid #2563eb; color:#2563eb; background:#eff6ff; border-radius:4px; cursor:pointer; margin-right:4px;">Edit</button>
+        <button type="button" onclick="deleteDbRow(${idx})" style="padding:3px 8px; font-size:0.75rem; border:1px solid #dc2626; color:#dc2626; background:#fef2f2; border-radius:4px; cursor:pointer;">Hapus</button>
+      </td>
+    `;
+
+    // Kolom Nilai
+    columns.forEach(col => {
+      let val = row[col];
+      let displayVal = val;
+      if (typeof val === 'object' && val !== null) {
+        displayVal = JSON.stringify(val);
+      } else if (val === null || val === undefined) {
+        displayVal = '<span style="color:#94a3b8; font-style:italic;">null</span>';
+      }
+      bodyHtml += `<td style="padding:8px 12px; max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${String(val || '')}">${displayVal}</td>`;
+    });
+    bodyHtml += `</tr>`;
+  });
+
+  body.innerHTML = bodyHtml;
+}
+
+// 3. Fungsi Hapus Data (DELETE)
+async function deleteDbRow(rowIndex) {
+  const row = activeDbRows[rowIndex];
+  if (!row) return;
+
+  const idCol = row.id !== undefined ? 'id' : Object.keys(row)[0];
+  const idVal = row[idCol];
+
+  if (!confirm(`Hapus baris data dengan ${idCol} = "${idVal}" dari tabel "${activeDbTable}"?`)) {
+    return;
+  }
+
+  try {
+    const res = await fetch(`${SUPABASE_REST.url}/${activeDbTable}?${idCol}=eq.${encodeURIComponent(idVal)}`, {
+      method: 'DELETE',
+      headers: supabaseFetchHeaders
+    });
+
+    if (!res.ok) throw new Error(`Status ${res.status}: ${res.statusText}`);
+
+    alert('Data berhasil dihapus!');
+    fetchDbTableData(activeDbTable);
+  } catch (err) {
+    alert('Gagal menghapus data: ' + err.message);
+  }
+}
+
+// 4. Modal Edit
+function openEditDbModal(rowIndex) {
+  editingDbIndex = rowIndex;
+  const row = activeDbRows[rowIndex];
+  if (!row) return;
+
+  const modal = document.getElementById('modalEditDbRecord');
+  const title = document.getElementById('modalEditDbTitle');
+  const form = document.getElementById('modalEditDbFormContainer');
+
+  title.textContent = `✏️ Edit: ${activeDbTable}`;
+  
+  let html = '<div style="display:flex; flex-direction:column; gap:10px;">';
+  for (const [key, value] of Object.entries(row)) {
+    const isId = (key === 'id');
+    const isReadOnly = isId || key === 'created_at';
+    const valStr = (typeof value === 'object' && value !== null) ? JSON.stringify(value) : (value ?? '');
+
+    html += `
+      <div style="display:flex; flex-direction:column; gap:3px;">
+        <label style="font-weight:600; font-size:0.8rem; color:#475569;">
+          ${key} ${isReadOnly ? '<small style="color:#94a3b8;">(Terkunci)</small>' : ''}
+        </label>
+        <input 
+          type="text" 
+          id="dbFieldInput_${key}" 
+          value="${String(valStr).replace(/"/g, '&quot;')}" 
+          ${isReadOnly ? 'readonly style="background:#f1f5f9; color:#64748b; padding:6px 8px; border:1px solid #cbd5e1; border-radius:6px;"' : 'style="padding:6px 8px; border:1px solid #cbd5e1; border-radius:6px;"'}
+        />
+      </div>
+    `;
+  }
+  html += '</div>';
+
+  form.innerHTML = html;
+  modal.style.display = 'flex';
+}
+
+function closeEditDbModal() {
+  const modal = document.getElementById('modalEditDbRecord');
+  if (modal) modal.style.display = 'none';
+  editingDbIndex = -1;
+}
+
+// 5. Simpan Perubahan (PATCH / UPDATE)
+async function saveEditedDbRecord() {
+  if (editingDbIndex < 0) return;
+  const row = activeDbRows[editingDbIndex];
+  if (!row) return;
+
+  const idCol = row.id !== undefined ? 'id' : Object.keys(row)[0];
+  const idVal = row[idCol];
+  const payload = {};
+
+  for (const key of Object.keys(row)) {
+    if (key === 'id' || key === 'created_at') continue;
+
+    const input = document.getElementById(`dbFieldInput_${key}`);
+    if (input) {
+      let val = input.value;
+      if (typeof row[key] === 'number') {
+        val = val === '' ? null : Number(val);
+      } else if (typeof row[key] === 'boolean') {
+        val = (val === 'true');
+      }
+      payload[key] = val;
+    }
+  }
+
+  const btnSave = document.getElementById('btnSaveDbRecord');
+  if (btnSave) {
+    btnSave.textContent = 'Menyimpan...';
+    btnSave.disabled = true;
+  }
+
+  try {
+    const res = await fetch(`${SUPABASE_REST.url}/${activeDbTable}?${idCol}=eq.${encodeURIComponent(idVal)}`, {
+      method: 'PATCH',
+      headers: supabaseFetchHeaders,
+      body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) throw new Error(`Status ${res.status}: ${res.statusText}`);
+
+    alert('Perubahan berhasil disimpan!');
+    closeEditDbModal();
+    fetchDbTableData(activeDbTable);
+  } catch (err) {
+    alert('Gagal menyimpan: ' + err.message);
+  } finally {
+    if (btnSave) {
+      btnSave.textContent = 'Simpan Perubahan';
+      btnSave.disabled = false;
+    }
+  }
+}
