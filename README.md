@@ -14,3 +14,5 @@ Aplikasi web responsif (Desktop & Mobile Phone) untuk pengelolaan Arisan Keluarg
 5. **Menu 3: Pengumuman (`adnan_Pengumuman`)** — Papan informasi keluarga dengan dukungan unggah dan pratinjau dokumen PDF.
 6. **Menu 4: Galeri Kegiatan (`adnan_Galeri`)** — Dokumentasi foto kegiatan arisan & silaturahmi keluarga.
 7. **Menu 5: Setting Periode & Pemenang Arisan (`adnan_Arisan`, `adnan_PeriodeArisan`, `adnan_PemenangArisan`)** — Pengaturan jadwal periode arisan dan pengundian pemenang.
+
+# ArisanAdnan
