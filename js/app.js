@@ -6600,5 +6600,3 @@ async function saveEditedDbRecord() {
     }
   }
 }
-updated_app.js
-Displaying
