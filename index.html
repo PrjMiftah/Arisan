@@ -1195,6 +1195,19 @@
       font-weight: 600;
       color: var(--text-main);
       cursor: pointer;
+      min-width: 0;
+      width: 100%;
+      box-sizing: border-box;
+      overflow: hidden;
+    }
+
+    .candidate-check-item span {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      display: block;
     }
 
     .candidate-check-item input[type="checkbox"] {
@@ -2423,6 +2436,30 @@
                 </div>
               </div>
 
+              <!-- PENGATURAN DURASI SPIN BERPUTAR KHUSUS ADMIN (Default 60 detik) -->
+              <div class="form-group"
+                style="margin-bottom:14px; background:var(--primary-light); border:1.5px solid var(--primary-border); border-radius:10px; padding:10px 14px;">
+                <label for="liveSpinDurationInput"
+                  style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; flex-wrap:wrap; gap:6px;">
+                  <span style="font-weight:700; color:var(--primary); font-size:0.86rem;">⏱️ Durasi Roda Spin Berputar (Detik):</span>
+                  <span style="font-size:0.75rem; font-weight:700; color:var(--primary); background:#ffffff; padding:2px 8px; border-radius:6px; border:1px solid var(--primary-border);">Default: 60 Detik</span>
+                </label>
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <button type="button" class="btn-secondary btn-sm" id="btnDecreaseSpinDuration"
+                    style="font-size:1.15rem; font-weight:800; padding:6px 14px; min-width:42px; background:#fff; line-height:1;"
+                    title="Kurangi 5 detik">−</button>
+                  <input type="number" id="liveSpinDurationInput" min="5" max="300" step="5" value="60"
+                    style="text-align:center; font-weight:800; font-size:1.05rem; width:90px; padding:6px 10px; border:1.5px solid var(--primary); border-radius:8px; background:#fff; color:var(--primary);" />
+                  <button type="button" class="btn-secondary btn-sm" id="btnIncreaseSpinDuration"
+                    style="font-size:1.15rem; font-weight:800; padding:6px 14px; min-width:42px; background:#fff; line-height:1;"
+                    title="Tambah 5 detik">+</button>
+                  <span style="font-size:0.85rem; font-weight:700; color:var(--text-main);">Detik</span>
+                </div>
+                <small style="display:block; margin-top:4px; font-size:0.74rem; color:var(--text-muted);">
+                  Dapat diatur dengan tombol + / − atau diketik langsung sesuai kebutuhan undian.
+                </small>
+              </div>
+
               <button type="button" class="btn-spin-live" id="btnTriggerLiveSpin">
                 <span>🎡</span>
                 <span id="btnTriggerLiveSpinText">PUTAR RODA UNDIAN SEKARANG (LIVE KE SEMUA CLIENT)</span>
@@ -3345,6 +3382,14 @@
                 </div>
 
                 <div class="form-group">
+                  <label for="bioStatusKepesertaan">Status Kepesertaan <span class="required-star">*</span></label>
+                  <select id="bioStatusKepesertaan" required>
+                    <option value="Peserta">Peserta</option>
+                    <option value="Partisipan">Partisipan</option>
+                  </select>
+                </div>
+
+                <div class="form-group">
                   <label for="bioTempatLahir">Tempat Lahir</label>
                   <input type="text" id="bioTempatLahir" placeholder="Contoh: Jakarta" />
                 </div>
@@ -3355,8 +3400,44 @@
                 </div>
 
                 <div class="form-group full-width">
-                  <label for="bioPekerjaan">Pekerjaan / Aktivitas</label>
-                  <input type="text" id="bioPekerjaan" placeholder="Contoh: Wiraswasta / Karyawan / Ibu Rumah Tangga" />
+                  <label for="bioPekerjaanSelect">Pekerjaan / Aktivitas</label>
+                  <select id="bioPekerjaanSelect">
+                    <option value="">-- Pilih Pekerjaan / Aktivitas --</option>
+                    <option value="PNS">PNS</option>
+                    <option value="PEG.SWASTA">PEG.SWASTA</option>
+                    <option value="WIRAUSAHA">WIRAUSAHA</option>
+                    <option value="TNI/POLRI">TNI/POLRI</option>
+                    <option value="PETANI">PETANI</option>
+                    <option value="NELAYAN">NELAYAN</option>
+                    <option value="LAINNYA">LAINNYA</option>
+                    <option value="TIDAK BEKERJA">TIDAK BEKERJA</option>
+                  </select>
+                  <div id="bioPekerjaanManualBox" class="hidden" style="margin-top: 8px;">
+                    <input type="text" id="bioPekerjaanManual" placeholder="Sebutkan pekerjaan / aktivitas lainnya..." />
+                  </div>
+                </div>
+
+                <!-- URL GOOGLE MAPS LOKASI RUMAH & TOMBOL AMBIL / RESET LOKASI -->
+                <div class="form-group full-width" style="background:#f8fafc; border:1.5px solid var(--border); border-radius:12px; padding:12px 14px; margin-top:4px;">
+                  <label for="bioGoogleMapsUrl" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px; margin-bottom:6px;">
+                    <span style="font-weight:700; color:var(--primary);">🗺️ Url Google Maps Lokasi Rumah (<code>google_maps_url</code>)</span>
+                    <span style="font-size:0.75rem; color:var(--text-muted); font-weight:600;">(Deteksi GPS atau Input Link Maps)</span>
+                  </label>
+                  <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                    <input type="url" id="bioGoogleMapsUrl" placeholder="https://maps.google.com/?q=..." style="flex:1; min-width:200px;" />
+                    <button type="button" class="btn-primary btn-sm" id="btnAmbilLokasiGps" style="padding:8px 14px; white-space:nowrap; display:inline-flex; align-items:center; gap:6px;">
+                      📍 Ambil Lokasi
+                    </button>
+                    <button type="button" class="btn-secondary btn-sm" id="btnResetLokasiGps" style="padding:8px 14px; white-space:nowrap; color:#dc2626; border-color:#fecaca; display:inline-flex; align-items:center; gap:6px;">
+                      🔄 Reset Lokasi
+                    </button>
+                    <a href="#" target="_blank" rel="noopener noreferrer" id="btnBukaLinkMapsPreview" class="btn-secondary btn-sm hidden" style="padding:8px 14px; white-space:nowrap; display:inline-flex; align-items:center; gap:6px; text-decoration:none; color:var(--primary);">
+                      ↗️ Buka Maps
+                    </a>
+                  </div>
+                  <small id="bioGpsStatusInfo" style="display:block; margin-top:6px; font-size:0.76rem; color:var(--text-muted);">
+                    Klik <strong>Ambil Lokasi</strong> untuk mendeteksi koordinat tempat tinggal Anda saat ini secara otomatis dari browser/perangkat.
+                  </small>
                 </div>
               </div>
 
@@ -3411,6 +3492,35 @@
           <div class="sub-tab-panel" id="tabKeluarga">
             <div class="card-box">
               <h4>3. Data Keluarga, Silsilah & Rekening Pencairan</h4>
+
+              <!-- UPLOAD FOTO KELUARGA (FILE LOKAL - DISIMPAN DI foto_kel_url) -->
+              <div class="form-group full-width"
+                style="margin-bottom: 20px; padding: 14px; background: #f8fafc; border: 1.5px dashed var(--border); border-radius: 12px;">
+                <label style="font-weight: 700; color: var(--text-main); display: flex; align-items: center; gap: 6px;">
+                  <span>📸</span> Foto Keluarga (File Lokal &mdash; Disimpan pada header <code>foto_kel_url</code>)
+                </label>
+                <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 2px; margin-bottom: 12px;">
+                  Pilih foto keluarga besar Anda dari file / folder lokal untuk ditampilkan pada Biodata Lengkap Anggota.
+                </p>
+                <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
+                  <div id="bioFotoKelPreviewBox"
+                    style="width: 110px; height: 80px; border-radius: 10px; border: 2px solid var(--border); background: #e2e8f0; display: flex; align-items: center; justify-content: center; font-size: 2rem; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.06);">
+                    👨‍👩‍👧‍👦
+                  </div>
+                  <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+                    <button type="button" class="btn-secondary btn-sm" id="btnTriggerUploadFotoKel"
+                      style="display: inline-flex; align-items: center; gap: 6px;">
+                      📁 Upload Foto Keluarga (File Lokal)
+                    </button>
+                    <button type="button" class="btn-secondary btn-sm" id="btnHapusFotoKel"
+                      style="color: #dc2626; border-color: #fecaca; display: none;">
+                      🗑️ Hapus Foto
+                    </button>
+                    <input type="file" id="bioFotoKelFileInput" accept="image/*" class="hidden" />
+                  </div>
+                </div>
+              </div>
+
               <div class="form-grid">
                 <!-- Silsilah 1: Kakek Buyut & Nenek Buyut -->
                 <div class="form-group">
@@ -3560,13 +3670,50 @@
   <!-- ===================================================================
        MODAL 2: PREVIEW BUKTI PEMBAYARAN / FOTO GALERI / PDF PENGUMUMAN
        =================================================================== -->
-  <div class="modal-overlay hidden" id="mediaModal">
+  <div class="modal-overlay hidden" id="mediaModal" style="z-index: 100005;">
     <div class="modal-box">
       <div class="modal-header">
         <strong id="modalTitle">Pratinjau Dokumen / Bukti</strong>
         <button type="button" class="btn-secondary btn-sm" id="closeModalBtn">✕ Tutup</button>
       </div>
       <div class="modal-body center-media" id="modalBodyContent"></div>
+    </div>
+  </div>
+
+  <!-- ===================================================================
+       MODAL: KONFIRMASI RESET HISTORY PUTARAN
+       =================================================================== -->
+  <div class="modal-overlay hidden" id="modalConfirmResetSpinHistory" style="z-index: 100010;">
+    <div class="modal-box"
+      style="max-width:460px; border-radius:18px; border:1px solid #fee2e2; box-shadow:0 25px 40px -5px rgba(220,38,38,0.3); overflow:hidden;">
+      <div
+        style="background:linear-gradient(135deg, #ef4444 0%, #b91c1c 100%); color:#ffffff; padding:16px 20px; display:flex; align-items:center; justify-content:space-between;">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span style="font-size:1.4rem;">⚠️</span>
+          <div>
+            <h4 style="margin:0; font-size:1.05rem; color:#ffffff; font-weight:800;">Konfirmasi Reset Putaran</h4>
+            <small style="color:#fecaca; font-size:0.75rem;">Tindakan ini akan mengosongkan riwayat putaran</small>
+          </div>
+        </div>
+        <button type="button" onclick="closeConfirmResetHistoryModal()"
+          style="border:none; background:rgba(255,255,255,0.2); width:30px; height:30px; border-radius:50%; font-size:1.2rem; cursor:pointer; color:#ffffff; display:flex; align-items:center; justify-content:center; line-height:1;">&times;</button>
+      </div>
+      <div style="padding:22px 20px; text-align:center;">
+        <p style="margin:0 0 16px; font-size:0.92rem; color:#334155; line-height:1.55;">
+          Apakah Anda yakin ingin <strong>mereset seluruh riwayat hasil putaran undian</strong>?<br />
+          Semua catatan putaran dan pemenang sementara akan dikosongkan kembali dari layar dan server.
+        </p>
+        <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top:18px;">
+          <button type="button" class="btn-secondary" onclick="closeConfirmResetHistoryModal()"
+            style="padding:9px 20px; font-weight:700;">
+            Tidak, Batalkan
+          </button>
+          <button type="button" class="btn-primary" id="btnExecuteResetHistory"
+            style="background:#dc2626; border-color:#b91c1c; padding:9px 22px; font-weight:800; box-shadow:0 4px 12px rgba(220,38,38,0.35);">
+            Ya, Reset Sekarang
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 
