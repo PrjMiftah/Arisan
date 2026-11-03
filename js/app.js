@@ -326,8 +326,9 @@ function getActivePeriodeList() {
 
 function formatPeriodeArisanLabel(p) {
   if (!p) return '';
-  if (p.keterangan && String(p.keterangan).trim()) {
-    return String(p.keterangan).trim();
+  const cleanKet = stripInternalMetaFromKeterangan(p.keterangan);
+  if (cleanKet && cleanKet.trim()) {
+    return cleanKet.trim();
   }
   const bulanText = p.bulan_tahun ? ` - ${p.bulan_tahun}` : '';
   return `Periode ${p.periode_ke}${bulanText}`;
@@ -344,11 +345,11 @@ function getPaymentPeriodeArisanLabel(payRow) {
   if (perMatch && perMatch[1]) return perMatch[1].trim();
   if (payRow.arisan_id && Array.isArray(cachedPeriodeList) && cachedPeriodeList.length > 0) {
     const relPeriode = cachedPeriodeList.find((p) => String(p.id) === String(payRow.arisan_id));
-    if (relPeriode) return relPeriode.keterangan || formatPeriodeArisanLabel(relPeriode);
+    if (relPeriode) return stripInternalMetaFromKeterangan(relPeriode.keterangan) || formatPeriodeArisanLabel(relPeriode);
   }
   if (isJenisArisan(payRow)) {
     const activePer = getActivePeriodeList()[0];
-    if (activePer) return activePer.keterangan || formatPeriodeArisanLabel(activePer);
+    if (activePer) return stripInternalMetaFromKeterangan(activePer.keterangan) || formatPeriodeArisanLabel(activePer);
   }
   return '-';
 }
@@ -1392,8 +1393,9 @@ function updateQuickStatsBar() {
 
   const activePeriode = activePeriods[0] || null;
   if (activePeriode) {
-    const activeLabel = (activePeriode.keterangan && String(activePeriode.keterangan).trim())
-      ? String(activePeriode.keterangan).trim()
+    const _rawKet1395 = stripInternalMetaFromKeterangan(activePeriode.keterangan);
+    const activeLabel = (_rawKet1395 && _rawKet1395.trim())
+      ? _rawKet1395.trim()
       : `Periode ${activePeriode.periode_ke}${activePeriode.bulan_tahun ? ' - ' + activePeriode.bulan_tahun : ''}`;
     elPeriode.textContent = activeLabel;
     elTglPeriode.textContent = `${activePeriode.tanggal_arisan || '-'} • ${activePeriode.tempat_arisan || ''}`;
@@ -2292,8 +2294,9 @@ function syncPayPeriodeByJenis() {
     const activePeriods = getActivePeriodeList();
     const activePer = activePeriods[0] || null;
     if (activePer) {
-      const activeLabel = (activePer.keterangan && String(activePer.keterangan).trim())
-        ? String(activePer.keterangan).trim()
+      const _rawKet2295 = stripInternalMetaFromKeterangan(activePer.keterangan);
+      const activeLabel = (_rawKet2295 && _rawKet2295.trim())
+        ? _rawKet2295.trim()
         : `Periode ${activePer.periode_ke}${activePer.bulan_tahun ? ' - ' + activePer.bulan_tahun : ''}`;
       payPeriode.value = activeLabel;
       payPeriode.placeholder = activeLabel;
@@ -6600,5 +6603,3 @@ async function saveEditedDbRecord() {
     }
   }
 }
-updated_app.js
-Displaying
