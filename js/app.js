@@ -908,7 +908,11 @@ function switchPeriodeSubTab(targetSubTabId) {
     panel.classList.toggle('active', panel.id === targetSubTabId);
   });
 
-  if (targetSubTabId === 'subTabDaftarUser') {
+  if (targetSubTabId === 'subTabMonitoringBayar') {
+    renderMonitoringPembayaran();
+  } else if (targetSubTabId === 'subTabMutasiKeuangan') {
+    renderMutasiKeuanganTable();
+  } else if (targetSubTabId === 'subTabDaftarUser') {
     loadRegisteredUsersData();
   } else if (targetSubTabId === 'subTabDatabaseManager') {
     const selector = document.getElementById('dbTableSelector');
@@ -1182,7 +1186,18 @@ function populateBiodataForm(user, bio) {
   document.getElementById('bioEmail').value = (bio && bio.email) || '';
   document.getElementById('bioAlamat').value = (bio && bio.alamat) || '';
   document.getElementById('bioKota').value = (bio && bio.kota) || '';
-  document.getElementById('bioNamaAyah').value = (bio && bio.nama_ayah) || 'H. Adnan';
+  const elBuyut = document.getElementById('bioNamaKakekBuyut');
+  if (elBuyut) elBuyut.value = (bio && bio.nama_kakek_buyut) || '';
+  const elNenekBuyut = document.getElementById('bioNamaNenekBuyut');
+  if (elNenekBuyut) elNenekBuyut.value = (bio && bio.nama_nenek_buyut) || '';
+  const elKakek = document.getElementById('bioNamaKakek');
+  if (elKakek) elKakek.value = (bio && bio.nama_kakek) || '';
+  const elNenek = document.getElementById('bioNamaNenek');
+  if (elNenek) elNenek.value = (bio && bio.nama_nenek) || '';
+  const elAyah = document.getElementById('bioNamaAyah');
+  if (elAyah) elAyah.value = (bio && bio.nama_ayah) || 'H. Adnan';
+  const elIbu = document.getElementById('bioNamaIbu');
+  if (elIbu) elIbu.value = (bio && bio.nama_ibu) || '';
   document.getElementById('bioSilsilah').value = (bio && (bio.silsilah_keluarga || bio.garis_sanad)) || '';
   document.getElementById('bioNamaPasangan').value = (bio && bio.nama_pasangan) || '';
   document.getElementById('bioJumlahAnak').value = bio && bio.jumlah_anak != null ? bio.jumlah_anak : 0;
@@ -2239,7 +2254,7 @@ function syncPayGroupSplitUI() {
       memberListContainer.innerHTML = '';
     }
 
-    if (payNominal) payNominal.value = nominalArisanDanKonsumsi > 0 ? nominalArisanDanKonsumsi : '';
+    if (payNominal) payNominal.value = '';
     if (payNominalHint) {
       payNominalHint.textContent = '';
     }
@@ -2642,6 +2657,8 @@ async function loadPembayaranData() {
     populateAdminPesertaDropdowns();
     renderPembayaranTableRows();
     updateQuickStatsBar();
+    renderMonitoringPembayaranTable();
+    renderMutasiKeuanganTable();
   } catch (err) {
     tbody.innerHTML = `<tr><td colspan="13" style="text-align:center; color:#dc2626;">${err.message}</td></tr>`;
   }
@@ -2918,9 +2935,14 @@ async function executeSavePembayaran(confirmedFromGroupModal = false) {
       const ua = isArs ? rates.uang_arisan : 0;
       const uk = isArs ? rates.uang_kas : 0;
       const uko = isArs ? rates.uang_konsumsi : 0;
-      const inputNominal = Number(
-        document.getElementById('payNominal').value || (isArs ? rates.nominal_arisan_konsumsi : 0)
-      );
+      const rawNominalInput = document.getElementById('payNominal').value;
+      const inputNominal = Number(rawNominalInput || 0);
+      if (inputNominal <= 0) {
+        showGlobalAlert('Silakan isi Nominal Pembayaran (Rp) yang valid terlebih dahulu.', 'error');
+        btn.disabled = false;
+        btn.textContent = '💾 Simpan Pembayaran (Status: Pending)';
+        return;
+      }
       const splitMeta = isArs ? `[SPLIT:${ua},${uk},${uko}]` : '';
       const jenisMeta = `[JENIS:${jenisBayar}]`;
       const periodeMeta = isArs && selectedPeriodeLabel ? `[PERIODE:${selectedPeriodeLabel}]` : '';
@@ -3230,6 +3252,7 @@ async function loadPengeluaranData() {
     populatePengeluaranAnggotaDropdown();
     renderPengeluaranTableRows();
     updateQuickStatsBar();
+    renderMutasiKeuanganTable();
   } catch (err) {
     tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:#dc2626;">${err.message}</td></tr>`;
   }
@@ -3738,16 +3761,22 @@ async function loadPeriodeAndPemenangData() {
               <td><strong>${formatRupiah(w.nominal_diterima)}</strong></td>
               <td>${w.metode_pencairan || '-'} ${w.nama_bank ? '(' + w.nama_bank + ')' : ''}</td>
               <td>${stripInternalMetaFromKeterangan(w.keterangan) || '-'}</td>
-              <td>
-                <button type="button" class="btn-secondary btn-sm" style="color:#dc2626; border-color:#fecaca;" onclick="deletePemenangArisan('${w.id || ''}', ${Number(w.periode_ke || 0)})">
-                  🗑️ Hapus
-                </button>
+              <td style="white-space:nowrap;">
+                <div style="display:flex; gap:6px;">
+                  <button type="button" class="btn-secondary btn-sm" style="color:#0284c7; border-color:#bae6fd;" onclick="openModalEditPemenang('${w.id || ''}', ${Number(w.periode_ke || 0)})">
+                    ✏️ Edit
+                  </button>
+                  <button type="button" class="btn-secondary btn-sm" style="color:#dc2626; border-color:#fecaca;" onclick="openModalKonfirmasiHapusPemenang('${w.id || ''}', ${Number(w.periode_ke || 0)}, '${encodeURIComponent(w.nama_pemenang || '')}')">
+                    🗑️ Hapus
+                  </button>
+                </div>
               </td>
             </tr>`
           )
           .join('');
       }
     }
+    renderMonitoringPembayaran();
   } catch (err) {
     console.error(err);
   }
@@ -3798,18 +3827,174 @@ async function deletePeriodeArisan(periodeId, periodeKe) {
   }
 }
 
-async function deletePemenangArisan(winnerId, periodeKe) {
+// ============================================================================
+// MODAL & ACTION EDIT PEMENANG ARISAN (Item 5)
+// ============================================================================
+function openModalEditPemenang(winnerId, periodeKe) {
+  if (!isUserAdmin()) {
+    showGlobalAlert('Hanya Role Admin yang dapat mengedit data Pemenang Arisan.', 'error');
+    return;
+  }
+  const target = (cachedPemenangList || []).find(
+    (w) => (winnerId && String(w.id) === String(winnerId)) || Number(w.periode_ke) === Number(periodeKe)
+  );
+  if (!target) {
+    showGlobalAlert('Data pemenang arisan tidak ditemukan.', 'error');
+    return;
+  }
+
+  const modal = document.getElementById('modalEditPemenang');
+  if (!modal) return;
+
+  document.getElementById('editWinId').value = target.id || '';
+  document.getElementById('editWinOldPeriodeKe').value = target.periode_ke || '';
+  document.getElementById('editWinPeriodeId').value = target.periode_id || '';
+  document.getElementById('editWinPeriodeKe').value = target.periode_ke || 1;
+  document.getElementById('editWinBulanTahun').value = target.bulan_tahun || '';
+  document.getElementById('editWinNama').value = target.nama_pemenang || '';
+  document.getElementById('editWinTanggalUndi').value = target.tanggal_undi || todayISO();
+  document.getElementById('editWinNominal').value = target.nominal_diterima || 0;
+
+  const metodeSelect = document.getElementById('editWinMetode');
+  if (metodeSelect) {
+    metodeSelect.value =
+      target.metode_pencairan && target.metode_pencairan.toLowerCase().includes('tunai')
+        ? 'Tunai'
+        : 'Transfer Bank';
+  }
+
+  populateBankDropdowns();
+  const bankSelect = document.getElementById('editWinBank');
+  if (bankSelect && target.nama_bank) {
+    bankSelect.value = target.nama_bank;
+  }
+
+  toggleModalEditWinBankDropdown();
+  document.getElementById('editWinKeterangan').value = stripInternalMetaFromKeterangan(target.keterangan) || '';
+
+  modal.style.display = 'flex';
+}
+
+function closeModalEditPemenang() {
+  const modal = document.getElementById('modalEditPemenang');
+  if (modal) modal.style.display = 'none';
+}
+
+function toggleModalEditWinBankDropdown() {
+  const metode = document.getElementById('editWinMetode').value;
+  const wrapper = document.getElementById('editWinBankWrapper');
+  if (wrapper) {
+    wrapper.style.display = metode === 'Transfer Bank' ? 'block' : 'none';
+  }
+}
+
+async function submitModalEditPemenang(e) {
+  if (e && e.preventDefault) e.preventDefault();
+  if (!isUserAdmin()) {
+    showGlobalAlert('Hanya Role Admin yang berhak menyimpan perubahan pemenang.', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('btnSaveEditPemenang');
+  const winId = document.getElementById('editWinId').value;
+  const oldPeriodeKe = Number(document.getElementById('editWinOldPeriodeKe').value || 0);
+  const periodeKe = Number(document.getElementById('editWinPeriodeKe').value || 1);
+  const bulanTahun = document.getElementById('editWinBulanTahun').value.trim();
+  const namaPemenang = document.getElementById('editWinNama').value.trim();
+  const tanggalUndi = document.getElementById('editWinTanggalUndi').value || todayISO();
+  const nominal = Number(document.getElementById('editWinNominal').value || 0);
+  const metode = document.getElementById('editWinMetode').value;
+  const namaBank = metode === 'Transfer Bank' ? document.getElementById('editWinBank').value : null;
+  const keterangan = document.getElementById('editWinKeterangan').value.trim();
+
+  if (!namaPemenang) {
+    showGlobalAlert('Nama pemenang wajib diisi.', 'error');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Menyimpan...';
+
+  try {
+    const payload = {
+      periode_ke: periodeKe,
+      bulan_tahun: bulanTahun,
+      nama_pemenang: namaPemenang,
+      tanggal_undi: tanggalUndi,
+      nominal_diterima: nominal,
+      metode_pencairan: metode,
+      nama_bank: namaBank,
+      keterangan: keterangan
+    };
+
+    if (winId) {
+      await adaptiveSupabaseWrite(TABLES.PEMENANG, payload, `?id=eq.${encodeURIComponent(winId)}`);
+    } else {
+      await adaptiveSupabaseWrite(TABLES.PEMENANG, payload, `?periode_ke=eq.${encodeURIComponent(oldPeriodeKe || periodeKe)}`);
+    }
+
+    // Sinkronkan juga pada adnan_Arisan
+    const matchPer = (cachedPeriodeList || []).find((p) => Number(p.periode_ke) === Number(oldPeriodeKe || periodeKe));
+    if (matchPer && matchPer.id) {
+      try {
+        await adaptiveSupabaseWrite(
+          TABLES.ARISAN,
+          {
+            pemenang_nama: namaPemenang,
+            total_diterima: nominal
+          },
+          `?id=eq.${encodeURIComponent(matchPer.id)}`
+        );
+      } catch (_) { }
+    }
+
+    closeModalEditPemenang();
+    await loadPeriodeAndPemenangData();
+    updateQuickStatsBar();
+    showGlobalAlert(`✅ Perubahan Pemenang <b>Periode Ke-${periodeKe} (${namaPemenang})</b> berhasil disimpan!`, 'success');
+  } catch (err) {
+    showGlobalAlert(err.message || 'Gagal menyimpan perubahan pemenang.', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '💾 Simpan Perubahan';
+  }
+}
+
+// ============================================================================
+// MODAL & ACTION KONFIRMASI HAPUS PEMENANG ARISAN (Item 5)
+// ============================================================================
+function openModalKonfirmasiHapusPemenang(winnerId, periodeKe, encodedNama) {
   if (!isUserAdmin()) {
     showGlobalAlert('Hanya Role Admin yang dapat menghapus data Pemenang Arisan.', 'error');
     return;
   }
-  if (!window.confirm(`Apakah Anda yakin ingin menghapus data Pemenang Periode Ke-${periodeKe || '-'}?`)) {
-    return;
-  }
+  const modal = document.getElementById('modalKonfirmasiHapusPemenang');
+  if (!modal) return;
+
+  const nama = encodedNama ? decodeURIComponent(encodedNama) : 'Pemenang';
+  document.getElementById('delWinId').value = winnerId || '';
+  document.getElementById('delWinPeriodeKe').value = periodeKe || '';
+  document.getElementById('delWinDetailText').innerHTML = `Periode Ke-<strong>${periodeKe || '-'}</strong> • 🏆 <strong>${nama}</strong>`;
+
+  modal.style.display = 'flex';
+}
+
+function closeModalHapusPemenang() {
+  const modal = document.getElementById('modalKonfirmasiHapusPemenang');
+  if (modal) modal.style.display = 'none';
+}
+
+async function executeConfirmedDeletePemenang() {
+  const winId = document.getElementById('delWinId').value;
+  const periodeKe = document.getElementById('delWinPeriodeKe').value;
+  const btn = document.getElementById('btnExecuteDeletePemenang');
+
+  btn.disabled = true;
+  btn.textContent = 'Menghapus...';
 
   try {
-    if (winnerId) {
-      await fetch(`${SUPABASE_REST_URL}/${TABLES.PEMENANG}?id=eq.${encodeURIComponent(winnerId)}`, {
+    if (winId) {
+      await fetch(`${SUPABASE_REST_URL}/${TABLES.PEMENANG}?id=eq.${encodeURIComponent(winId)}`, {
         method: 'DELETE',
         headers: supabaseHeaders
       });
@@ -3819,7 +4004,7 @@ async function deletePemenangArisan(winnerId, periodeKe) {
         method: 'DELETE',
         headers: supabaseHeaders
       });
-      // Kosongkan juga kolom pemenang_nama pada adnan_Arisan bila tercatat di sana
+      // Kosongkan juga pemenang_nama pada adnan_Arisan
       const matchPer = (cachedPeriodeList || []).find((p) => Number(p.periode_ke) === Number(periodeKe));
       if (matchPer && matchPer.id && matchPer.pemenang_nama) {
         try {
@@ -3832,13 +4017,330 @@ async function deletePemenangArisan(winnerId, periodeKe) {
       }
     }
 
+    closeModalHapusPemenang();
     await loadPeriodeAndPemenangData();
     updateQuickStatsBar();
     showGlobalAlert(`🗑️ Data Pemenang <b>Periode Ke-${periodeKe}</b> berhasil dihapus!`, 'success');
   } catch (err) {
     showGlobalAlert(err.message || 'Gagal menghapus data Pemenang Arisan.', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '🗑️ Ya, Hapus Pemenang';
   }
 }
+
+// Fallback wrapper jika masih dipanggil
+async function deletePemenangArisan(winnerId, periodeKe) {
+  openModalKonfirmasiHapusPemenang(winnerId, periodeKe, '');
+}
+
+window.openModalEditPemenang = openModalEditPemenang;
+window.closeModalEditPemenang = closeModalEditPemenang;
+window.toggleModalEditWinBankDropdown = toggleModalEditWinBankDropdown;
+window.submitModalEditPemenang = submitModalEditPemenang;
+window.openModalKonfirmasiHapusPemenang = openModalKonfirmasiHapusPemenang;
+window.closeModalHapusPemenang = closeModalHapusPemenang;
+window.executeConfirmedDeletePemenang = executeConfirmedDeletePemenang;
+window.deletePemenangArisan = deletePemenangArisan;
+
+// ============================================================================
+// MONITORING PEMBAYARAN SELURUH ANGGOTA ARISAN (PERIODE AKTIF) (Item 2)
+// ============================================================================
+let activeMonitoringStatusFilter = 'all'; // 'all', 'paid', 'unpaid'
+let activeMonitoringPeriodeId = null;
+
+function getActiveMonitoringPeriod() {
+  if (activeMonitoringPeriodeId && Array.isArray(cachedPeriodeList)) {
+    const found = cachedPeriodeList.find((p) => String(p.id) === String(activeMonitoringPeriodeId));
+    if (found) return found;
+  }
+  return (
+    (cachedPeriodeList || []).find((p) => String(p.status).toLowerCase() === 'aktif') ||
+    (cachedPeriodeList || [])[0] ||
+    null
+  );
+}
+
+function setMonitoringStatusFilter(filter) {
+  activeMonitoringStatusFilter = filter;
+  const btnAll = document.getElementById('btnFilterMonSemua');
+  const btnPaid = document.getElementById('btnFilterMonSudah');
+  const btnUnpaid = document.getElementById('btnFilterMonBelum');
+  if (btnAll) btnAll.classList.toggle('active', filter === 'all');
+  if (btnPaid) btnPaid.classList.toggle('active', filter === 'paid');
+  if (btnUnpaid) btnUnpaid.classList.toggle('active', filter === 'unpaid');
+  renderMonitoringPembayaranTable();
+}
+
+function refreshMonitoringPembayaran() {
+  loadPembayaranData().then(() => {
+    renderMonitoringPembayaran();
+  });
+}
+
+function renderMonitoringPembayaran() {
+  const period = getActiveMonitoringPeriod();
+  const labelEl = document.getElementById('labelMonitoringPeriodeAktif');
+  const selectEl = document.getElementById('selectFilterMonitoringPeriode');
+
+  if (selectEl && Array.isArray(cachedPeriodeList)) {
+    const currentVal = period ? period.id : '';
+    selectEl.innerHTML = cachedPeriodeList
+      .map(
+        (p) =>
+          `<option value="${p.id}" ${String(p.id) === String(currentVal) ? 'selected' : ''}>Periode Ke-${p.periode_ke} (${p.bulan_tahun || '-'}) ${String(p.status).toLowerCase() === 'aktif' ? '• [AKTIF]' : ''}</option>`
+      )
+      .join('');
+
+    selectEl.onchange = (e) => {
+      activeMonitoringPeriodeId = e.target.value;
+      renderMonitoringPembayaran();
+    };
+  }
+
+  if (labelEl) {
+    if (period) {
+      labelEl.innerHTML = `Periode yang dimonitor: <strong>Periode Ke-${period.periode_ke} (${period.bulan_tahun || '-'})</strong> ${String(period.status).toLowerCase() === 'aktif' ? '<span class="status-pill complete" style="margin-left:6px; font-size:0.75rem;">Status: Aktif</span>' : ''}`;
+    } else {
+      labelEl.textContent = 'Belum ada periode arisan.';
+    }
+  }
+
+  renderMonitoringPembayaranTable();
+}
+
+function renderMonitoringPembayaranTable() {
+  const tbody = document.getElementById('tableBodyMonitoringPembayaran');
+  if (!tbody) return;
+
+  const period = getActiveMonitoringPeriod();
+  const anggotaList = Array.isArray(cachedAnggotaList) ? cachedAnggotaList : [];
+  const searchInput = document.getElementById('searchMonitoringAnggota');
+  const searchQuery = searchInput ? searchInput.value.trim().toLowerCase() : '';
+
+  if (!period) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;">Pilih atau buat periode arisan terlebih dahulu.</td></tr>`;
+    return;
+  }
+
+  const periodKe = Number(period.periode_ke || 0);
+  const periodIdStr = String(period.id || '');
+
+  // Kumpulkan pembayaran uang arisan yang terkait dengan periode ini
+  const relevantPayments = (cachedPembayaranList || []).filter((pay) => {
+    const status = String(pay.status || '').toLowerCase();
+    if (status === 'ditolak') return false;
+    const isArs = getEffectiveJenisBayar(pay).toLowerCase().includes('arisan');
+    if (!isArs) return false;
+
+    // Cek kecocokan periode
+    if (pay.arisan_id && String(pay.arisan_id) === periodIdStr) return true;
+    const payPeriodLabel = getPaymentPeriodeArisanLabel(pay).toLowerCase();
+    if (payPeriodLabel.includes(`periode ke-${periodKe}`) || payPeriodLabel.includes(`periode ${periodKe}`)) return true;
+    const ket = String(pay.keterangan || '').toLowerCase();
+    if (ket.includes(`periode ke-${periodKe}`) || ket.includes(`periode ${periodKe}`)) return true;
+    return false;
+  });
+
+  // Pemetaan pembayaran per anggota
+  let totalCount = anggotaList.length;
+  let paidCount = 0;
+  let unpaidCount = 0;
+
+  const memberRowsData = anggotaList.map((m) => {
+    const mNama = String(m.nama_lengkap || '').trim();
+    const mNamaLower = mNama.toLowerCase();
+
+    // Cari pembayaran atas nama anggota ini atau grup
+    const matchPay = relevantPayments.find((p) => {
+      const pNama = String(p.nama_pembayar || '').trim().toLowerCase();
+      if (pNama === mNamaLower) return true;
+      if (pNama.includes(mNamaLower)) return true;
+      // Cek apakah anggota tercakup di group arisan
+      const groupMembers = extractGroupPaidMembersFromKeterangan(p);
+      return groupMembers.some((gm) => gm.toLowerCase() === mNamaLower);
+    });
+
+    const isPaid = !!matchPay;
+    if (isPaid) paidCount++;
+    else unpaidCount++;
+
+    return {
+      member: m,
+      nama: mNama,
+      isPaid,
+      payment: matchPay
+    };
+  });
+
+  const countTotalEl = document.getElementById('monCountTotal');
+  const countPaidEl = document.getElementById('monCountPaid');
+  const countUnpaidEl = document.getElementById('monCountUnpaid');
+  if (countTotalEl) countTotalEl.textContent = totalCount;
+  if (countPaidEl) countPaidEl.textContent = paidCount;
+  if (countUnpaidEl) countUnpaidEl.textContent = unpaidCount;
+
+  // Filter berdasarkan status tab
+  let filteredData = memberRowsData;
+  if (activeMonitoringStatusFilter === 'paid') {
+    filteredData = filteredData.filter((d) => d.isPaid);
+  } else if (activeMonitoringStatusFilter === 'unpaid') {
+    filteredData = filteredData.filter((d) => !d.isPaid);
+  }
+
+  // Filter berdasarkan search input
+  if (searchQuery) {
+    filteredData = filteredData.filter((d) => d.nama.toLowerCase().includes(searchQuery));
+  }
+
+  if (filteredData.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:18px; color:var(--text-secondary);">Tidak ada anggota arisan yang cocok dengan filter.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = filteredData
+    .map((item, idx) => {
+      const p = item.payment;
+      const statusBadge = item.isPaid
+        ? `<span class="status-pill complete" style="font-weight:700;">✓ Sudah Bayar</span>`
+        : `<span class="status-pill incomplete" style="font-weight:700; background:#fef2f2; color:#b91c1c; border-color:#fecaca;">✕ Belum Bayar</span>`;
+
+      const nominalText =
+        item.isPaid && p ? `<strong>${formatRupiah(p.nominal)}</strong>` : '<span style="color:#94a3b8;">-</span>';
+      const tglText = item.isPaid && p ? p.tanggal_bayar || '-' : '<span style="color:#94a3b8;">-</span>';
+
+      const buktiThumbnail =
+        item.isPaid && p && p.bukti_url
+          ? `<a href="javascript:void(0)" onclick="openPayBuktiLightbox('${encodeURIComponent(p.bukti_url)}', '${encodeURIComponent(item.nama)}')" style="font-size:0.78rem; font-weight:700; color:var(--primary); text-decoration:underline;">📸 Lihat Bukti</a>`
+          : item.isPaid && p
+          ? `<span style="font-size:0.8rem; color:#64748b;">${p.metode_bayar || 'Tunai/Bank'}</span>`
+          : '<span style="color:#94a3b8;">-</span>';
+
+      return `
+        <tr>
+          <td>${idx + 1}</td>
+          <td>
+            <a href="javascript:void(0)" onclick="showMemberDetailBiodataModal('${encodeURIComponent(item.nama)}')" style="font-weight:700; color:#1e293b; text-decoration:none;">
+              👤 ${item.nama}
+            </a>
+            ${item.member.garis_sanad ? `<div style="font-size:0.75rem; color:#64748b;">${item.member.garis_sanad}</div>` : ''}
+          </td>
+          <td>${statusBadge}</td>
+          <td>${nominalText}</td>
+          <td>${tglText}</td>
+          <td>${buktiThumbnail}</td>
+        </tr>
+      `;
+    })
+    .join('');
+}
+
+window.renderMonitoringPembayaran = renderMonitoringPembayaran;
+window.refreshMonitoringPembayaran = refreshMonitoringPembayaran;
+window.setMonitoringStatusFilter = setMonitoringStatusFilter;
+window.renderMonitoringPembayaranTable = renderMonitoringPembayaranTable;
+
+// ============================================================================
+// DAFTAR MUTASI KEUANGAN (DEBET & KREDIT) (Item 3)
+// ============================================================================
+function renderMutasiKeuanganTable() {
+  const tbody = document.getElementById('tableBodyMutasiKeuangan');
+  if (!tbody) return;
+
+  const totalDebetEl = document.getElementById('mutasiTotalDebet');
+  const totalKreditEl = document.getElementById('mutasiTotalKredit');
+  const saldoAkhirEl = document.getElementById('mutasiSaldoAkhir');
+
+  // 1. Kumpulkan Debet dari adnan_Pembayaran
+  const debetList = (cachedPembayaranList || [])
+    .filter((p) => {
+      const status = String(p.status || '').toLowerCase();
+      return status !== 'ditolak';
+    })
+    .map((p) => ({
+      id: p.id || '',
+      dateStr: p.tanggal_bayar || todayISO(),
+      timestamp: new Date(p.tanggal_bayar || todayISO()).getTime() || 0,
+      jenis: 'DEBET',
+      kategori: getEffectiveJenisBayar(p) || 'Penerimaan',
+      uraian: `${p.nama_pembayar || 'Peserta'}${p.keterangan ? ' - ' + stripInternalMetaFromKeterangan(p.keterangan) : ''}`,
+      debet: Number(p.nominal || 0),
+      kredit: 0
+    }));
+
+  // 2. Kumpulkan Kredit dari adnan_Pengeluaran
+  const kreditList = (cachedPengeluaranList || []).map((q) => ({
+    id: q.id || '',
+    dateStr: q.tanggal_pengeluaran || q.tanggal || todayISO(),
+    timestamp: new Date(q.tanggal_pengeluaran || q.tanggal || todayISO()).getTime() || 0,
+    jenis: 'KREDIT',
+    kategori: q.kategori || 'Pengeluaran Kas',
+    uraian: `${q.nama_pengeluaran || 'Pengeluaran'}${q.keterangan ? ' - ' + q.keterangan : ''}`,
+    debet: 0,
+    kredit: Number(q.nominal || 0)
+  }));
+
+  const allEntries = [...debetList, ...kreditList];
+
+  if (allEntries.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:18px;">Belum ada catatan mutasi keuangan.</td></tr>`;
+    if (totalDebetEl) totalDebetEl.textContent = formatRupiah(0);
+    if (totalKreditEl) totalKreditEl.textContent = formatRupiah(0);
+    if (saldoAkhirEl) saldoAkhirEl.textContent = formatRupiah(0);
+    return;
+  }
+
+  // 3. Urutkan secara kronologis tertua -> terbaru untuk menghitung saldo berjalan kumulatif
+  allEntries.sort((a, b) => {
+    if (a.dateStr === b.dateStr) return a.timestamp - b.timestamp;
+    return a.dateStr.localeCompare(b.dateStr);
+  });
+
+  let runningSaldo = 0;
+  let sumDebet = 0;
+  let sumKredit = 0;
+
+  for (const item of allEntries) {
+    sumDebet += item.debet;
+    sumKredit += item.kredit;
+    runningSaldo += item.debet - item.kredit;
+    item.saldo = runningSaldo;
+  }
+
+  if (totalDebetEl) totalDebetEl.textContent = formatRupiah(sumDebet);
+  if (totalKreditEl) totalKreditEl.textContent = formatRupiah(sumKredit);
+  if (saldoAkhirEl) saldoAkhirEl.textContent = formatRupiah(runningSaldo);
+
+  // 4. Balikkan urutan sehingga tanggal termuda (terbaru) berada di paling atas!
+  allEntries.sort((a, b) => {
+    if (a.dateStr === b.dateStr) return b.timestamp - a.timestamp;
+    return b.dateStr.localeCompare(a.dateStr);
+  });
+
+  tbody.innerHTML = allEntries
+    .map((item, idx) => {
+      const isDebet = item.jenis === 'DEBET';
+      const jenisBadge = isDebet
+        ? `<span class="gallery-badge" style="background:#f0fdf4; color:#15803d; border:1px solid #86efac; font-size:0.75rem; font-weight:800;">🟢 DEBET</span>`
+        : `<span class="gallery-badge" style="background:#fef2f2; color:#b91c1c; border:1px solid #fecaca; font-size:0.75rem; font-weight:800;">🔴 KREDIT</span>`;
+
+      return `
+        <tr>
+          <td>${idx + 1}</td>
+          <td><strong>${item.dateStr}</strong></td>
+          <td>${jenisBadge}</td>
+          <td><span style="font-size:0.82rem; font-weight:600; color:#475569;">${item.kategori}</span></td>
+          <td style="max-width:320px; line-height:1.4;">${item.uraian}</td>
+          <td style="text-align:right; font-weight:700; color:#15803d;">${item.debet > 0 ? '+' + formatRupiah(item.debet) : '-'}</td>
+          <td style="text-align:right; font-weight:700; color:#b91c1c;">${item.kredit > 0 ? '-' + formatRupiah(item.kredit) : '-'}</td>
+          <td style="text-align:right; font-weight:800; color:#0f766e;">${formatRupiah(item.saldo)}</td>
+        </tr>
+      `;
+    })
+    .join('');
+}
+
+window.renderMutasiKeuanganTable = renderMutasiKeuanganTable;
 
 window.deletePeriodeArisan = deletePeriodeArisan;
 window.deletePemenangArisan = deletePemenangArisan;
@@ -4879,6 +5381,22 @@ function showDetailBiodataAnggota(memberKey) {
           <span>👨‍👩‍👧‍👦</span> Data Keluarga & Silsilah
         </div>
         <div style="display:flex; flex-direction:column; gap:8px; font-size:0.84rem;">
+          <div style="display:flex; justify-content:space-between; gap:10px;">
+            <span style="color:#64748b;">Kakek Buyut:</span>
+            <strong style="color:#1e293b;">${member.nama_kakek_buyut || '-'}</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between; gap:10px;">
+            <span style="color:#64748b;">Nenek Buyut:</span>
+            <strong style="color:#1e293b;">${member.nama_nenek_buyut || '-'}</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between; gap:10px;">
+            <span style="color:#64748b;">Kakek:</span>
+            <strong style="color:#1e293b;">${member.nama_kakek || '-'}</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between; gap:10px;">
+            <span style="color:#64748b;">Nenek:</span>
+            <strong style="color:#1e293b;">${member.nama_nenek || '-'}</strong>
+          </div>
           <div style="display:flex; justify-content:space-between; gap:10px;">
             <span style="color:#64748b;">Nama Ayah:</span>
             <strong style="color:#1e293b;">${member.nama_ayah || '-'}</strong>
@@ -5921,7 +6439,7 @@ async function triggerAdminLiveSpin() {
   animateWheelSpinToState(nextState);
 }
 
-async function selectSpinHistoryAsOfficialWinner(historyId) {
+function selectSpinHistoryAsOfficialWinner(historyId) {
   if (!isUserAdmin()) {
     showGlobalAlert('Hanya User Admin yang dapat menetapkan pemenang resmi dari History Putaran.', 'error');
     return;
@@ -5934,7 +6452,85 @@ async function selectSpinHistoryAsOfficialWinner(historyId) {
     return;
   }
 
+  const modal = document.getElementById('modalPengesahanPemenang');
+  if (!modal) return;
+
+  const periodeObj =
+    (cachedPeriodeList || []).find((p) => String(p.id) === String(targetEntry.periode_id)) ||
+    (cachedPeriodeList || []).find((p) => Number(p.periode_ke) === Number(targetEntry.periode_ke)) ||
+    cachedPeriodeList[0] ||
+    null;
+
+  const perKe = targetEntry.periode_ke || (periodeObj ? periodeObj.periode_ke : 1);
+  const blnTahun = periodeObj ? periodeObj.bulan_tahun : targetEntry.periode_label || '-';
+  const member = findAnggotaByNameOrId(targetEntry.winner_name, targetEntry.winner_id);
+
+  document.getElementById('modalSahHistoryId').value = historyId;
+  document.getElementById('modalSahWinnerId').value = (member && member.id) || targetEntry.winner_id || '';
+  document.getElementById('modalSahWinnerUserId').value = (member && member.user_id) || targetEntry.winner_user_id || '';
+  document.getElementById('modalSahNamaPemenang').value = targetEntry.winner_name;
+  document.getElementById('modalSahPeriodeLabel').textContent = `Periode Ke-${perKe}`;
+  document.getElementById('modalSahBulanTahun').textContent = blnTahun;
+  document.getElementById('modalSahTanggalUndi').value = todayISO();
+  document.getElementById('modalSahTotalDiterima').value = ''; // Nilai awal dikosongkan ("") sesuai permintaan
+
+  document.getElementById('modalSahMetode').value = 'Transfer Bank';
+  populateBankDropdowns();
+  const bankSelect = document.getElementById('modalSahBank');
+  if (bankSelect && member && member.nama_bank) {
+    bankSelect.value = member.nama_bank;
+  }
+  toggleModalSahBankDropdown();
+
+  document.getElementById('modalSahKeterangan').value = `Disahkan dari Live Spin Undian Putaran Ke-${targetEntry.putaran_ke || 1} (${targetEntry.waktu || ''})`;
+
+  const btnConfirm = document.getElementById('btnConfirmSahPemenang');
+  if (btnConfirm) {
+    btnConfirm.innerHTML = `🏆 Konfirmasi Penerima Periode Ke-${perKe}`;
+  }
+
+  modal.style.display = 'flex';
+}
+
+function closeModalPengesahanPemenang() {
+  const modal = document.getElementById('modalPengesahanPemenang');
+  if (modal) modal.style.display = 'none';
+}
+
+function toggleModalSahBankDropdown() {
+  const metode = document.getElementById('modalSahMetode').value;
+  const wrapper = document.getElementById('modalSahBankWrapper');
+  if (wrapper) {
+    wrapper.style.display = metode === 'Transfer Bank' ? 'block' : 'none';
+  }
+}
+
+async function submitModalPengesahanPemenang(e) {
+  if (e && e.preventDefault) e.preventDefault();
+  if (!isUserAdmin()) {
+    showGlobalAlert('Hanya Role Admin yang berhak mengesahkan pemenang.', 'error');
+    return;
+  }
+
+  const historyId = document.getElementById('modalSahHistoryId').value;
+  const historyList = Array.isArray(liveSpinState.history) ? [...liveSpinState.history] : [];
+  const targetEntry = historyList.find((h) => String(h.history_id) === String(historyId));
+  if (!targetEntry) {
+    showGlobalAlert('Data putaran tidak valid.', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('btnConfirmSahPemenang');
+  btn.disabled = true;
+  btn.textContent = 'Mengesahkan...';
+
   const adminName = currentLoggedUser ? currentLoggedUser.nama_lengkap || currentLoggedUser.user_id : 'Admin';
+  const totalDiterima = Number(document.getElementById('modalSahTotalDiterima').value || 0);
+  const tanggalUndi = document.getElementById('modalSahTanggalUndi').value || todayISO();
+  const metode = document.getElementById('modalSahMetode').value;
+  const namaBank = metode === 'Transfer Bank' ? document.getElementById('modalSahBank').value : null;
+  const keterangan = document.getElementById('modalSahKeterangan').value.trim();
+
   const updatedHistory = historyList.map((h) => ({
     ...h,
     is_official: String(h.history_id) === String(historyId),
@@ -5968,7 +6564,7 @@ async function selectSpinHistoryAsOfficialWinner(historyId) {
         {
           pemenang_id: member ? member.id : null,
           pemenang_nama: targetEntry.winner_name,
-          total_diterima: Number(targetEntry.nominal_diterima || 0),
+          total_diterima: totalDiterima,
           status: 'selesai'
         },
         `?id=eq.${encodeURIComponent(periodeObj.id)}`
@@ -5994,11 +6590,11 @@ async function selectSpinHistoryAsOfficialWinner(historyId) {
         anggota_id: member ? member.id : null,
         user_id: member ? member.user_id || null : null,
         nama_pemenang: targetEntry.winner_name,
-        tanggal_undi: todayISO(),
-        nominal_diterima: Number(targetEntry.nominal_diterima || 0),
-        metode_pencairan: 'Transfer Bank',
-        nama_bank: member ? member.nama_bank || null : null,
-        keterangan: `Disahkan dari Live Spin Undian Putaran Ke-${targetEntry.putaran_ke} (${targetEntry.waktu})`,
+        tanggal_undi: tanggalUndi,
+        nominal_diterima: totalDiterima,
+        metode_pencairan: metode,
+        nama_bank: namaBank,
+        keterangan: keterangan,
         ditetapkan_oleh: adminName
       });
     } catch (_) { }
@@ -6010,17 +6606,24 @@ async function selectSpinHistoryAsOfficialWinner(historyId) {
     await loadPeriodeAndPemenangData();
     renderLiveSpinCandidateChecklist();
     updateQuickStatsBar();
+    closeModalPengesahanPemenang();
 
     showGlobalAlert(
-      `🏆 <b>Pemenang Resmi Disahkan!</b> Hasil <b>Putaran Ke-${targetEntry.putaran_ke} (${targetEntry.winner_name})</b> telah ditetapkan sebagai Pemenang Resmi pada <code>adnan_Arisan</code> & <code>adnan_PemenangArisan</code>!`,
+      `🏆 <b>Pemenang Resmi Disahkan!</b> <b>${targetEntry.winner_name}</b> telah ditetapkan sebagai Penerima Arisan Periode Ke-${targetEntry.periode_ke || 1}!`,
       'success'
     );
   } catch (err) {
     showGlobalAlert(err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '🏆 Konfirmasi Penetapan Pemenang';
   }
 }
 
 window.selectSpinHistoryAsOfficialWinner = selectSpinHistoryAsOfficialWinner;
+window.closeModalPengesahanPemenang = closeModalPengesahanPemenang;
+window.toggleModalSahBankDropdown = toggleModalSahBankDropdown;
+window.submitModalPengesahanPemenang = submitModalPengesahanPemenang;
 
 async function resetLiveSpinHistoryByAdmin() {
   if (!isUserAdmin()) return;
@@ -6346,7 +6949,12 @@ if (biodataForm) {
         email: document.getElementById('bioEmail').value.trim() || null,
         alamat: document.getElementById('bioAlamat').value.trim(),
         kota: document.getElementById('bioKota').value.trim() || null,
-        nama_ayah: document.getElementById('bioNamaAyah').value.trim() || 'H. Adnan',
+        nama_kakek_buyut: (document.getElementById('bioNamaKakekBuyut') && document.getElementById('bioNamaKakekBuyut').value.trim()) || null,
+        nama_nenek_buyut: (document.getElementById('bioNamaNenekBuyut') && document.getElementById('bioNamaNenekBuyut').value.trim()) || null,
+        nama_kakek: (document.getElementById('bioNamaKakek') && document.getElementById('bioNamaKakek').value.trim()) || null,
+        nama_nenek: (document.getElementById('bioNamaNenek') && document.getElementById('bioNamaNenek').value.trim()) || null,
+        nama_ayah: (document.getElementById('bioNamaAyah') && document.getElementById('bioNamaAyah').value.trim()) || 'H. Adnan',
+        nama_ibu: (document.getElementById('bioNamaIbu') && document.getElementById('bioNamaIbu').value.trim()) || null,
         garis_sanad: silsilah,
         silsilah_keluarga: silsilah,
         nama_pasangan: document.getElementById('bioNamaPasangan').value.trim() || null,
