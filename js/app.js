@@ -355,11 +355,15 @@ function getPaymentPeriodeArisanLabel(payRow) {
 }
 
 function stripInternalMetaFromKeterangan(ket) {
-  return String(ket || '')
-    .replace(/\s*\[SPLIT:\d+,\d+,\d+\]\s*/g, '')
-    .replace(/\s*\[JENIS:[^\]]*\]\s*/g, '')
-    .replace(/\s*\[PERIODE:[^\]]*\]\s*/g, '')
-    .replace(/\s*\[LIVESPINSTATE:[^\]]*\]\s*/g, '')
+  if (!ket) return '';
+  return String(ket)
+    .replace(/\s*\[SPLIT:[^\]]*\]\s*/gi, '')
+    .replace(/\s*\[JENIS:[^\]]*\]\s*/gi, '')
+    .replace(/\s*\[PERIODE:[^\]]*\]\s*/gi, '')
+    .replace(/\s*\[LIVESPINSTATE:[^\]]*\]\s*/gi, '')
+    .replace(/\s*\[REK:[^\]]*\]\s*/gi, '')
+    .replace(/\[[^\]]*\]/g, '')
+    .replace(/[\[\]]/g, '')
     .split('|')
     .map((part) => part.trim())
     .filter((part) => {
@@ -367,6 +371,10 @@ function stripInternalMetaFromKeterangan(ket) {
       const lower = part.toLowerCase();
       if (lower.startsWith('group:')) return false;
       if (lower.startsWith('split arisan')) return false;
+      if (lower.includes('dibayarkan pemenang')) return false;
+      if (lower.includes('masuk kas')) return false;
+      if (lower.includes('sisa kas')) return false;
+      if (lower.includes('uang arisan') && lower.includes('konsumsi')) return false;
       return true;
     })
     .join(' | ')
@@ -900,7 +908,11 @@ function switchPeriodeSubTab(targetSubTabId) {
     panel.classList.toggle('active', panel.id === targetSubTabId);
   });
 
-  if (targetSubTabId === 'subTabDaftarUser') {
+  if (targetSubTabId === 'subTabMonitoringBayar') {
+    renderMonitoringPembayaran();
+  } else if (targetSubTabId === 'subTabMutasiKeuangan') {
+    renderMutasiKeuanganTable();
+  } else if (targetSubTabId === 'subTabDaftarUser') {
     loadRegisteredUsersData();
   } else if (targetSubTabId === 'subTabDatabaseManager') {
     const selector = document.getElementById('dbTableSelector');
@@ -1174,7 +1186,18 @@ function populateBiodataForm(user, bio) {
   document.getElementById('bioEmail').value = (bio && bio.email) || '';
   document.getElementById('bioAlamat').value = (bio && bio.alamat) || '';
   document.getElementById('bioKota').value = (bio && bio.kota) || '';
-  document.getElementById('bioNamaAyah').value = (bio && bio.nama_ayah) || 'H. Adnan';
+  const elBuyut = document.getElementById('bioNamaKakekBuyut');
+  if (elBuyut) elBuyut.value = (bio && bio.nama_kakek_buyut) || '';
+  const elNenekBuyut = document.getElementById('bioNamaNenekBuyut');
+  if (elNenekBuyut) elNenekBuyut.value = (bio && bio.nama_nenek_buyut) || '';
+  const elKakek = document.getElementById('bioNamaKakek');
+  if (elKakek) elKakek.value = (bio && bio.nama_kakek) || '';
+  const elNenek = document.getElementById('bioNamaNenek');
+  if (elNenek) elNenek.value = (bio && bio.nama_nenek) || '';
+  const elAyah = document.getElementById('bioNamaAyah');
+  if (elAyah) elAyah.value = (bio && bio.nama_ayah) || 'H. Adnan';
+  const elIbu = document.getElementById('bioNamaIbu');
+  if (elIbu) elIbu.value = (bio && bio.nama_ibu) || '';
   document.getElementById('bioSilsilah').value = (bio && (bio.silsilah_keluarga || bio.garis_sanad)) || '';
   document.getElementById('bioNamaPasangan').value = (bio && bio.nama_pasangan) || '';
   document.getElementById('bioJumlahAnak').value = bio && bio.jumlah_anak != null ? bio.jumlah_anak : 0;
@@ -2053,11 +2076,11 @@ function getActivePeriodeSplitRates() {
   let found = null;
   if (targetId) {
     found = activeList.find((p) => String(p.id) === String(targetId)) ||
-            cachedPeriodeList.find((p) => String(p.id) === String(targetId));
+      cachedPeriodeList.find((p) => String(p.id) === String(targetId));
   }
   if (!found && targetKet) {
     found = activeList.find((p) => String(p.keterangan || '').trim().toLowerCase() === targetKet.toLowerCase()) ||
-            cachedPeriodeList.find((p) => String(p.keterangan || '').trim().toLowerCase() === targetKet.toLowerCase());
+      cachedPeriodeList.find((p) => String(p.keterangan || '').trim().toLowerCase() === targetKet.toLowerCase());
   }
   if (!found) {
     found = activeList[0] || null;
@@ -2137,6 +2160,7 @@ function syncPayGroupSplitUI() {
   const nominalArisanDanKonsumsi = rates.nominal_arisan_konsumsi;
 
   if (matchedGroup) {
+    wrapper.classList.remove('hidden');
     const members = extractGroupMembersArray(matchedGroup);
     const isSameGroup =
       activeDetectedGroupForPay &&
@@ -2155,7 +2179,7 @@ function syncPayGroupSplitUI() {
       titleEl.innerHTML = `👨‍👩‍👧‍👦 Group Arisan Ditemukan: <span style="text-decoration:underline;">${matchedGroup.nama_group}</span> (${members.length} Orang)`;
     }
     if (subtitleEl) {
-      subtitleEl.innerHTML = `Penanggung Jawab: <strong>${matchedGroup.penanggung_jawab}</strong> • Rincian per orang: <strong>a. Uang Arisan (${formatRupiah(rates.uang_arisan)}) + b. Konsumsi (${formatRupiah(rates.uang_konsumsi)}) + c. Kas (${formatRupiah(rates.uang_kas)}) = ${formatRupiah(rates.total)}</strong> • Dibayarkan ke Pemenang: <strong>${formatRupiah(nominalArisanDanKonsumsi)}</strong> (Sisa <strong>${formatRupiah(rates.uang_kas)}</strong> masuk Kas).`;
+      subtitleEl.innerHTML = `Penanggung Jawab: <strong>${matchedGroup.penanggung_jawab}</strong> • Silakan centang anggota group yang ingin dibayarkan:`;
     }
     if (selectAllLabel) selectAllLabel.classList.remove('hidden');
 
@@ -2177,13 +2201,6 @@ function syncPayGroupSplitUI() {
                 <span class="gallery-badge" style="font-size:0.7rem; ${isPJ ? 'background:#fef3c7; color:#b45309;' : ''}">
                   ${isPJ ? '👑 Penanggung Jawab' : '👤 Anggota Group'}
                 </span>
-              </div>
-              <div style="font-size:0.78rem; font-weight:700; color:var(--text-secondary);">
-                a. Arisan: <span style="color:var(--primary);">${formatRupiah(rates.uang_arisan)}</span> +
-                b. Konsumsi: <span style="color:#0284c7;">${formatRupiah(rates.uang_konsumsi)}</span> +
-                c. Kas: <span style="color:#b45309;">${formatRupiah(rates.uang_kas)}</span> =
-                <strong>${formatRupiah(rates.total)}</strong> •
-                Pemenang: <strong style="color:#15803d;">${formatRupiah(nominalArisanDanKonsumsi)}</strong>
               </div>
             </label>
           `;
@@ -2212,42 +2229,34 @@ function syncPayGroupSplitUI() {
     const sumTotalRincian = activeCount * rates.total;
     const sumDibayarkanPemenang = activeCount * nominalArisanDanKonsumsi;
 
-    document.getElementById('splitPreviewArisan').textContent = formatRupiah(sumArisan);
-    document.getElementById('splitPreviewKas').textContent = formatRupiah(sumKas);
-    document.getElementById('splitPreviewKonsumsi').textContent = formatRupiah(sumKonsumsi);
+    const elArisan = document.getElementById('splitPreviewArisan');
+    if (elArisan) elArisan.textContent = formatRupiah(sumArisan);
+    const elKas = document.getElementById('splitPreviewKas');
+    if (elKas) elKas.textContent = formatRupiah(sumKas);
+    const elKonsumsi = document.getElementById('splitPreviewKonsumsi');
+    if (elKonsumsi) elKonsumsi.textContent = formatRupiah(sumKonsumsi);
     const elTotalIuran = document.getElementById('splitPreviewTotalIuran');
     if (elTotalIuran) elTotalIuran.textContent = formatRupiah(sumTotalRincian);
-    document.getElementById('splitPreviewTotal').textContent = formatRupiah(sumDibayarkanPemenang);
+    const elTotal = document.getElementById('splitPreviewTotal');
+    if (elTotal) elTotal.textContent = formatRupiah(sumDibayarkanPemenang);
 
     if (payNominal) payNominal.value = sumDibayarkanPemenang > 0 ? sumDibayarkanPemenang : '';
     if (payNominalHint) {
-      payNominalHint.textContent = `(${activeCount} Orang × [Arisan ${formatRupiah(rates.uang_arisan)} + Konsumsi ${formatRupiah(rates.uang_konsumsi)} = ${formatRupiah(nominalArisanDanKonsumsi)}]; Sisa Kas ${formatRupiah(sumKas)} masuk Kas)`;
+      payNominalHint.textContent = `(${activeCount} Orang Dipilih)`;
     }
   } else {
     activeDetectedGroupForPay = null;
     checkedGroupMembersMap = {};
 
-    if (titleEl) {
-      titleEl.textContent = `📋 Perincian Uang Arisan (a. Uang Arisan ${formatRupiah(rates.uang_arisan)} + b. Konsumsi ${formatRupiah(rates.uang_konsumsi)} + c. Kas ${formatRupiah(rates.uang_kas)} = ${formatRupiah(rates.total)})`;
-    }
-    if (subtitleEl) {
-      subtitleEl.innerHTML = `Dibayarkan ke Pemenang: <strong>Uang Arisan (${formatRupiah(rates.uang_arisan)}) + Uang Konsumsi (${formatRupiah(rates.uang_konsumsi)}) = ${formatRupiah(nominalArisanDanKonsumsi)}</strong> • Sisanya <strong>${formatRupiah(rates.uang_kas)} masuk Kas</strong>.`;
-    }
+    wrapper.classList.add('hidden');
     if (selectAllLabel) selectAllLabel.classList.add('hidden');
     if (memberListContainer) {
       memberListContainer.innerHTML = '';
     }
 
-    document.getElementById('splitPreviewArisan').textContent = formatRupiah(rates.uang_arisan);
-    document.getElementById('splitPreviewKas').textContent = formatRupiah(rates.uang_kas);
-    document.getElementById('splitPreviewKonsumsi').textContent = formatRupiah(rates.uang_konsumsi);
-    const elTotalIuran = document.getElementById('splitPreviewTotalIuran');
-    if (elTotalIuran) elTotalIuran.textContent = formatRupiah(rates.total);
-    document.getElementById('splitPreviewTotal').textContent = formatRupiah(nominalArisanDanKonsumsi);
-
-    if (payNominal) payNominal.value = nominalArisanDanKonsumsi > 0 ? nominalArisanDanKonsumsi : '';
+    if (payNominal) payNominal.value = '';
     if (payNominalHint) {
-      payNominalHint.textContent = `(Dibayarkan Pemenang: Arisan ${formatRupiah(rates.uang_arisan)} + Konsumsi ${formatRupiah(rates.uang_konsumsi)} = ${formatRupiah(nominalArisanDanKonsumsi)}; Sisa ${formatRupiah(rates.uang_kas)} masuk Kas dari Total ${formatRupiah(rates.total)})`;
+      payNominalHint.textContent = '';
     }
   }
 }
@@ -2648,6 +2657,8 @@ async function loadPembayaranData() {
     populateAdminPesertaDropdowns();
     renderPembayaranTableRows();
     updateQuickStatsBar();
+    renderMonitoringPembayaranTable();
+    renderMutasiKeuanganTable();
   } catch (err) {
     tbody.innerHTML = `<tr><td colspan="13" style="text-align:center; color:#dc2626;">${err.message}</td></tr>`;
   }
@@ -2878,7 +2889,6 @@ async function executeSavePembayaran(confirmedFromGroupModal = false) {
         const jenisMeta = `[JENIS:${jenisBayar}]`;
         const periodeMeta = selectedPeriodeLabel ? `[PERIODE:${selectedPeriodeLabel}]` : '';
         const fullKeterangan = [
-          `Dibayarkan Pemenang: Arisan ${formatRupiah(rates.uang_arisan)} + Konsumsi ${formatRupiah(rates.uang_konsumsi)} = ${formatRupiah(nominalPerMember)} (Sisa Kas ${formatRupiah(rates.uang_kas)} masuk Kas dari Total ${formatRupiah(rates.total)})`,
           ketInput,
           metode === 'Transfer Bank' && namaBank ? `Bank: ${namaBank}` : '',
           noRek ? `Rek: ${noRek}` : '',
@@ -2925,15 +2935,19 @@ async function executeSavePembayaran(confirmedFromGroupModal = false) {
       const ua = isArs ? rates.uang_arisan : 0;
       const uk = isArs ? rates.uang_kas : 0;
       const uko = isArs ? rates.uang_konsumsi : 0;
-      const inputNominal = Number(
-        document.getElementById('payNominal').value || (isArs ? rates.nominal_arisan_konsumsi : 0)
-      );
+      const rawNominalInput = document.getElementById('payNominal').value;
+      const inputNominal = Number(rawNominalInput || 0);
+      if (inputNominal <= 0) {
+        showGlobalAlert('Silakan isi Nominal Pembayaran (Rp) yang valid terlebih dahulu.', 'error');
+        btn.disabled = false;
+        btn.textContent = '💾 Simpan Pembayaran (Status: Pending)';
+        return;
+      }
       const splitMeta = isArs ? `[SPLIT:${ua},${uk},${uko}]` : '';
       const jenisMeta = `[JENIS:${jenisBayar}]`;
       const periodeMeta = isArs && selectedPeriodeLabel ? `[PERIODE:${selectedPeriodeLabel}]` : '';
 
       const fullKeterangan = [
-        isArs ? `Dibayarkan Pemenang: Arisan ${formatRupiah(ua)} + Konsumsi ${formatRupiah(uko)} = ${formatRupiah(ua + uko)} (Sisa Kas ${formatRupiah(uk)} masuk Kas dari Total ${formatRupiah(ua + uko + uk)})` : '',
         ketInput,
         metode === 'Transfer Bank' && namaBank ? `Bank: ${namaBank}` : '',
         noRek ? `Rek: ${noRek}` : '',
@@ -3238,6 +3252,7 @@ async function loadPengeluaranData() {
     populatePengeluaranAnggotaDropdown();
     renderPengeluaranTableRows();
     updateQuickStatsBar();
+    renderMutasiKeuanganTable();
   } catch (err) {
     tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:#dc2626;">${err.message}</td></tr>`;
   }
@@ -3746,16 +3761,22 @@ async function loadPeriodeAndPemenangData() {
               <td><strong>${formatRupiah(w.nominal_diterima)}</strong></td>
               <td>${w.metode_pencairan || '-'} ${w.nama_bank ? '(' + w.nama_bank + ')' : ''}</td>
               <td>${stripInternalMetaFromKeterangan(w.keterangan) || '-'}</td>
-              <td>
-                <button type="button" class="btn-secondary btn-sm" style="color:#dc2626; border-color:#fecaca;" onclick="deletePemenangArisan('${w.id || ''}', ${Number(w.periode_ke || 0)})">
-                  🗑️ Hapus
-                </button>
+              <td style="white-space:nowrap;">
+                <div style="display:flex; gap:6px;">
+                  <button type="button" class="btn-secondary btn-sm" style="color:#0284c7; border-color:#bae6fd;" onclick="openModalEditPemenang('${w.id || ''}', ${Number(w.periode_ke || 0)})">
+                    ✏️ Edit
+                  </button>
+                  <button type="button" class="btn-secondary btn-sm" style="color:#dc2626; border-color:#fecaca;" onclick="openModalKonfirmasiHapusPemenang('${w.id || ''}', ${Number(w.periode_ke || 0)}, '${encodeURIComponent(w.nama_pemenang || '')}')">
+                    🗑️ Hapus
+                  </button>
+                </div>
               </td>
             </tr>`
           )
           .join('');
       }
     }
+    renderMonitoringPembayaran();
   } catch (err) {
     console.error(err);
   }
@@ -3806,18 +3827,174 @@ async function deletePeriodeArisan(periodeId, periodeKe) {
   }
 }
 
-async function deletePemenangArisan(winnerId, periodeKe) {
+// ============================================================================
+// MODAL & ACTION EDIT PEMENANG ARISAN (Item 5)
+// ============================================================================
+function openModalEditPemenang(winnerId, periodeKe) {
+  if (!isUserAdmin()) {
+    showGlobalAlert('Hanya Role Admin yang dapat mengedit data Pemenang Arisan.', 'error');
+    return;
+  }
+  const target = (cachedPemenangList || []).find(
+    (w) => (winnerId && String(w.id) === String(winnerId)) || Number(w.periode_ke) === Number(periodeKe)
+  );
+  if (!target) {
+    showGlobalAlert('Data pemenang arisan tidak ditemukan.', 'error');
+    return;
+  }
+
+  const modal = document.getElementById('modalEditPemenang');
+  if (!modal) return;
+
+  document.getElementById('editWinId').value = target.id || '';
+  document.getElementById('editWinOldPeriodeKe').value = target.periode_ke || '';
+  document.getElementById('editWinPeriodeId').value = target.periode_id || '';
+  document.getElementById('editWinPeriodeKe').value = target.periode_ke || 1;
+  document.getElementById('editWinBulanTahun').value = target.bulan_tahun || '';
+  document.getElementById('editWinNama').value = target.nama_pemenang || '';
+  document.getElementById('editWinTanggalUndi').value = target.tanggal_undi || todayISO();
+  document.getElementById('editWinNominal').value = target.nominal_diterima || 0;
+
+  const metodeSelect = document.getElementById('editWinMetode');
+  if (metodeSelect) {
+    metodeSelect.value =
+      target.metode_pencairan && target.metode_pencairan.toLowerCase().includes('tunai')
+        ? 'Tunai'
+        : 'Transfer Bank';
+  }
+
+  populateBankDropdowns();
+  const bankSelect = document.getElementById('editWinBank');
+  if (bankSelect && target.nama_bank) {
+    bankSelect.value = target.nama_bank;
+  }
+
+  toggleModalEditWinBankDropdown();
+  document.getElementById('editWinKeterangan').value = stripInternalMetaFromKeterangan(target.keterangan) || '';
+
+  modal.style.display = 'flex';
+}
+
+function closeModalEditPemenang() {
+  const modal = document.getElementById('modalEditPemenang');
+  if (modal) modal.style.display = 'none';
+}
+
+function toggleModalEditWinBankDropdown() {
+  const metode = document.getElementById('editWinMetode').value;
+  const wrapper = document.getElementById('editWinBankWrapper');
+  if (wrapper) {
+    wrapper.style.display = metode === 'Transfer Bank' ? 'block' : 'none';
+  }
+}
+
+async function submitModalEditPemenang(e) {
+  if (e && e.preventDefault) e.preventDefault();
+  if (!isUserAdmin()) {
+    showGlobalAlert('Hanya Role Admin yang berhak menyimpan perubahan pemenang.', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('btnSaveEditPemenang');
+  const winId = document.getElementById('editWinId').value;
+  const oldPeriodeKe = Number(document.getElementById('editWinOldPeriodeKe').value || 0);
+  const periodeKe = Number(document.getElementById('editWinPeriodeKe').value || 1);
+  const bulanTahun = document.getElementById('editWinBulanTahun').value.trim();
+  const namaPemenang = document.getElementById('editWinNama').value.trim();
+  const tanggalUndi = document.getElementById('editWinTanggalUndi').value || todayISO();
+  const nominal = Number(document.getElementById('editWinNominal').value || 0);
+  const metode = document.getElementById('editWinMetode').value;
+  const namaBank = metode === 'Transfer Bank' ? document.getElementById('editWinBank').value : null;
+  const keterangan = document.getElementById('editWinKeterangan').value.trim();
+
+  if (!namaPemenang) {
+    showGlobalAlert('Nama pemenang wajib diisi.', 'error');
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Menyimpan...';
+
+  try {
+    const payload = {
+      periode_ke: periodeKe,
+      bulan_tahun: bulanTahun,
+      nama_pemenang: namaPemenang,
+      tanggal_undi: tanggalUndi,
+      nominal_diterima: nominal,
+      metode_pencairan: metode,
+      nama_bank: namaBank,
+      keterangan: keterangan
+    };
+
+    if (winId) {
+      await adaptiveSupabaseWrite(TABLES.PEMENANG, payload, `?id=eq.${encodeURIComponent(winId)}`);
+    } else {
+      await adaptiveSupabaseWrite(TABLES.PEMENANG, payload, `?periode_ke=eq.${encodeURIComponent(oldPeriodeKe || periodeKe)}`);
+    }
+
+    // Sinkronkan juga pada adnan_Arisan
+    const matchPer = (cachedPeriodeList || []).find((p) => Number(p.periode_ke) === Number(oldPeriodeKe || periodeKe));
+    if (matchPer && matchPer.id) {
+      try {
+        await adaptiveSupabaseWrite(
+          TABLES.ARISAN,
+          {
+            pemenang_nama: namaPemenang,
+            total_diterima: nominal
+          },
+          `?id=eq.${encodeURIComponent(matchPer.id)}`
+        );
+      } catch (_) { }
+    }
+
+    closeModalEditPemenang();
+    await loadPeriodeAndPemenangData();
+    updateQuickStatsBar();
+    showGlobalAlert(`✅ Perubahan Pemenang <b>Periode Ke-${periodeKe} (${namaPemenang})</b> berhasil disimpan!`, 'success');
+  } catch (err) {
+    showGlobalAlert(err.message || 'Gagal menyimpan perubahan pemenang.', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '💾 Simpan Perubahan';
+  }
+}
+
+// ============================================================================
+// MODAL & ACTION KONFIRMASI HAPUS PEMENANG ARISAN (Item 5)
+// ============================================================================
+function openModalKonfirmasiHapusPemenang(winnerId, periodeKe, encodedNama) {
   if (!isUserAdmin()) {
     showGlobalAlert('Hanya Role Admin yang dapat menghapus data Pemenang Arisan.', 'error');
     return;
   }
-  if (!window.confirm(`Apakah Anda yakin ingin menghapus data Pemenang Periode Ke-${periodeKe || '-'}?`)) {
-    return;
-  }
+  const modal = document.getElementById('modalKonfirmasiHapusPemenang');
+  if (!modal) return;
+
+  const nama = encodedNama ? decodeURIComponent(encodedNama) : 'Pemenang';
+  document.getElementById('delWinId').value = winnerId || '';
+  document.getElementById('delWinPeriodeKe').value = periodeKe || '';
+  document.getElementById('delWinDetailText').innerHTML = `Periode Ke-<strong>${periodeKe || '-'}</strong> • 🏆 <strong>${nama}</strong>`;
+
+  modal.style.display = 'flex';
+}
+
+function closeModalHapusPemenang() {
+  const modal = document.getElementById('modalKonfirmasiHapusPemenang');
+  if (modal) modal.style.display = 'none';
+}
+
+async function executeConfirmedDeletePemenang() {
+  const winId = document.getElementById('delWinId').value;
+  const periodeKe = document.getElementById('delWinPeriodeKe').value;
+  const btn = document.getElementById('btnExecuteDeletePemenang');
+
+  btn.disabled = true;
+  btn.textContent = 'Menghapus...';
 
   try {
-    if (winnerId) {
-      await fetch(`${SUPABASE_REST_URL}/${TABLES.PEMENANG}?id=eq.${encodeURIComponent(winnerId)}`, {
+    if (winId) {
+      await fetch(`${SUPABASE_REST_URL}/${TABLES.PEMENANG}?id=eq.${encodeURIComponent(winId)}`, {
         method: 'DELETE',
         headers: supabaseHeaders
       });
@@ -3827,7 +4004,7 @@ async function deletePemenangArisan(winnerId, periodeKe) {
         method: 'DELETE',
         headers: supabaseHeaders
       });
-      // Kosongkan juga kolom pemenang_nama pada adnan_Arisan bila tercatat di sana
+      // Kosongkan juga pemenang_nama pada adnan_Arisan
       const matchPer = (cachedPeriodeList || []).find((p) => Number(p.periode_ke) === Number(periodeKe));
       if (matchPer && matchPer.id && matchPer.pemenang_nama) {
         try {
@@ -3840,13 +4017,330 @@ async function deletePemenangArisan(winnerId, periodeKe) {
       }
     }
 
+    closeModalHapusPemenang();
     await loadPeriodeAndPemenangData();
     updateQuickStatsBar();
     showGlobalAlert(`🗑️ Data Pemenang <b>Periode Ke-${periodeKe}</b> berhasil dihapus!`, 'success');
   } catch (err) {
     showGlobalAlert(err.message || 'Gagal menghapus data Pemenang Arisan.', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '🗑️ Ya, Hapus Pemenang';
   }
 }
+
+// Fallback wrapper jika masih dipanggil
+async function deletePemenangArisan(winnerId, periodeKe) {
+  openModalKonfirmasiHapusPemenang(winnerId, periodeKe, '');
+}
+
+window.openModalEditPemenang = openModalEditPemenang;
+window.closeModalEditPemenang = closeModalEditPemenang;
+window.toggleModalEditWinBankDropdown = toggleModalEditWinBankDropdown;
+window.submitModalEditPemenang = submitModalEditPemenang;
+window.openModalKonfirmasiHapusPemenang = openModalKonfirmasiHapusPemenang;
+window.closeModalHapusPemenang = closeModalHapusPemenang;
+window.executeConfirmedDeletePemenang = executeConfirmedDeletePemenang;
+window.deletePemenangArisan = deletePemenangArisan;
+
+// ============================================================================
+// MONITORING PEMBAYARAN SELURUH ANGGOTA ARISAN (PERIODE AKTIF) (Item 2)
+// ============================================================================
+let activeMonitoringStatusFilter = 'all'; // 'all', 'paid', 'unpaid'
+let activeMonitoringPeriodeId = null;
+
+function getActiveMonitoringPeriod() {
+  if (activeMonitoringPeriodeId && Array.isArray(cachedPeriodeList)) {
+    const found = cachedPeriodeList.find((p) => String(p.id) === String(activeMonitoringPeriodeId));
+    if (found) return found;
+  }
+  return (
+    (cachedPeriodeList || []).find((p) => String(p.status).toLowerCase() === 'aktif') ||
+    (cachedPeriodeList || [])[0] ||
+    null
+  );
+}
+
+function setMonitoringStatusFilter(filter) {
+  activeMonitoringStatusFilter = filter;
+  const btnAll = document.getElementById('btnFilterMonSemua');
+  const btnPaid = document.getElementById('btnFilterMonSudah');
+  const btnUnpaid = document.getElementById('btnFilterMonBelum');
+  if (btnAll) btnAll.classList.toggle('active', filter === 'all');
+  if (btnPaid) btnPaid.classList.toggle('active', filter === 'paid');
+  if (btnUnpaid) btnUnpaid.classList.toggle('active', filter === 'unpaid');
+  renderMonitoringPembayaranTable();
+}
+
+function refreshMonitoringPembayaran() {
+  loadPembayaranData().then(() => {
+    renderMonitoringPembayaran();
+  });
+}
+
+function renderMonitoringPembayaran() {
+  const period = getActiveMonitoringPeriod();
+  const labelEl = document.getElementById('labelMonitoringPeriodeAktif');
+  const selectEl = document.getElementById('selectFilterMonitoringPeriode');
+
+  if (selectEl && Array.isArray(cachedPeriodeList)) {
+    const currentVal = period ? period.id : '';
+    selectEl.innerHTML = cachedPeriodeList
+      .map(
+        (p) =>
+          `<option value="${p.id}" ${String(p.id) === String(currentVal) ? 'selected' : ''}>Periode Ke-${p.periode_ke} (${p.bulan_tahun || '-'}) ${String(p.status).toLowerCase() === 'aktif' ? '• [AKTIF]' : ''}</option>`
+      )
+      .join('');
+
+    selectEl.onchange = (e) => {
+      activeMonitoringPeriodeId = e.target.value;
+      renderMonitoringPembayaran();
+    };
+  }
+
+  if (labelEl) {
+    if (period) {
+      labelEl.innerHTML = `Periode yang dimonitor: <strong>Periode Ke-${period.periode_ke} (${period.bulan_tahun || '-'})</strong> ${String(period.status).toLowerCase() === 'aktif' ? '<span class="status-pill complete" style="margin-left:6px; font-size:0.75rem;">Status: Aktif</span>' : ''}`;
+    } else {
+      labelEl.textContent = 'Belum ada periode arisan.';
+    }
+  }
+
+  renderMonitoringPembayaranTable();
+}
+
+function renderMonitoringPembayaranTable() {
+  const tbody = document.getElementById('tableBodyMonitoringPembayaran');
+  if (!tbody) return;
+
+  const period = getActiveMonitoringPeriod();
+  const anggotaList = Array.isArray(cachedAnggotaList) ? cachedAnggotaList : [];
+  const searchInput = document.getElementById('searchMonitoringAnggota');
+  const searchQuery = searchInput ? searchInput.value.trim().toLowerCase() : '';
+
+  if (!period) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;">Pilih atau buat periode arisan terlebih dahulu.</td></tr>`;
+    return;
+  }
+
+  const periodKe = Number(period.periode_ke || 0);
+  const periodIdStr = String(period.id || '');
+
+  // Kumpulkan pembayaran uang arisan yang terkait dengan periode ini
+  const relevantPayments = (cachedPembayaranList || []).filter((pay) => {
+    const status = String(pay.status || '').toLowerCase();
+    if (status === 'ditolak') return false;
+    const isArs = getEffectiveJenisBayar(pay).toLowerCase().includes('arisan');
+    if (!isArs) return false;
+
+    // Cek kecocokan periode
+    if (pay.arisan_id && String(pay.arisan_id) === periodIdStr) return true;
+    const payPeriodLabel = getPaymentPeriodeArisanLabel(pay).toLowerCase();
+    if (payPeriodLabel.includes(`periode ke-${periodKe}`) || payPeriodLabel.includes(`periode ${periodKe}`)) return true;
+    const ket = String(pay.keterangan || '').toLowerCase();
+    if (ket.includes(`periode ke-${periodKe}`) || ket.includes(`periode ${periodKe}`)) return true;
+    return false;
+  });
+
+  // Pemetaan pembayaran per anggota
+  let totalCount = anggotaList.length;
+  let paidCount = 0;
+  let unpaidCount = 0;
+
+  const memberRowsData = anggotaList.map((m) => {
+    const mNama = String(m.nama_lengkap || '').trim();
+    const mNamaLower = mNama.toLowerCase();
+
+    // Cari pembayaran atas nama anggota ini atau grup
+    const matchPay = relevantPayments.find((p) => {
+      const pNama = String(p.nama_pembayar || '').trim().toLowerCase();
+      if (pNama === mNamaLower) return true;
+      if (pNama.includes(mNamaLower)) return true;
+      // Cek apakah anggota tercakup di group arisan
+      const groupMembers = extractGroupPaidMembersFromKeterangan(p);
+      return groupMembers.some((gm) => gm.toLowerCase() === mNamaLower);
+    });
+
+    const isPaid = !!matchPay;
+    if (isPaid) paidCount++;
+    else unpaidCount++;
+
+    return {
+      member: m,
+      nama: mNama,
+      isPaid,
+      payment: matchPay
+    };
+  });
+
+  const countTotalEl = document.getElementById('monCountTotal');
+  const countPaidEl = document.getElementById('monCountPaid');
+  const countUnpaidEl = document.getElementById('monCountUnpaid');
+  if (countTotalEl) countTotalEl.textContent = totalCount;
+  if (countPaidEl) countPaidEl.textContent = paidCount;
+  if (countUnpaidEl) countUnpaidEl.textContent = unpaidCount;
+
+  // Filter berdasarkan status tab
+  let filteredData = memberRowsData;
+  if (activeMonitoringStatusFilter === 'paid') {
+    filteredData = filteredData.filter((d) => d.isPaid);
+  } else if (activeMonitoringStatusFilter === 'unpaid') {
+    filteredData = filteredData.filter((d) => !d.isPaid);
+  }
+
+  // Filter berdasarkan search input
+  if (searchQuery) {
+    filteredData = filteredData.filter((d) => d.nama.toLowerCase().includes(searchQuery));
+  }
+
+  if (filteredData.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:18px; color:var(--text-secondary);">Tidak ada anggota arisan yang cocok dengan filter.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = filteredData
+    .map((item, idx) => {
+      const p = item.payment;
+      const statusBadge = item.isPaid
+        ? `<span class="status-pill complete" style="font-weight:700;">✓ Sudah Bayar</span>`
+        : `<span class="status-pill incomplete" style="font-weight:700; background:#fef2f2; color:#b91c1c; border-color:#fecaca;">✕ Belum Bayar</span>`;
+
+      const nominalText =
+        item.isPaid && p ? `<strong>${formatRupiah(p.nominal)}</strong>` : '<span style="color:#94a3b8;">-</span>';
+      const tglText = item.isPaid && p ? p.tanggal_bayar || '-' : '<span style="color:#94a3b8;">-</span>';
+
+      const buktiThumbnail =
+        item.isPaid && p && p.bukti_url
+          ? `<a href="javascript:void(0)" onclick="openPayBuktiLightbox('${encodeURIComponent(p.bukti_url)}', '${encodeURIComponent(item.nama)}')" style="font-size:0.78rem; font-weight:700; color:var(--primary); text-decoration:underline;">📸 Lihat Bukti</a>`
+          : item.isPaid && p
+            ? `<span style="font-size:0.8rem; color:#64748b;">${p.metode_bayar || 'Tunai/Bank'}</span>`
+            : '<span style="color:#94a3b8;">-</span>';
+
+      return `
+        <tr>
+          <td>${idx + 1}</td>
+          <td>
+            <a href="javascript:void(0)" onclick="showMemberDetailBiodataModal('${encodeURIComponent(item.nama)}')" style="font-weight:700; color:#1e293b; text-decoration:none;">
+              👤 ${item.nama}
+            </a>
+            ${item.member.garis_sanad ? `<div style="font-size:0.75rem; color:#64748b;">${item.member.garis_sanad}</div>` : ''}
+          </td>
+          <td>${statusBadge}</td>
+          <td>${nominalText}</td>
+          <td>${tglText}</td>
+          <td>${buktiThumbnail}</td>
+        </tr>
+      `;
+    })
+    .join('');
+}
+
+window.renderMonitoringPembayaran = renderMonitoringPembayaran;
+window.refreshMonitoringPembayaran = refreshMonitoringPembayaran;
+window.setMonitoringStatusFilter = setMonitoringStatusFilter;
+window.renderMonitoringPembayaranTable = renderMonitoringPembayaranTable;
+
+// ============================================================================
+// DAFTAR MUTASI KEUANGAN (DEBET & KREDIT) (Item 3)
+// ============================================================================
+function renderMutasiKeuanganTable() {
+  const tbody = document.getElementById('tableBodyMutasiKeuangan');
+  if (!tbody) return;
+
+  const totalDebetEl = document.getElementById('mutasiTotalDebet');
+  const totalKreditEl = document.getElementById('mutasiTotalKredit');
+  const saldoAkhirEl = document.getElementById('mutasiSaldoAkhir');
+
+  // 1. Kumpulkan Debet dari adnan_Pembayaran
+  const debetList = (cachedPembayaranList || [])
+    .filter((p) => {
+      const status = String(p.status || '').toLowerCase();
+      return status !== 'ditolak';
+    })
+    .map((p) => ({
+      id: p.id || '',
+      dateStr: p.tanggal_bayar || todayISO(),
+      timestamp: new Date(p.tanggal_bayar || todayISO()).getTime() || 0,
+      jenis: 'DEBET',
+      kategori: getEffectiveJenisBayar(p) || 'Penerimaan',
+      uraian: `${p.nama_pembayar || 'Peserta'}${p.keterangan ? ' - ' + stripInternalMetaFromKeterangan(p.keterangan) : ''}`,
+      debet: Number(p.nominal || 0),
+      kredit: 0
+    }));
+
+  // 2. Kumpulkan Kredit dari adnan_Pengeluaran
+  const kreditList = (cachedPengeluaranList || []).map((q) => ({
+    id: q.id || '',
+    dateStr: q.tanggal_pengeluaran || q.tanggal || todayISO(),
+    timestamp: new Date(q.tanggal_pengeluaran || q.tanggal || todayISO()).getTime() || 0,
+    jenis: 'KREDIT',
+    kategori: q.kategori || 'Pengeluaran Kas',
+    uraian: `${q.nama_pengeluaran || 'Pengeluaran'}${q.keterangan ? ' - ' + q.keterangan : ''}`,
+    debet: 0,
+    kredit: Number(q.nominal || 0)
+  }));
+
+  const allEntries = [...debetList, ...kreditList];
+
+  if (allEntries.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:18px;">Belum ada catatan mutasi keuangan.</td></tr>`;
+    if (totalDebetEl) totalDebetEl.textContent = formatRupiah(0);
+    if (totalKreditEl) totalKreditEl.textContent = formatRupiah(0);
+    if (saldoAkhirEl) saldoAkhirEl.textContent = formatRupiah(0);
+    return;
+  }
+
+  // 3. Urutkan secara kronologis tertua -> terbaru untuk menghitung saldo berjalan kumulatif
+  allEntries.sort((a, b) => {
+    if (a.dateStr === b.dateStr) return a.timestamp - b.timestamp;
+    return a.dateStr.localeCompare(b.dateStr);
+  });
+
+  let runningSaldo = 0;
+  let sumDebet = 0;
+  let sumKredit = 0;
+
+  for (const item of allEntries) {
+    sumDebet += item.debet;
+    sumKredit += item.kredit;
+    runningSaldo += item.debet - item.kredit;
+    item.saldo = runningSaldo;
+  }
+
+  if (totalDebetEl) totalDebetEl.textContent = formatRupiah(sumDebet);
+  if (totalKreditEl) totalKreditEl.textContent = formatRupiah(sumKredit);
+  if (saldoAkhirEl) saldoAkhirEl.textContent = formatRupiah(runningSaldo);
+
+  // 4. Balikkan urutan sehingga tanggal termuda (terbaru) berada di paling atas!
+  allEntries.sort((a, b) => {
+    if (a.dateStr === b.dateStr) return b.timestamp - a.timestamp;
+    return b.dateStr.localeCompare(a.dateStr);
+  });
+
+  tbody.innerHTML = allEntries
+    .map((item, idx) => {
+      const isDebet = item.jenis === 'DEBET';
+      const jenisBadge = isDebet
+        ? `<span class="gallery-badge" style="background:#f0fdf4; color:#15803d; border:1px solid #86efac; font-size:0.75rem; font-weight:800;">🟢 DEBET</span>`
+        : `<span class="gallery-badge" style="background:#fef2f2; color:#b91c1c; border:1px solid #fecaca; font-size:0.75rem; font-weight:800;">🔴 KREDIT</span>`;
+
+      return `
+        <tr>
+          <td>${idx + 1}</td>
+          <td><strong>${item.dateStr}</strong></td>
+          <td>${jenisBadge}</td>
+          <td><span style="font-size:0.82rem; font-weight:600; color:#475569;">${item.kategori}</span></td>
+          <td style="max-width:320px; line-height:1.4;">${item.uraian}</td>
+          <td style="text-align:right; font-weight:700; color:#15803d;">${item.debet > 0 ? '+' + formatRupiah(item.debet) : '-'}</td>
+          <td style="text-align:right; font-weight:700; color:#b91c1c;">${item.kredit > 0 ? '-' + formatRupiah(item.kredit) : '-'}</td>
+          <td style="text-align:right; font-weight:800; color:#0f766e;">${formatRupiah(item.saldo)}</td>
+        </tr>
+      `;
+    })
+    .join('');
+}
+
+window.renderMutasiKeuanganTable = renderMutasiKeuanganTable;
 
 window.deletePeriodeArisan = deletePeriodeArisan;
 window.deletePemenangArisan = deletePemenangArisan;
@@ -4777,17 +5271,204 @@ function renderMemberGallery() {
         ? `<img src="${photoUrl}" alt="${nama}" onclick="openMediaByKey('${mediaKey}')" title="Klik untuk memperbesar foto ${nama}" />`
         : `<span>${initials}</span>`;
 
+      const memberKey = String(a.id || a.user_id || idx);
       return `
-        <div class="member-gallery-card">
+        <div class="member-gallery-card" onclick="showDetailBiodataAnggota('${memberKey}')" style="cursor:pointer;" title="Klik untuk melihat Biodata Lengkap ${nama}">
           <div class="member-photo-box">
             ${photoContent}
           </div>
           <div class="member-name-label">${nama}</div>
+          <div style="font-size:0.75rem; color:var(--primary); font-weight:700; margin-top:4px;">👤 Lihat Biodata Lengkap &rarr;</div>
         </div>
       `;
     })
     .join('');
 }
+
+function showDetailBiodataAnggota(memberKey) {
+  const allMembers = cachedAnggotaList || [];
+  const member = allMembers.find((a, idx) => String(a.id) === String(memberKey) || String(a.user_id) === String(memberKey) || String(idx) === String(memberKey)) ||
+    allMembers.find((a) => String(a.nama_lengkap || '').trim().toLowerCase() === String(memberKey || '').trim().toLowerCase());
+  if (!member) {
+    showGlobalAlert('Data biodata anggota tidak ditemukan.', 'error');
+    return;
+  }
+
+  const modal = document.getElementById('modalDetailBiodataAnggota');
+  const container = document.getElementById('modalMemberDetailContent');
+  const footerExtra = document.getElementById('modalMemberFooterExtra');
+  if (!modal || !container) return;
+
+  const nama = member.nama_lengkap || 'Anggota Arisan';
+  const panggilan = member.nama_panggilan || member.panggilan || '';
+  const photoUrl = member.foto_url || member.foto || null;
+  const initials = nama.split(' ').filter(Boolean).slice(0, 2).map((p) => p[0].toUpperCase()).join('') || 'KA';
+  const mediaKey = `modal_member_${member.id || 'foto'}`;
+  if (photoUrl) {
+    registerMediaPreview(mediaKey, `Foto Profil - ${nama}`, photoUrl);
+  }
+
+  const avatarHtml = photoUrl
+    ? `<img src="${photoUrl}" alt="${nama}" onclick="openMediaByKey('${mediaKey}')" style="width:110px; height:110px; border-radius:50%; object-fit:cover; border:3.5px solid var(--primary); box-shadow:0 6px 16px rgba(15,118,110,0.25); cursor:pointer;" title="Klik untuk memperbesar foto" />`
+    : `<div style="width:110px; height:110px; border-radius:50%; background:linear-gradient(135deg, var(--primary), #115e59); color:#fff; display:flex; align-items:center; justify-content:center; font-size:2.3rem; font-weight:800; border:3.5px solid var(--primary-border); box-shadow:0 6px 16px rgba(15,118,110,0.2);">${initials}</div>`;
+
+  const cleanPhone = String(member.no_hp || '').replace(/[^0-9]/g, '');
+  const waUrl = cleanPhone ? (cleanPhone.startsWith('0') ? '62' + cleanPhone.slice(1) : cleanPhone) : null;
+
+  container.innerHTML = `
+    <!-- Header Avatar & Profil Singkat -->
+    <div style="display:flex; flex-direction:column; align-items:center; text-align:center; padding-bottom:18px; margin-bottom:18px; border-bottom:1px solid #e2e8f0;">
+      <div style="position:relative; margin-bottom:12px;">
+        ${avatarHtml}
+        ${photoUrl ? `<span style="position:absolute; bottom:2px; right:2px; background:var(--primary); color:#fff; border-radius:50%; width:26px; height:26px; display:flex; align-items:center; justify-content:center; font-size:0.75rem; border:2px solid #fff;" title="Foto Resmi Terverifikasi">✓</span>` : ''}
+      </div>
+      <h3 style="margin:0 0 4px 0; color:#0f172a; font-size:1.3rem; font-weight:800;">${nama}</h3>
+      ${panggilan ? `<div style="color:var(--text-secondary); font-size:0.9rem; font-weight:600; margin-bottom:8px;">Panggilan: <em>"${panggilan}"</em></div>` : ''}
+      <div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:center; margin-top:4px;">
+        <span class="gallery-badge" style="background:#f0fdfa; color:var(--primary); border:1px solid var(--primary-border); font-size:0.8rem; font-weight:700;">
+          🎯 ${member.jumlah_ikut_arisan || member.jumlah_slot || 1} Slot Arisan
+        </span>
+        <span class="gallery-badge" style="background:#f8fafc; color:#475569; border:1px solid #cbd5e1; font-size:0.8rem; font-weight:600;">
+          🌳 ${member.garis_sanad || 'Bani Adnan'}
+        </span>
+        ${member.sudah_menang ? '<span class="status-pill complete">🏆 Sudah Pernah Menang</span>' : '<span class="status-pill incomplete">⏳ Belum Menang</span>'}
+      </div>
+    </div>
+
+    <!-- Grid Data Biodata Lengkap -->
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:16px;">
+      
+      <!-- Kartu 1: Identitas Pribadi -->
+      <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:14px;">
+        <div style="font-weight:800; font-size:0.88rem; color:var(--primary); margin-bottom:10px; display:flex; align-items:center; gap:6px;">
+          <span>📌</span> Identitas Pribadi
+        </div>
+        <div style="display:flex; flex-direction:column; gap:8px; font-size:0.84rem;">
+          <div style="display:flex; justify-content:space-between; gap:10px;">
+            <span style="color:#64748b;">Jenis Kelamin:</span>
+            <strong style="color:#1e293b;">${member.jenis_kelamin || '-'}</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between; gap:10px;">
+            <span style="color:#64748b;">Tempat, Tgl Lahir:</span>
+            <strong style="color:#1e293b; text-align:right;">${[member.tempat_lahir, member.tanggal_lahir].filter(Boolean).join(', ') || '-'}</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between; gap:10px;">
+            <span style="color:#64748b;">Pekerjaan:</span>
+            <strong style="color:#1e293b; text-align:right;">${member.pekerjaan || '-'}</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between; gap:10px;">
+            <span style="color:#64748b;">No. HP / WA:</span>
+            <strong style="color:var(--primary);">${member.no_hp || '-'}</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between; gap:10px;">
+            <span style="color:#64748b;">Email:</span>
+            <strong style="color:#1e293b; word-break:break-all;">${member.email || '-'}</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between; gap:10px;">
+            <span style="color:#64748b;">Kota / Domisili:</span>
+            <strong style="color:#1e293b;">${member.kota || '-'}</strong>
+          </div>
+          <div style="border-top:1px dashed #cbd5e1; padding-top:6px; margin-top:2px;">
+            <span style="color:#64748b; font-size:0.78rem;">Alamat Lengkap:</span>
+            <div style="font-weight:600; color:#334155; margin-top:2px; line-height:1.4;">${member.alamat || '-'}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Kartu 2: Data Keluarga & Silsilah -->
+      <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:14px;">
+        <div style="font-weight:800; font-size:0.88rem; color:var(--primary); margin-bottom:10px; display:flex; align-items:center; gap:6px;">
+          <span>👨‍👩‍👧‍👦</span> Data Keluarga & Silsilah
+        </div>
+        <div style="display:flex; flex-direction:column; gap:8px; font-size:0.84rem;">
+          <div style="display:flex; justify-content:space-between; gap:10px;">
+            <span style="color:#64748b;">Kakek Buyut:</span>
+            <strong style="color:#1e293b;">${member.nama_kakek_buyut || '-'}</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between; gap:10px;">
+            <span style="color:#64748b;">Nenek Buyut:</span>
+            <strong style="color:#1e293b;">${member.nama_nenek_buyut || '-'}</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between; gap:10px;">
+            <span style="color:#64748b;">Kakek:</span>
+            <strong style="color:#1e293b;">${member.nama_kakek || '-'}</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between; gap:10px;">
+            <span style="color:#64748b;">Nenek:</span>
+            <strong style="color:#1e293b;">${member.nama_nenek || '-'}</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between; gap:10px;">
+            <span style="color:#64748b;">Nama Ayah:</span>
+            <strong style="color:#1e293b;">${member.nama_ayah || '-'}</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between; gap:10px;">
+            <span style="color:#64748b;">Nama Ibu:</span>
+            <strong style="color:#1e293b;">${member.nama_ibu || '-'}</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between; gap:10px;">
+            <span style="color:#64748b;">Nama Pasangan:</span>
+            <strong style="color:#1e293b;">${member.nama_pasangan || '-'}</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between; gap:10px;">
+            <span style="color:#64748b;">Jumlah Anak:</span>
+            <strong style="color:#1e293b;">${member.jumlah_anak != null ? member.jumlah_anak + ' Anak' : '-'}</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between; gap:10px;">
+            <span style="color:#64748b;">Garis Sanad:</span>
+            <strong style="color:var(--primary);">${member.garis_sanad || 'Bani Adnan'}</strong>
+          </div>
+          <div style="border-top:1px dashed #cbd5e1; padding-top:6px; margin-top:2px;">
+            <span style="color:#64748b; font-size:0.78rem;">Catatan Silsilah:</span>
+            <div style="font-weight:600; color:#334155; margin-top:2px; line-height:1.4;">${member.silsilah_keluarga || '-'}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Kartu 3: Rekening Pembayaran & Akun -->
+      <div style="grid-column:1/-1; background:#f0fdf4; border:1.5px solid #86efac; border-radius:12px; padding:14px;">
+        <div style="font-weight:800; font-size:0.88rem; color:#15803d; margin-bottom:8px; display:flex; align-items:center; gap:6px;">
+          <span>💳</span> Data Rekening & Keikutsertaan Arisan
+        </div>
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; font-size:0.84rem;">
+          <div>
+            <div style="color:#64748b; font-size:0.75rem; text-transform:uppercase; font-weight:700;">Nama Bank</div>
+            <div style="font-weight:800; color:#1e293b; font-size:0.95rem;">${member.nama_bank || '-'}</div>
+          </div>
+          <div>
+            <div style="color:#64748b; font-size:0.75rem; text-transform:uppercase; font-weight:700;">Nomor Rekening</div>
+            <div style="font-weight:800; color:#0f766e; font-size:0.95rem;"><code>${member.no_rekening || '-'}</code></div>
+          </div>
+          <div>
+            <div style="color:#64748b; font-size:0.75rem; text-transform:uppercase; font-weight:700;">Atas Nama Rekening</div>
+            <div style="font-weight:800; color:#1e293b; font-size:0.95rem;">${member.atas_nama_rekening || member.nama_lengkap || '-'}</div>
+          </div>
+          <div>
+            <div style="color:#64748b; font-size:0.75rem; text-transform:uppercase; font-weight:700;">Status Peserta</div>
+            <div style="font-weight:800; color:#15803d; font-size:0.95rem;">${member.jumlah_ikut_arisan || 1} Slot Terdaftar</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  if (footerExtra) {
+    const waBtn = waUrl
+      ? `<a href="https://wa.me/${waUrl}" target="_blank" rel="noopener" class="btn-primary btn-sm" style="display:inline-flex; align-items:center; gap:6px; background:#22c55e; border-color:#16a34a; text-decoration:none;">
+           <span>💬</span> <span>Hubungi WhatsApp</span>
+         </a>`
+      : '';
+    footerExtra.innerHTML = waBtn;
+  }
+
+  modal.style.display = 'flex';
+}
+
+function closeMemberDetailModal() {
+  const modal = document.getElementById('modalDetailBiodataAnggota');
+  if (modal) modal.style.display = 'none';
+}
+window.showDetailBiodataAnggota = showDetailBiodataAnggota;
+window.closeMemberDetailModal = closeMemberDetailModal;
 
 const searchAnggotaInputEl = document.getElementById('searchAnggotaInput');
 if (searchAnggotaInputEl) {
@@ -4855,7 +5536,7 @@ let liveSpinState = {
   winner_user_id: '',
   winner_name: '',
   target_angle: 0,
-  duration_ms: 6500,
+  duration_ms: 60000,
   started_at: 0,
   triggered_by: 'Admin',
   official_history_id: null,
@@ -5124,12 +5805,21 @@ function updateSpinSpotlightUI(state) {
       badgeText.textContent = `🔴 LIVE SPIN BERJALAN • Putaran Ke-${state.putaran_ke || 1} Sedang Berputar...`;
     }
     if (labelEl) labelEl.textContent = `🎡 MENGUNDI PUTARAN KE-${state.putaran_ke || 1}...`;
+    if (centerHub) {
+      centerHub.innerHTML = `<img src="img/wheel-spin-logo.jpg" alt="Logo Arisan Keluarga Adnan" class="logo-img" style="width:100%; height:100%; object-fit:contain; background:#ffffff; border-radius:50%;" />`;
+    }
     return;
   }
 
   if (officialEntry) {
     const member = findAnggotaByNameOrId(officialEntry.winner_name, officialEntry.winner_user_id);
     const photoUrl = member && (member.foto_url || member.foto);
+    const initials = String(officialEntry.winner_name || 'KA')
+      .split(' ')
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((p) => p[0].toUpperCase())
+      .join('');
     if (badgeText) {
       badgeText.textContent = `🏆 PEMENANG RESMI DISAHKAN • Putaran Ke-${officialEntry.putaran_ke} (${officialEntry.winner_name})`;
     }
@@ -5138,13 +5828,17 @@ function updateSpinSpotlightUI(state) {
     }
     if (nameEl) nameEl.textContent = officialEntry.winner_name;
     if (metaEl) {
-      metaEl.innerHTML = `${officialEntry.periode_label || 'Periode Aktif'} • Dana Diterima: <strong>${formatRupiah(officialEntry.nominal_diterima || state.nominal_diterima || 0)}</strong> • Disahkan oleh ${officialEntry.disahkan_oleh || 'Admin'}`;
+      metaEl.innerHTML = `${officialEntry.periode_label || 'Periode Aktif'} • Disahkan oleh ${officialEntry.disahkan_oleh || 'Admin'}`;
     }
     if (avatarEl) {
-      avatarEl.innerHTML = photoUrl ? `<img src="${photoUrl}" alt="${officialEntry.winner_name}" />` : '🏆';
+      avatarEl.innerHTML = photoUrl
+        ? `<img src="${photoUrl}" alt="${officialEntry.winner_name}" />`
+        : `<div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-weight:800; color:#fff; font-size:1.1rem; background:var(--primary); border-radius:50%;">${initials}</div>`;
     }
     if (centerHub) {
-      centerHub.innerHTML = photoUrl ? `<img src="${photoUrl}" alt="${officialEntry.winner_name}" />` : '🏆';
+      centerHub.innerHTML = photoUrl
+        ? `<img src="${photoUrl}" alt="${officialEntry.winner_name}" style="width:100%; height:100%; object-fit:cover; border-radius:50%;" />`
+        : `<div style="width:100%; height:100%; border-radius:50%; background:linear-gradient(135deg, #0f766e, #115e59); color:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:1rem; font-weight:800; text-align:center;"><span style="font-size:1.25rem; line-height:1;">👑</span><span style="margin-top:2px;">${initials}</span></div>`;
     }
     return;
   }
@@ -5152,6 +5846,12 @@ function updateSpinSpotlightUI(state) {
   if (state.winner_name && state.putaran_ke > 0) {
     const member = findAnggotaByNameOrId(state.winner_name, state.winner_user_id);
     const photoUrl = member && (member.foto_url || member.foto);
+    const initials = String(state.winner_name || 'KA')
+      .split(' ')
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((p) => p[0].toUpperCase())
+      .join('');
     if (badgeText) {
       badgeText.textContent = `🟢 HASIL PUTARAN KE-${state.putaran_ke}: ${state.winner_name} (Menunggu Pengesahan Admin)`;
     }
@@ -5160,13 +5860,17 @@ function updateSpinSpotlightUI(state) {
     }
     if (nameEl) nameEl.textContent = state.winner_name;
     if (metaEl) {
-      metaEl.innerHTML = `Tercatat di History Putaran #${state.putaran_ke} • Nominal: <strong>${formatRupiah(state.nominal_diterima || 0)}</strong>. Admin dapat memutar lagi atau memilih putaran ini sebagai Pemenang Resmi.`;
+      metaEl.innerHTML = `Tercatat di History Putaran #${state.putaran_ke}. Admin dapat memutar lagi atau memilih putaran ini sebagai Pemenang Resmi.`;
     }
     if (avatarEl) {
-      avatarEl.innerHTML = photoUrl ? `<img src="${photoUrl}" alt="${state.winner_name}" />` : '🎉';
+      avatarEl.innerHTML = photoUrl
+        ? `<img src="${photoUrl}" alt="${state.winner_name}" />`
+        : `<div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-weight:800; color:#fff; font-size:1.1rem; background:var(--primary); border-radius:50%;">${initials}</div>`;
     }
     if (centerHub) {
-      centerHub.innerHTML = photoUrl ? `<img src="${photoUrl}" alt="${state.winner_name}" />` : '🎡';
+      centerHub.innerHTML = photoUrl
+        ? `<img src="${photoUrl}" alt="${state.winner_name}" style="width:100%; height:100%; object-fit:cover; border-radius:50%;" />`
+        : `<div style="width:100%; height:100%; border-radius:50%; background:linear-gradient(135deg, #0f766e, #115e59); color:#fff; display:flex; flex-direction:column; align-items:center; justify-content:center; font-size:1rem; font-weight:800; text-align:center;"><span style="font-size:1.25rem; line-height:1;">🎉</span><span style="margin-top:2px;">${initials}</span></div>`;
     }
   } else {
     if (badgeText) badgeText.textContent = '🟢 LIVE SYNC AKTIF • Menunggu Putaran Undian Admin';
@@ -5176,7 +5880,9 @@ function updateSpinSpotlightUI(state) {
       metaEl.textContent = 'Setiap hasil putaran ke-1, ke-2, dst. akan tercatat di Tabel History di bawah.';
     }
     if (avatarEl) avatarEl.innerHTML = '🎯';
-    if (centerHub) centerHub.innerHTML = '🎡';
+    if (centerHub) {
+      centerHub.innerHTML = `<img src="img/wheel-spin-logo.jpg" alt="Logo Arisan Keluarga Adnan" class="logo-img" style="width:100%; height:100%; object-fit:contain; background:#ffffff; border-radius:50%;" />`;
+    }
   }
 }
 
@@ -5199,7 +5905,7 @@ function renderSpinHistoryTable() {
   if (historyList.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="7" style="text-align:center; color:var(--text-muted); padding:20px;">
+        <td colspan="6" style="text-align:center; color:var(--text-muted); padding:20px;">
           Belum ada history putaran undian. Setiap kali roda diputar (Putaran Ke-1, Ke-2, dst.), hasilnya akan tampil di sini.
         </td>
       </tr>
@@ -5274,7 +5980,6 @@ function renderSpinHistoryTable() {
               </div>
             </div>
           </td>
-          <td><strong style="color:var(--primary);">${formatRupiah(item.nominal_diterima || 0)}</strong></td>
           <td>${statusBadge}</td>
           <td>${actionHtml}</td>
         </tr>
@@ -5291,12 +5996,22 @@ function animateWheelSpinToState(stateObj) {
 
   if (!candidates || candidates.length === 0) return;
 
+  // Layar langsung menuju putaran roda saat tombol putar diklik atau animasi spin dimulai
+  const wheelStage = document.querySelector('.wheel-stage-card') || document.getElementById('arisanWheelCanvas');
+  if (wheelStage) {
+    wheelStage.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
   if (activeSpinRafId) {
     cancelAnimationFrame(activeSpinRafId);
     activeSpinRafId = null;
   }
 
   isWheelCurrentlySpinning = true;
+  const centerHub = document.getElementById('wheelCenterHub');
+  if (centerHub) {
+    centerHub.innerHTML = `<img src="img/wheel-spin-logo.jpg" alt="Logo Arisan Keluarga Adnan" class="logo-img" style="width:100%; height:100%; object-fit:contain; background:#ffffff; border-radius:50%;" />`;
+  }
   const btnSpin = document.getElementById('btnTriggerLiveSpin');
   const btnSpinText = document.getElementById('btnTriggerLiveSpinText');
   if (btnSpin) btnSpin.disabled = true;
@@ -5307,11 +6022,11 @@ function animateWheelSpinToState(stateObj) {
   updateSpinSpotlightUI(stateObj);
 
   const startAngle = currentWheelAngleRad % (Math.PI * 2);
-  let targetAngle = Number(stateObj.target_angle || Math.PI * 16);
-  if (targetAngle <= startAngle + Math.PI * 6) {
-    targetAngle += Math.PI * 16;
+  let targetAngle = Number(stateObj.target_angle || (Math.PI * 2 * 50));
+  if (targetAngle <= startAngle + Math.PI * 10) {
+    targetAngle += Math.PI * 2 * 50;
   }
-  const duration = Number(stateObj.duration_ms || 6500);
+  const duration = Number(stateObj.duration_ms || 60000);
   let startTime = null;
 
   const nameEl = document.getElementById('spinSpotlightName');
@@ -5330,8 +6045,8 @@ function animateWheelSpinToState(stateObj) {
 
     const elapsed = Math.max(0, now - startTime);
     const progress = Math.min(1, elapsed / duration);
-    // Cubic ease-out agar putaran melambat secara dramatis dan halus
-    const eased = 1 - Math.pow(1 - progress, 3);
+    // Quintic ease-out agar putaran melambat secara dramatis dan halus selama 60 detik (1 menit)
+    const eased = 1 - Math.pow(1 - progress, 3.5);
     const angle = startAngle + (targetAngle - startAngle) * eased;
 
     currentWheelAngleRad = angle;
@@ -5692,7 +6407,8 @@ async function triggerAdminLiveSpin() {
   const sliceAngle = (Math.PI * 2) / candidates.length;
   const jitterWithinSlice = (0.25 + Math.random() * 0.5) * sliceAngle;
   const baseStopAngle = -Math.PI / 2 - (randomIdx * sliceAngle + jitterWithinSlice);
-  const extraFullRotations = (8 + Math.floor(Math.random() * 3)) * Math.PI * 2;
+  // Putaran 1 menit (60 detik) dengan ~50 putaran penuh
+  const extraFullRotations = (50 + Math.floor(Math.random() * 5)) * Math.PI * 2;
   const targetAngle = baseStopAngle + extraFullRotations;
 
   const existingHistory = Array.isArray(liveSpinState.history) ? [...liveSpinState.history] : [];
@@ -5732,7 +6448,7 @@ async function triggerAdminLiveSpin() {
     winner_user_id: winnerMember ? winnerMember.user_id || '' : '',
     winner_name: winnerName,
     target_angle: targetAngle,
-    duration_ms: 6500,
+    duration_ms: 60000,
     started_at: spinTimestamp,
     triggered_by: currentLoggedUser ? currentLoggedUser.nama_lengkap || currentLoggedUser.user_id : 'Admin',
     official_history_id: liveSpinState.official_history_id || null,
@@ -5740,12 +6456,19 @@ async function triggerAdminLiveSpin() {
   };
 
   lastProcessedSpinId = spinTimestamp;
+
+  // Layar langsung menuju putaran roda
+  const wheelStage = document.querySelector('.wheel-stage-card') || document.getElementById('arisanWheelCanvas');
+  if (wheelStage) {
+    wheelStage.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
   // Kirim sinyal ke seluruh client sekaligus mulai putaran roda
   broadcastLiveSpinStateToAllClients(nextState);
   animateWheelSpinToState(nextState);
 }
 
-async function selectSpinHistoryAsOfficialWinner(historyId) {
+function selectSpinHistoryAsOfficialWinner(historyId) {
   if (!isUserAdmin()) {
     showGlobalAlert('Hanya User Admin yang dapat menetapkan pemenang resmi dari History Putaran.', 'error');
     return;
@@ -5758,7 +6481,85 @@ async function selectSpinHistoryAsOfficialWinner(historyId) {
     return;
   }
 
+  const modal = document.getElementById('modalPengesahanPemenang');
+  if (!modal) return;
+
+  const periodeObj =
+    (cachedPeriodeList || []).find((p) => String(p.id) === String(targetEntry.periode_id)) ||
+    (cachedPeriodeList || []).find((p) => Number(p.periode_ke) === Number(targetEntry.periode_ke)) ||
+    cachedPeriodeList[0] ||
+    null;
+
+  const perKe = targetEntry.periode_ke || (periodeObj ? periodeObj.periode_ke : 1);
+  const blnTahun = periodeObj ? periodeObj.bulan_tahun : targetEntry.periode_label || '-';
+  const member = findAnggotaByNameOrId(targetEntry.winner_name, targetEntry.winner_id);
+
+  document.getElementById('modalSahHistoryId').value = historyId;
+  document.getElementById('modalSahWinnerId').value = (member && member.id) || targetEntry.winner_id || '';
+  document.getElementById('modalSahWinnerUserId').value = (member && member.user_id) || targetEntry.winner_user_id || '';
+  document.getElementById('modalSahNamaPemenang').value = targetEntry.winner_name;
+  document.getElementById('modalSahPeriodeLabel').textContent = `Periode Ke-${perKe}`;
+  document.getElementById('modalSahBulanTahun').textContent = blnTahun;
+  document.getElementById('modalSahTanggalUndi').value = todayISO();
+  document.getElementById('modalSahTotalDiterima').value = ''; // Nilai awal dikosongkan ("") sesuai permintaan
+
+  document.getElementById('modalSahMetode').value = 'Transfer Bank';
+  populateBankDropdowns();
+  const bankSelect = document.getElementById('modalSahBank');
+  if (bankSelect && member && member.nama_bank) {
+    bankSelect.value = member.nama_bank;
+  }
+  toggleModalSahBankDropdown();
+
+  document.getElementById('modalSahKeterangan').value = `Disahkan dari Live Spin Undian Putaran Ke-${targetEntry.putaran_ke || 1} (${targetEntry.waktu || ''})`;
+
+  const btnConfirm = document.getElementById('btnConfirmSahPemenang');
+  if (btnConfirm) {
+    btnConfirm.innerHTML = `🏆 Konfirmasi Penerima Periode Ke-${perKe}`;
+  }
+
+  modal.style.display = 'flex';
+}
+
+function closeModalPengesahanPemenang() {
+  const modal = document.getElementById('modalPengesahanPemenang');
+  if (modal) modal.style.display = 'none';
+}
+
+function toggleModalSahBankDropdown() {
+  const metode = document.getElementById('modalSahMetode').value;
+  const wrapper = document.getElementById('modalSahBankWrapper');
+  if (wrapper) {
+    wrapper.style.display = metode === 'Transfer Bank' ? 'block' : 'none';
+  }
+}
+
+async function submitModalPengesahanPemenang(e) {
+  if (e && e.preventDefault) e.preventDefault();
+  if (!isUserAdmin()) {
+    showGlobalAlert('Hanya Role Admin yang berhak mengesahkan pemenang.', 'error');
+    return;
+  }
+
+  const historyId = document.getElementById('modalSahHistoryId').value;
+  const historyList = Array.isArray(liveSpinState.history) ? [...liveSpinState.history] : [];
+  const targetEntry = historyList.find((h) => String(h.history_id) === String(historyId));
+  if (!targetEntry) {
+    showGlobalAlert('Data putaran tidak valid.', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('btnConfirmSahPemenang');
+  btn.disabled = true;
+  btn.textContent = 'Mengesahkan...';
+
   const adminName = currentLoggedUser ? currentLoggedUser.nama_lengkap || currentLoggedUser.user_id : 'Admin';
+  const totalDiterima = Number(document.getElementById('modalSahTotalDiterima').value || 0);
+  const tanggalUndi = document.getElementById('modalSahTanggalUndi').value || todayISO();
+  const metode = document.getElementById('modalSahMetode').value;
+  const namaBank = metode === 'Transfer Bank' ? document.getElementById('modalSahBank').value : null;
+  const keterangan = document.getElementById('modalSahKeterangan').value.trim();
+
   const updatedHistory = historyList.map((h) => ({
     ...h,
     is_official: String(h.history_id) === String(historyId),
@@ -5792,7 +6593,7 @@ async function selectSpinHistoryAsOfficialWinner(historyId) {
         {
           pemenang_id: member ? member.id : null,
           pemenang_nama: targetEntry.winner_name,
-          total_diterima: Number(targetEntry.nominal_diterima || 0),
+          total_diterima: totalDiterima,
           status: 'selesai'
         },
         `?id=eq.${encodeURIComponent(periodeObj.id)}`
@@ -5818,11 +6619,11 @@ async function selectSpinHistoryAsOfficialWinner(historyId) {
         anggota_id: member ? member.id : null,
         user_id: member ? member.user_id || null : null,
         nama_pemenang: targetEntry.winner_name,
-        tanggal_undi: todayISO(),
-        nominal_diterima: Number(targetEntry.nominal_diterima || 0),
-        metode_pencairan: 'Transfer Bank',
-        nama_bank: member ? member.nama_bank || null : null,
-        keterangan: `Disahkan dari Live Spin Undian Putaran Ke-${targetEntry.putaran_ke} (${targetEntry.waktu})`,
+        tanggal_undi: tanggalUndi,
+        nominal_diterima: totalDiterima,
+        metode_pencairan: metode,
+        nama_bank: namaBank,
+        keterangan: keterangan,
         ditetapkan_oleh: adminName
       });
     } catch (_) { }
@@ -5834,17 +6635,24 @@ async function selectSpinHistoryAsOfficialWinner(historyId) {
     await loadPeriodeAndPemenangData();
     renderLiveSpinCandidateChecklist();
     updateQuickStatsBar();
+    closeModalPengesahanPemenang();
 
     showGlobalAlert(
-      `🏆 <b>Pemenang Resmi Disahkan!</b> Hasil <b>Putaran Ke-${targetEntry.putaran_ke} (${targetEntry.winner_name})</b> telah ditetapkan sebagai Pemenang Resmi pada <code>adnan_Arisan</code> & <code>adnan_PemenangArisan</code>!`,
+      `🏆 <b>Pemenang Resmi Disahkan!</b> <b>${targetEntry.winner_name}</b> telah ditetapkan sebagai Penerima Arisan Periode Ke-${targetEntry.periode_ke || 1}!`,
       'success'
     );
   } catch (err) {
     showGlobalAlert(err.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '🏆 Konfirmasi Penetapan Pemenang';
   }
 }
 
 window.selectSpinHistoryAsOfficialWinner = selectSpinHistoryAsOfficialWinner;
+window.closeModalPengesahanPemenang = closeModalPengesahanPemenang;
+window.toggleModalSahBankDropdown = toggleModalSahBankDropdown;
+window.submitModalPengesahanPemenang = submitModalPengesahanPemenang;
 
 async function resetLiveSpinHistoryByAdmin() {
   if (!isUserAdmin()) return;
@@ -5864,7 +6672,7 @@ async function resetLiveSpinHistoryByAdmin() {
     winner_user_id: '',
     winner_name: '',
     target_angle: 0,
-    duration_ms: 6500,
+    duration_ms: 60000,
     started_at: resetTs,
     triggered_by: currentLoggedUser ? currentLoggedUser.nama_lengkap || currentLoggedUser.user_id : 'Admin',
     official_history_id: null,
@@ -6170,7 +6978,12 @@ if (biodataForm) {
         email: document.getElementById('bioEmail').value.trim() || null,
         alamat: document.getElementById('bioAlamat').value.trim(),
         kota: document.getElementById('bioKota').value.trim() || null,
-        nama_ayah: document.getElementById('bioNamaAyah').value.trim() || 'H. Adnan',
+        nama_kakek_buyut: (document.getElementById('bioNamaKakekBuyut') && document.getElementById('bioNamaKakekBuyut').value.trim()) || null,
+        nama_nenek_buyut: (document.getElementById('bioNamaNenekBuyut') && document.getElementById('bioNamaNenekBuyut').value.trim()) || null,
+        nama_kakek: (document.getElementById('bioNamaKakek') && document.getElementById('bioNamaKakek').value.trim()) || null,
+        nama_nenek: (document.getElementById('bioNamaNenek') && document.getElementById('bioNamaNenek').value.trim()) || null,
+        nama_ayah: (document.getElementById('bioNamaAyah') && document.getElementById('bioNamaAyah').value.trim()) || 'H. Adnan',
+        nama_ibu: (document.getElementById('bioNamaIbu') && document.getElementById('bioNamaIbu').value.trim()) || null,
         garis_sanad: silsilah,
         silsilah_keluarga: silsilah,
         nama_pasangan: document.getElementById('bioNamaPasangan').value.trim() || null,
@@ -6342,16 +7155,50 @@ document.addEventListener('DOMContentLoaded', async () => {
 // ============================================================================
 
 const SUPABASE_REST = {
-  url: 'https://zufpuadipntstcnqxxpm.supabase.co/rest/v1',
-  key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp1ZnB1YWRpcG50c3RjbnF4eHBtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMwNjM2OTMsImV4cCI6MjEwODYzOTY5M30.gjXuVjWUjIaJX4JI6_d_fpq01fnsvDPedMuKD9SCYIA'
+  url: 'https://zufpuadipntstcnqxxpm.supabase.co/rest/v1'
 };
 
-const supabaseFetchHeaders = {
-  'apikey': SUPABASE_REST.key,
-  'Authorization': `Bearer ${SUPABASE_REST.key}`,
-  'Content-Type': 'application/json',
-  'Prefer': 'return=representation'
-};
+function getEffectiveSupabaseKey() {
+  const customKey = localStorage.getItem('adnan_custom_supabase_key');
+  if (customKey && customKey.trim()) return customKey.trim();
+  return SUPABASE_ANON_KEY;
+}
+
+function getSupabaseDbHeaders(preferReturnRepresentation = false) {
+  const activeKey = getEffectiveSupabaseKey();
+  const headers = {
+    'apikey': activeKey,
+    'Authorization': `Bearer ${activeKey}`,
+    'Content-Type': 'application/json'
+  };
+  if (preferReturnRepresentation) {
+    headers['Prefer'] = 'return=representation';
+  } else {
+    headers['Prefer'] = 'return=minimal';
+  }
+  return headers;
+}
+
+function promptConfigureSupabaseKey() {
+  const currentKey = localStorage.getItem('adnan_custom_supabase_key') || '';
+  const newKey = prompt(
+    '🔑 PENGATURAN KUNCI API SUPABASE (DATABASE EDITOR)\n\nJika tabel mengembalikan error 401 saat mengubah/menghapus data, Anda dapat memasukkan Service Role Key Supabase untuk bypass RLS secara penuh.\n\nKosongkan jika ingin kembali ke Anon Key default:',
+    currentKey
+  );
+  if (newKey !== null) {
+    if (newKey.trim()) {
+      localStorage.setItem('adnan_custom_supabase_key', newKey.trim());
+      alert('✅ Kunci API Supabase kustom berhasil disimpan!');
+    } else {
+      localStorage.removeItem('adnan_custom_supabase_key');
+      alert('🔄 Kunci API Supabase dikembalikan ke Anon Key default.');
+    }
+    if (activeDbTable) {
+      fetchDbTableData(activeDbTable);
+    }
+  }
+}
+window.promptConfigureSupabaseKey = promptConfigureSupabaseKey;
 
 let activeDbTable = '';
 let activeDbRows = [];
@@ -6404,17 +7251,24 @@ async function fetchDbTableData(tableName) {
 
   try {
     let res = await fetch(`${SUPABASE_REST.url}/${tableName}?select=*&order=id.desc`, {
-      headers: supabaseFetchHeaders
+      headers: getSupabaseDbHeaders(false)
     });
 
     if (!res.ok) {
       // Fallback jika tabel tidak memiliki kolom id untuk sorting
       res = await fetch(`${SUPABASE_REST.url}/${tableName}?select=*`, {
-        headers: supabaseFetchHeaders
+        headers: getSupabaseDbHeaders(false)
       });
     }
 
-    if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
+    if (!res.ok) {
+      let errMsg = `HTTP Error: ${res.status}`;
+      try {
+        const errJson = await res.json();
+        errMsg = errJson.message || errMsg;
+      } catch (_) { }
+      throw new Error(errMsg);
+    }
     activeDbRows = await res.json();
 
     renderDbTableData(tableName, activeDbRows);
@@ -6485,25 +7339,52 @@ async function deleteDbRow(rowIndex) {
   const row = activeDbRows[rowIndex];
   if (!row) return;
 
-  const idCol = row.id !== undefined ? 'id' : Object.keys(row)[0];
-  const idVal = row[idCol];
+  let idCol = 'id';
+  let idVal = row.id;
+  if (idVal === undefined || idVal === null || idVal === '') {
+    const altKeys = ['user_id', 'kode_transaksi', 'periode_ke', 'nama_group', 'kategori'];
+    const foundAlt = altKeys.find((k) => row[k] !== undefined && row[k] !== null && row[k] !== '');
+    if (foundAlt) {
+      idCol = foundAlt;
+      idVal = row[foundAlt];
+    } else {
+      idCol = Object.keys(row)[0];
+      idVal = row[idCol];
+    }
+  }
 
   if (!confirm(`Hapus baris data dengan ${idCol} = "${idVal}" dari tabel "${activeDbTable}"?`)) {
     return;
   }
 
+  const url = `${SUPABASE_REST.url}/${activeDbTable}?${idCol}=eq.${encodeURIComponent(idVal)}`;
+
   try {
-    const res = await fetch(`${SUPABASE_REST.url}/${activeDbTable}?${idCol}=eq.${encodeURIComponent(idVal)}`, {
+    let res = await fetch(url, {
       method: 'DELETE',
-      headers: supabaseFetchHeaders
+      headers: getSupabaseDbHeaders(false)
     });
 
-    if (!res.ok) throw new Error(`Status ${res.status}: ${res.statusText}`);
+    if (!res.ok) {
+      let errDetail = '';
+      try {
+        const errJson = await res.json();
+        errDetail = errJson.message || errJson.details || errJson.hint || JSON.stringify(errJson);
+      } catch (_) {
+        errDetail = res.statusText || `HTTP ${res.status}`;
+      }
+      if (res.status === 401 || res.status === 403) {
+        throw new Error(
+          `Status ${res.status}: ${errDetail}.\n\nSolusi: Gunakan tombol '🔑 Kunci API Supabase' di pojok atas tabel untuk memasukkan Service Role Key Supabase.`
+        );
+      }
+      throw new Error(`Status ${res.status}: ${errDetail}`);
+    }
 
-    alert('Data berhasil dihapus!');
+    alert('✅ Data berhasil dihapus!');
     fetchDbTableData(activeDbTable);
   } catch (err) {
-    alert('Gagal menghapus data: ' + err.message);
+    alert('❌ Gagal menghapus data: ' + err.message);
   }
 }
 
@@ -6522,7 +7403,7 @@ function openEditDbModal(rowIndex) {
   let html = '<div style="display:flex; flex-direction:column; gap:10px;">';
   for (const [key, value] of Object.entries(row)) {
     const isId = (key === 'id');
-    const isReadOnly = isId || key === 'created_at';
+    const isReadOnly = isId || key === 'created_at' || key === 'updated_at';
     const valStr = (typeof value === 'object' && value !== null) ? JSON.stringify(value) : (value ?? '');
 
     html += `
@@ -6557,20 +7438,43 @@ async function saveEditedDbRecord() {
   const row = activeDbRows[editingDbIndex];
   if (!row) return;
 
-  const idCol = row.id !== undefined ? 'id' : Object.keys(row)[0];
-  const idVal = row[idCol];
-  const payload = {};
+  // Temukan primary key identifier yang valid
+  let idCol = 'id';
+  let idVal = row.id;
+  if (idVal === undefined || idVal === null || idVal === '') {
+    const altKeys = ['user_id', 'kode_transaksi', 'periode_ke', 'nama_group', 'kategori'];
+    const foundAlt = altKeys.find((k) => row[k] !== undefined && row[k] !== null && row[k] !== '');
+    if (foundAlt) {
+      idCol = foundAlt;
+      idVal = row[foundAlt];
+    } else {
+      idCol = Object.keys(row)[0];
+      idVal = row[idCol];
+    }
+  }
 
+  if (idVal === undefined || idVal === null) {
+    alert('❌ Gagal menyimpan: Baris data tidak memiliki ID atau kunci penentu unik.');
+    return;
+  }
+
+  const payload = {};
   for (const key of Object.keys(row)) {
-    if (key === 'id' || key === 'created_at') continue;
+    // Jangan kirim primary key atau generated timestamp
+    if (key === 'id' || key === 'created_at' || key === 'updated_at') continue;
 
     const input = document.getElementById(`dbFieldInput_${key}`);
     if (input) {
       let val = input.value;
       if (typeof row[key] === 'number') {
-        val = val === '' ? null : Number(val);
+        val = (val === '' || val === null) ? null : Number(val);
       } else if (typeof row[key] === 'boolean') {
-        val = (val === 'true');
+        val = (val === 'true' || val === true);
+      } else if (val === '') {
+        // Jika aslinya null atau kolom bertipe foreign key/uuid/date/timestamp, kirim null bukan string kosong
+        if (row[key] === null || /^(tanggal.*|.*_at|.*_id|arisan_id|anggota_id|pemenang_id)$/i.test(key)) {
+          val = null;
+        }
       }
       payload[key] = val;
     }
@@ -6582,20 +7486,50 @@ async function saveEditedDbRecord() {
     btnSave.disabled = true;
   }
 
+  const url = `${SUPABASE_REST.url}/${activeDbTable}?${idCol}=eq.${encodeURIComponent(idVal)}`;
+
   try {
-    const res = await fetch(`${SUPABASE_REST.url}/${activeDbTable}?${idCol}=eq.${encodeURIComponent(idVal)}`, {
+    // Coba percobaan 1: Gunakan return=representation
+    let res = await fetch(url, {
       method: 'PATCH',
-      headers: supabaseFetchHeaders,
+      headers: getSupabaseDbHeaders(true),
       body: JSON.stringify(payload)
     });
 
-    if (!res.ok) throw new Error(`Status ${res.status}: ${res.statusText}`);
+    // Jika 401 atau 403 atau 406 (sering terjadi karena RLS SELECT atau format Prefer representation):
+    // Coba percobaan 2: Fallback ke Prefer: return=minimal
+    if (!res.ok && (res.status === 401 || res.status === 403 || res.status === 406)) {
+      console.warn(`PATCH percobaan 1 gagal dengan status ${res.status}. Mencoba percobaan 2 dengan return=minimal...`);
+      res = await fetch(url, {
+        method: 'PATCH',
+        headers: getSupabaseDbHeaders(false),
+        body: JSON.stringify(payload)
+      });
+    }
 
-    alert('Perubahan berhasil disimpan!');
+    if (!res.ok) {
+      let errDetail = '';
+      try {
+        const errJson = await res.json();
+        errDetail = errJson.message || errJson.details || errJson.hint || JSON.stringify(errJson);
+      } catch (_) {
+        errDetail = res.statusText || `HTTP ${res.status}`;
+      }
+
+      if (res.status === 401 || res.status === 403) {
+        throw new Error(
+          `Status ${res.status} (Izin Akses/RLS Supabase): ${errDetail}.\n\nTips Solusi:\n1. Pastikan RLS diizinkan untuk UPDATE di tabel ${activeDbTable}.\n2. Atau masukkan Service Role Key Supabase Anda pada tombol '🔑 Kunci API Supabase' di pojok atas tabel.`
+        );
+      }
+
+      throw new Error(`Status ${res.status}: ${errDetail}`);
+    }
+
+    alert('✅ Perubahan berhasil disimpan ke tabel Supabase!');
     closeEditDbModal();
     fetchDbTableData(activeDbTable);
   } catch (err) {
-    alert('Gagal menyimpan: ' + err.message);
+    alert('❌ Gagal menyimpan: ' + err.message);
   } finally {
     if (btnSave) {
       btnSave.textContent = 'Simpan Perubahan';

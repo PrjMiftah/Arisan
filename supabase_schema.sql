@@ -82,6 +82,12 @@ ALTER TABLE public."adnan_DataAnggota" ADD COLUMN IF NOT EXISTS nama_bank TEXT;
 ALTER TABLE public."adnan_DataAnggota" ADD COLUMN IF NOT EXISTS no_rekening TEXT;
 ALTER TABLE public."adnan_DataAnggota" ADD COLUMN IF NOT EXISTS atas_nama_rekening TEXT;
 ALTER TABLE public."adnan_DataAnggota" ADD COLUMN IF NOT EXISTS jumlah_ikut_arisan INTEGER DEFAULT 1;
+ALTER TABLE public."adnan_DataAnggota" ADD COLUMN IF NOT EXISTS nama_kakek_buyut TEXT;
+ALTER TABLE public."adnan_DataAnggota" ADD COLUMN IF NOT EXISTS nama_nenek_buyut TEXT;
+ALTER TABLE public."adnan_DataAnggota" ADD COLUMN IF NOT EXISTS nama_kakek TEXT;
+ALTER TABLE public."adnan_DataAnggota" ADD COLUMN IF NOT EXISTS nama_nenek TEXT;
+ALTER TABLE public."adnan_DataAnggota" ADD COLUMN IF NOT EXISTS nama_ibu TEXT;
+ALTER TABLE public."adnan_DataAnggota" ADD COLUMN IF NOT EXISTS nama_ayah TEXT DEFAULT '-';
 
 -- 3. Tabel Setting Periode Arisan Utama (adnan_Arisan & adnan_PeriodeArisan)
 -- Split Iuran per Orang: Uang Arisan Rp 100.000, Uang Kas Rp 40.000, Uang Konsumsi Rp 30.000 (Total Rp 170.000)
