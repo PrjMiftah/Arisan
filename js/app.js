@@ -158,6 +158,7 @@ let checkedGroupMembersMap = {};
 
 // File DataURL sementara untuk upload bukti/foto/PDF
 let uploadedBioFotoDataUrl = null;
+let uploadedBioFotoKelDataUrl = null;
 let uploadedPayBuktiDataUrl = null;
 let uploadedExpBuktiDataUrl = null;
 let uploadedAnnPdfDataUrl = null;
@@ -937,6 +938,20 @@ function updateBioPhotoPreviewUI(photoDataUrl, fallbackInitials = '👤') {
   }
 }
 
+function updateBioFotoKelPreviewUI(photoDataUrl) {
+  const previewBox = document.getElementById('bioFotoKelPreviewBox');
+  const btnHapus = document.getElementById('btnHapusFotoKel');
+  if (!previewBox) return;
+
+  if (photoDataUrl) {
+    previewBox.innerHTML = `<img src="${photoDataUrl}" alt="Foto Keluarga" style="width:100%; height:100%; object-fit:cover; border-radius:8px;" />`;
+    if (btnHapus) btnHapus.style.display = 'inline-flex';
+  } else {
+    previewBox.innerHTML = '👨‍👩‍👧‍👦';
+    if (btnHapus) btnHapus.style.display = 'none';
+  }
+}
+
 function updateHeaderAvatarPhoto(user, bio) {
   const headerAvatar = document.getElementById('headerAvatar');
   if (!headerAvatar) return;
@@ -1063,6 +1078,125 @@ if (btnTriggerLocalUpload && bioFotoFileInput) {
 }
 
 // ============================================================================
+// UPLOAD FOTO KELUARGA (FILE LOKAL - DISIMPAN DI foto_kel_url)
+const btnTriggerUploadFotoKel = document.getElementById('btnTriggerUploadFotoKel');
+const bioFotoKelFileInput = document.getElementById('bioFotoKelFileInput');
+const btnHapusFotoKel = document.getElementById('btnHapusFotoKel');
+if (btnTriggerUploadFotoKel && bioFotoKelFileInput) {
+  btnTriggerUploadFotoKel.addEventListener('click', () => bioFotoKelFileInput.click());
+  bioFotoKelFileInput.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    uploadedBioFotoKelDataUrl = await readFileAsDataURL(file, 900);
+    updateBioFotoKelPreviewUI(uploadedBioFotoKelDataUrl);
+    showBiodataAlert('📸 Foto Keluarga berhasil dimuat dari file lokal! Jangan lupa klik "Simpan Biodata".', 'success');
+  });
+}
+if (btnHapusFotoKel) {
+  btnHapusFotoKel.addEventListener('click', () => {
+    uploadedBioFotoKelDataUrl = null;
+    if (bioFotoKelFileInput) bioFotoKelFileInput.value = '';
+    updateBioFotoKelPreviewUI(null);
+    showBiodataAlert('Foto keluarga telah dihapus dari form.', 'info');
+  });
+}
+
+// AMBIL & RESET LOKASI GOOGLE MAPS (google_maps_url)
+const btnAmbilLokasiGps = document.getElementById('btnAmbilLokasiGps');
+const btnResetLokasiGps = document.getElementById('btnResetLokasiGps');
+const bioGoogleMapsUrl = document.getElementById('bioGoogleMapsUrl');
+const btnBukaLinkMapsPreview = document.getElementById('btnBukaLinkMapsPreview');
+const bioGpsStatusInfo = document.getElementById('bioGpsStatusInfo');
+
+if (btnAmbilLokasiGps && bioGoogleMapsUrl) {
+  btnAmbilLokasiGps.addEventListener('click', () => {
+    if (!navigator.geolocation) {
+      alert('Fitur Geolocation tidak didukung oleh browser Anda.');
+      return;
+    }
+    const originalText = btnAmbilLokasiGps.innerHTML;
+    btnAmbilLokasiGps.innerHTML = '⏳ Mencari GPS...';
+    btnAmbilLokasiGps.disabled = true;
+    if (bioGpsStatusInfo) bioGpsStatusInfo.textContent = 'Mendeteksi titik koordinat GPS...';
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        btnAmbilLokasiGps.innerHTML = originalText;
+        btnAmbilLokasiGps.disabled = false;
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        const mapsUrl = `https://www.google.com/maps?q=${lat},${lng}`;
+        bioGoogleMapsUrl.value = mapsUrl;
+        if (btnBukaLinkMapsPreview) {
+          btnBukaLinkMapsPreview.href = mapsUrl;
+          btnBukaLinkMapsPreview.classList.remove('hidden');
+        }
+        if (bioGpsStatusInfo) {
+          bioGpsStatusInfo.textContent = `✅ Titik GPS berhasil diperoleh: [${lat.toFixed(6)}, ${lng.toFixed(6)}]. URL Google Maps siap disimpan.`;
+        }
+        showBiodataAlert('📍 Lokasi Google Maps berhasil diperoleh berdasarkan koordinat GPS Anda!', 'success');
+      },
+      (error) => {
+        btnAmbilLokasiGps.innerHTML = originalText;
+        btnAmbilLokasiGps.disabled = false;
+        let errMsg = 'Gagal mengambil lokasi GPS.';
+        if (error.code === 1) errMsg = 'Izin lokasi GPS ditolak oleh browser/perangkat.';
+        else if (error.code === 2) errMsg = 'Posisi GPS tidak dapat ditemukan.';
+        else if (error.code === 3) errMsg = 'Waktu permintaan GPS habis (timeout).';
+        if (bioGpsStatusInfo) {
+          bioGpsStatusInfo.textContent = `⚠️ ${errMsg} Anda dapat menempelkan URL Google Maps secara manual.`;
+        }
+        alert(errMsg + '\n\nSilakan izinkan akses lokasi di browser atau salin URL Google Maps rumah Anda secara manual ke dalam kolom.');
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    );
+  });
+}
+
+if (btnResetLokasiGps && bioGoogleMapsUrl) {
+  btnResetLokasiGps.addEventListener('click', () => {
+    bioGoogleMapsUrl.value = '';
+    if (btnBukaLinkMapsPreview) {
+      btnBukaLinkMapsPreview.href = '#';
+      btnBukaLinkMapsPreview.classList.add('hidden');
+    }
+    if (bioGpsStatusInfo) {
+      bioGpsStatusInfo.textContent = 'Lokasi Google Maps telah direset. Anda dapat mengambil lokasi baru atau mengetik secara manual.';
+    }
+  });
+}
+
+if (bioGoogleMapsUrl) {
+  bioGoogleMapsUrl.addEventListener('input', (e) => {
+    const val = e.target.value.trim();
+    if (btnBukaLinkMapsPreview) {
+      if (val) {
+        btnBukaLinkMapsPreview.href = val;
+        btnBukaLinkMapsPreview.classList.remove('hidden');
+      } else {
+        btnBukaLinkMapsPreview.classList.add('hidden');
+      }
+    }
+  });
+}
+
+// TOGGLE PEKERJAAN DROPDOWN DAN INPUT MANUAL (LAINNYA)
+const bioPekerjaanSelect = document.getElementById('bioPekerjaanSelect');
+const bioPekerjaanManualBox = document.getElementById('bioPekerjaanManualBox');
+const bioPekerjaanManual = document.getElementById('bioPekerjaanManual');
+
+if (bioPekerjaanSelect) {
+  bioPekerjaanSelect.addEventListener('change', (e) => {
+    if (e.target.value === 'LAINNYA') {
+      if (bioPekerjaanManualBox) bioPekerjaanManualBox.classList.remove('hidden');
+      if (bioPekerjaanManual) bioPekerjaanManual.focus();
+    } else {
+      if (bioPekerjaanManualBox) bioPekerjaanManualBox.classList.add('hidden');
+      if (bioPekerjaanManual) bioPekerjaanManual.value = '';
+    }
+  });
+}
+
 // AUTH: LOGIN & REGISTER USER (adnan_User)
 // ============================================================================
 const loginForm = document.getElementById('loginForm');
@@ -1181,7 +1315,55 @@ function populateBiodataForm(user, bio) {
   document.getElementById('bioJenisKelamin').value = (bio && bio.jenis_kelamin) || '';
   document.getElementById('bioTempatLahir').value = (bio && bio.tempat_lahir) || '';
   document.getElementById('bioTanggalLahir').value = (bio && bio.tanggal_lahir) || '';
-  document.getElementById('bioPekerjaan').value = (bio && bio.pekerjaan) || '';
+  const elStatus = document.getElementById('bioStatusKepesertaan');
+  if (elStatus) elStatus.value = (bio && bio.status_kepesertaan) || 'Peserta';
+
+  const standardJobs = ['PNS', 'PEG.SWASTA', 'WIRAUSAHA', 'TNI/POLRI', 'PETANI', 'NELAYAN', 'TIDAK BEKERJA'];
+  const selJob = document.getElementById('bioPekerjaanSelect');
+  const manBox = document.getElementById('bioPekerjaanManualBox');
+  const manInput = document.getElementById('bioPekerjaanManual');
+  const jobVal = (bio && bio.pekerjaan) ? String(bio.pekerjaan).trim() : '';
+  if (selJob) {
+    if (!jobVal) {
+      selJob.value = '';
+      if (manBox) manBox.classList.add('hidden');
+      if (manInput) manInput.value = '';
+    } else if (standardJobs.includes(jobVal.toUpperCase())) {
+      selJob.value = jobVal.toUpperCase();
+      if (manBox) manBox.classList.add('hidden');
+      if (manInput) manInput.value = '';
+    } else {
+      selJob.value = 'LAINNYA';
+      if (manBox) manBox.classList.remove('hidden');
+      if (manInput) manInput.value = jobVal;
+    }
+  }
+
+  // Google Maps Lokasi
+  const mapsUrl = (bio && bio.google_maps_url) || '';
+  const mapsInput = document.getElementById('bioGoogleMapsUrl');
+  const mapsPreviewBtn = document.getElementById('btnBukaLinkMapsPreview');
+  const gpsStatus = document.getElementById('bioGpsStatusInfo');
+  if (mapsInput) mapsInput.value = mapsUrl;
+  if (mapsPreviewBtn) {
+    if (mapsUrl) {
+      mapsPreviewBtn.href = mapsUrl;
+      mapsPreviewBtn.classList.remove('hidden');
+    } else {
+      mapsPreviewBtn.classList.add('hidden');
+    }
+  }
+  if (gpsStatus) {
+    gpsStatus.textContent = mapsUrl ? '✅ Lokasi Google Maps tersimpan: ' + mapsUrl : 'Klik "Ambil Lokasi" untuk mendeteksi koordinat GPS tempat Anda secara otomatis melalui browser/HP.';
+  }
+
+  // Foto Keluarga
+  const existingFotoKel = (bio && (bio.foto_kel_url || bio.foto_kel)) || null;
+  uploadedBioFotoKelDataUrl = existingFotoKel;
+  updateBioFotoKelPreviewUI(existingFotoKel);
+
+  const elPekerjaanOld = document.getElementById('bioPekerjaan');
+  if (elPekerjaanOld) elPekerjaanOld.value = jobVal;
   document.getElementById('bioNoHp').value = defaultHp;
   document.getElementById('bioEmail').value = (bio && bio.email) || '';
   document.getElementById('bioAlamat').value = (bio && bio.alamat) || '';
@@ -1249,7 +1431,17 @@ function renderBiodataSummary(bio) {
         .filter(Boolean)
         .join(' - ') || '-'
     },
-    { label: 'Status Kepesertaan', value: bio.status_aktif !== false ? 'Aktif Terdaftar' : 'Nonaktif' }
+    { label: 'Status Kepesertaan', value: bio.status_kepesertaan || (bio.status_aktif !== false ? 'Peserta' : 'Nonaktif') },
+    {
+      label: 'Lokasi Google Maps',
+      value: bio.google_maps_url
+        ? `<a href="${bio.google_maps_url}" target="_blank" rel="noopener" style="color:var(--primary); font-weight:700; text-decoration:underline;">Buka di Google Maps ↗</a>`
+        : '-'
+    },
+    {
+      label: 'Foto Keluarga',
+      value: (bio.foto_kel_url || uploadedBioFotoKelDataUrl) ? '✅ Tersedia' : 'Belum Ada'
+    }
   ];
 
   container.innerHTML = items
@@ -5268,7 +5460,7 @@ function renderMemberGallery() {
       }
 
       const photoContent = photoUrl
-        ? `<img src="${photoUrl}" alt="${nama}" onclick="openMediaByKey('${mediaKey}')" title="Klik untuk memperbesar foto ${nama}" />`
+        ? `<img src="${photoUrl}" alt="${nama}" />`
         : `<span>${initials}</span>`;
 
       const memberKey = String(a.id || a.user_id || idx);
@@ -5286,6 +5478,14 @@ function renderMemberGallery() {
 }
 
 function showDetailBiodataAnggota(memberKey) {
+  // Pastikan window pratinjau media/dokumen tertutup saat membuka Biodata Lengkap
+  const mediaModal = document.getElementById('mediaModal');
+  if (mediaModal && !mediaModal.classList.contains('hidden')) {
+    mediaModal.classList.add('hidden');
+    const mediaBody = document.getElementById('modalBodyContent');
+    if (mediaBody) mediaBody.innerHTML = '';
+  }
+
   const allMembers = cachedAnggotaList || [];
   const member = allMembers.find((a, idx) => String(a.id) === String(memberKey) || String(a.user_id) === String(memberKey) || String(idx) === String(memberKey)) ||
     allMembers.find((a) => String(a.nama_lengkap || '').trim().toLowerCase() === String(memberKey || '').trim().toLowerCase());
@@ -5303,13 +5503,8 @@ function showDetailBiodataAnggota(memberKey) {
   const panggilan = member.nama_panggilan || member.panggilan || '';
   const photoUrl = member.foto_url || member.foto || null;
   const initials = nama.split(' ').filter(Boolean).slice(0, 2).map((p) => p[0].toUpperCase()).join('') || 'KA';
-  const mediaKey = `modal_member_${member.id || 'foto'}`;
-  if (photoUrl) {
-    registerMediaPreview(mediaKey, `Foto Profil - ${nama}`, photoUrl);
-  }
-
   const avatarHtml = photoUrl
-    ? `<img src="${photoUrl}" alt="${nama}" onclick="openMediaByKey('${mediaKey}')" style="width:110px; height:110px; border-radius:50%; object-fit:cover; border:3.5px solid var(--primary); box-shadow:0 6px 16px rgba(15,118,110,0.25); cursor:pointer;" title="Klik untuk memperbesar foto" />`
+    ? `<img src="${photoUrl}" alt="${nama}" style="width:110px; height:110px; border-radius:50%; object-fit:cover; border:3.5px solid var(--primary); box-shadow:0 6px 16px rgba(15,118,110,0.25);" />`
     : `<div style="width:110px; height:110px; border-radius:50%; background:linear-gradient(135deg, var(--primary), #115e59); color:#fff; display:flex; align-items:center; justify-content:center; font-size:2.3rem; font-weight:800; border:3.5px solid var(--primary-border); box-shadow:0 6px 16px rgba(15,118,110,0.2);">${initials}</div>`;
 
   const cleanPhone = String(member.no_hp || '').replace(/[^0-9]/g, '');
@@ -5357,6 +5552,10 @@ function showDetailBiodataAnggota(memberKey) {
             <strong style="color:#1e293b; text-align:right;">${member.pekerjaan || '-'}</strong>
           </div>
           <div style="display:flex; justify-content:space-between; gap:10px;">
+            <span style="color:#64748b;">Status Kepesertaan:</span>
+            <strong style="color:var(--primary);">${member.status_kepesertaan || 'Peserta'}</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between; gap:10px;">
             <span style="color:#64748b;">No. HP / WA:</span>
             <strong style="color:var(--primary);">${member.no_hp || '-'}</strong>
           </div>
@@ -5371,6 +5570,18 @@ function showDetailBiodataAnggota(memberKey) {
           <div style="border-top:1px dashed #cbd5e1; padding-top:6px; margin-top:2px;">
             <span style="color:#64748b; font-size:0.78rem;">Alamat Lengkap:</span>
             <div style="font-weight:600; color:#334155; margin-top:2px; line-height:1.4;">${member.alamat || '-'}</div>
+          </div>
+          <div style="border-top:1px dashed #cbd5e1; padding-top:8px; margin-top:4px;">
+            <span style="color:#64748b; font-size:0.78rem;">Lokasi Google Maps:</span>
+            <div style="margin-top:4px;">
+              ${member.google_maps_url ? `
+                <a href="${member.google_maps_url}" target="_blank" rel="noopener noreferrer"
+                  style="display:inline-flex; align-items:center; gap:6px; padding:6px 12px; background:#eff6ff; color:#2563eb; border:1px solid #bfdbfe; border-radius:8px; font-weight:700; font-size:0.82rem; text-decoration:none;"
+                  title="Klik untuk membuka lokasi di Google Maps">
+                  <span>🗺️</span> <span>Buka di Google Maps</span> <span style="font-size:0.75rem;">↗</span>
+                </a>
+              ` : `<span style="color:#94a3b8; font-style:italic; font-size:0.8rem;">Belum ditambahkan</span>`}
+            </div>
           </div>
         </div>
       </div>
@@ -5424,6 +5635,23 @@ function showDetailBiodataAnggota(memberKey) {
         </div>
       </div>
 
+      ${member.foto_kel_url ? `
+      <!-- Foto Keluarga (Tampil di atas Rekening jika ada foto_kel_url) -->
+      <div style="grid-column:1/-1; background:#ffffff; border:1.5px solid #cbd5e1; border-radius:12px; padding:14px;">
+        <div style="font-weight:800; font-size:0.88rem; color:var(--primary); margin-bottom:10px; display:flex; align-items:center; gap:6px;">
+          <span>👨‍👩‍👧‍👦</span> Foto Keluarga Besar
+        </div>
+        <div style="display:flex; flex-direction:column; align-items:center; gap:8px;">
+          <div style="max-width:100%; border-radius:10px; overflow:hidden; border:2px solid var(--primary-border); box-shadow:0 4px 14px rgba(15,118,110,0.12); cursor:pointer;"
+               onclick="openMediaModal('Foto Keluarga - ${nama}', '${member.foto_kel_url}')"
+               title="Klik untuk memperbesar Foto Keluarga">
+            <img src="${member.foto_kel_url}" alt="Foto Keluarga ${nama}" style="max-height:220px; width:auto; max-width:100%; object-fit:contain; display:block;" />
+          </div>
+          <small style="color:var(--text-muted); font-size:0.78rem;">🔍 Klik foto keluarga di atas untuk memperbesar</small>
+        </div>
+      </div>
+      ` : ''}
+
       <!-- Kartu 3: Rekening Pembayaran & Akun -->
       <div style="grid-column:1/-1; background:#f0fdf4; border:1.5px solid #86efac; border-radius:12px; padding:14px;">
         <div style="font-weight:800; font-size:0.88rem; color:#15803d; margin-bottom:8px; display:flex; align-items:center; gap:6px;">
@@ -5466,6 +5694,16 @@ function showDetailBiodataAnggota(memberKey) {
 function closeMemberDetailModal() {
   const modal = document.getElementById('modalDetailBiodataAnggota');
   if (modal) modal.style.display = 'none';
+  const container = document.getElementById('modalMemberDetailContent');
+  if (container) container.innerHTML = '';
+  const footerExtra = document.getElementById('modalMemberFooterExtra');
+  if (footerExtra) footerExtra.innerHTML = '';
+  const mediaModal = document.getElementById('mediaModal');
+  if (mediaModal && !mediaModal.classList.contains('hidden')) {
+    mediaModal.classList.add('hidden');
+    const mediaBody = document.getElementById('modalBodyContent');
+    if (mediaBody) mediaBody.innerHTML = '';
+  }
 }
 window.showDetailBiodataAnggota = showDetailBiodataAnggota;
 window.closeMemberDetailModal = closeMemberDetailModal;
@@ -5671,7 +5909,7 @@ function renderLiveSpinCandidateChecklist() {
       return `
         <label class="candidate-check-item">
           <input type="checkbox" class="chk-spin-candidate-item" data-candidate-name="${nama}" ${isChecked ? 'checked' : ''} />
-          <span style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${nama}">
+          <span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:block;" title="${nama}">
             ${nama} ${wonBadge}
           </span>
         </label>
@@ -6407,8 +6645,12 @@ async function triggerAdminLiveSpin() {
   const sliceAngle = (Math.PI * 2) / candidates.length;
   const jitterWithinSlice = (0.25 + Math.random() * 0.5) * sliceAngle;
   const baseStopAngle = -Math.PI / 2 - (randomIdx * sliceAngle + jitterWithinSlice);
-  // Putaran 1 menit (60 detik) dengan ~50 putaran penuh
-  const extraFullRotations = (50 + Math.floor(Math.random() * 5)) * Math.PI * 2;
+  // Ambil durasi spin dari input Admin (default 60 detik)
+  const durationInput = document.getElementById('liveSpinDurationInput');
+  const spinDurationSec = Math.max(5, Math.min(300, Number(durationInput ? durationInput.value : 60) || 60));
+  const spinDurationMs = spinDurationSec * 1000;
+  const fullTurns = Math.max(6, Math.round((spinDurationSec / 60) * 50)) + Math.floor(Math.random() * 4);
+  const extraFullRotations = fullTurns * Math.PI * 2;
   const targetAngle = baseStopAngle + extraFullRotations;
 
   const existingHistory = Array.isArray(liveSpinState.history) ? [...liveSpinState.history] : [];
@@ -6448,7 +6690,7 @@ async function triggerAdminLiveSpin() {
     winner_user_id: winnerMember ? winnerMember.user_id || '' : '',
     winner_name: winnerName,
     target_angle: targetAngle,
-    duration_ms: 60000,
+    duration_ms: spinDurationMs,
     started_at: spinTimestamp,
     triggered_by: currentLoggedUser ? currentLoggedUser.nama_lengkap || currentLoggedUser.user_id : 'Admin',
     official_history_id: liveSpinState.official_history_id || null,
@@ -6772,10 +7014,53 @@ if (btnTriggerLiveSpinEl) {
   });
 }
 
+// PENGATURAN DURASI SPIN OLEH ADMIN
+const btnDecreaseSpinDuration = document.getElementById('btnDecreaseSpinDuration');
+const btnIncreaseSpinDuration = document.getElementById('btnIncreaseSpinDuration');
+const liveSpinDurationInput = document.getElementById('liveSpinDurationInput');
+
+if (btnDecreaseSpinDuration && liveSpinDurationInput) {
+  btnDecreaseSpinDuration.addEventListener('click', () => {
+    let cur = Number(liveSpinDurationInput.value || 60);
+    cur = Math.max(5, cur - 5);
+    liveSpinDurationInput.value = cur;
+  });
+}
+
+if (btnIncreaseSpinDuration && liveSpinDurationInput) {
+  btnIncreaseSpinDuration.addEventListener('click', () => {
+    let cur = Number(liveSpinDurationInput.value || 60);
+    cur = Math.min(300, cur + 5);
+    liveSpinDurationInput.value = cur;
+  });
+}
+
+// MODAL KONFIRMASI RESET HISTORY PUTARAN
+function openConfirmResetHistoryModal() {
+  const modal = document.getElementById('modalConfirmResetSpinHistory');
+  if (modal) modal.classList.remove('hidden');
+}
+
+function closeConfirmResetHistoryModal() {
+  const modal = document.getElementById('modalConfirmResetSpinHistory');
+  if (modal) modal.classList.add('hidden');
+}
+window.openConfirmResetHistoryModal = openConfirmResetHistoryModal;
+window.closeConfirmResetHistoryModal = closeConfirmResetHistoryModal;
+
 const btnResetLiveSpinHistoryEl = document.getElementById('btnResetLiveSpinHistory');
 if (btnResetLiveSpinHistoryEl) {
   btnResetLiveSpinHistoryEl.addEventListener('click', () => {
-    resetLiveSpinHistoryByAdmin();
+    openConfirmResetHistoryModal();
+  });
+}
+
+const btnExecuteResetHistory = document.getElementById('btnExecuteResetHistory');
+if (btnExecuteResetHistory) {
+  btnExecuteResetHistory.addEventListener('click', async () => {
+    closeConfirmResetHistoryModal();
+    await resetLiveSpinHistoryByAdmin();
+    showGlobalAlert('🗑️ Riwayat putaran undian berhasil direset!', 'info');
   });
 }
 
@@ -6973,7 +7258,15 @@ if (biodataForm) {
         jenis_kelamin: document.getElementById('bioJenisKelamin').value,
         tempat_lahir: document.getElementById('bioTempatLahir').value.trim() || null,
         tanggal_lahir: document.getElementById('bioTanggalLahir').value || null,
-        pekerjaan: document.getElementById('bioPekerjaan').value.trim() || null,
+        pekerjaan: (() => {
+          const sel = document.getElementById('bioPekerjaanSelect') ? document.getElementById('bioPekerjaanSelect').value : '';
+          if (sel === 'LAINNYA') {
+            const manual = document.getElementById('bioPekerjaanManual');
+            return (manual && manual.value.trim()) ? manual.value.trim() : 'LAINNYA';
+          }
+          return sel || null;
+        })(),
+        status_kepesertaan: (document.getElementById('bioStatusKepesertaan') && document.getElementById('bioStatusKepesertaan').value) || 'Peserta',
         no_hp: document.getElementById('bioNoHp').value.trim(),
         email: document.getElementById('bioEmail').value.trim() || null,
         alamat: document.getElementById('bioAlamat').value.trim(),
@@ -6994,6 +7287,8 @@ if (biodataForm) {
         no_rekening: document.getElementById('bioNoRekening').value.trim() || null,
         atas_nama_rekening: document.getElementById('bioAtasNama').value.trim() || namaLengkap,
         foto_url: uploadedBioFotoDataUrl || null,
+        foto_kel_url: uploadedBioFotoKelDataUrl || null,
+        google_maps_url: (document.getElementById('bioGoogleMapsUrl') && document.getElementById('bioGoogleMapsUrl').value.trim()) || null,
         foto: uploadedBioFotoDataUrl || null,
         status_aktif: true
       };
@@ -7289,8 +7584,20 @@ function renderDbTableData(tableName, rows) {
   const body = document.getElementById('dbTableBody');
 
   if (!rows || rows.length === 0) {
-    head.innerHTML = `<tr><th style="padding:10px 12px;">Status</th></tr>`;
-    body.innerHTML = `<tr><td style="padding:24px; text-align:center; color:#64748b;">Tabel <strong>${tableName}</strong> masih kosong.</td></tr>`;
+    head.innerHTML = `<tr><th style="padding:10px 12px; background:#f1f5f9; color:#475569;">Informasi Data</th></tr>`;
+    body.innerHTML = `
+      <tr>
+        <td style="padding:40px 20px; text-align:center; color:#64748b;">
+          <div style="font-size:2.5rem; margin-bottom:8px;">📭</div>
+          <div style="font-size:1.05rem; font-weight:700; color:#1e293b;">Tabel ${tableName} masih kosong</div>
+          <p style="font-size:0.84rem; color:#94a3b8; margin-top:4px;">Belum ada baris data atau record yang tersimpan pada tabel ini.</p>
+        </td>
+      </tr>
+    `;
+    if (status) {
+      status.style.display = 'block';
+      status.innerHTML = `Tabel <code>${tableName}</code> masih kosong (0 data).`;
+    }
     return;
   }
 
@@ -7305,15 +7612,16 @@ function renderDbTableData(tableName, rows) {
   head.innerHTML = headHtml;
 
   // Body
+  const isSuperAdmin = isUserAdmin();
   let bodyHtml = '';
   rows.forEach((row, idx) => {
     bodyHtml += `<tr style="border-bottom:1px solid #e2e8f0;">`;
 
-    // Tombol Edit & Hapus
+    // Tombol Edit & Hapus (Diizinkan penuh untuk Role Admin di seluruh tabel)
     bodyHtml += `
       <td style="padding:6px 10px; text-align:center; white-space:nowrap;">
-        <button type="button" onclick="openEditDbModal(${idx})" style="padding:3px 8px; font-size:0.75rem; border:1px solid #2563eb; color:#2563eb; background:#eff6ff; border-radius:4px; cursor:pointer; margin-right:4px;">Edit</button>
-        <button type="button" onclick="deleteDbRow(${idx})" style="padding:3px 8px; font-size:0.75rem; border:1px solid #dc2626; color:#dc2626; background:#fef2f2; border-radius:4px; cursor:pointer;">Hapus</button>
+        <button type="button" onclick="openEditDbModal(${idx})" style="padding:4px 9px; font-size:0.75rem; font-weight:700; border:1px solid #2563eb; color:#2563eb; background:#eff6ff; border-radius:6px; cursor:pointer; margin-right:4px;" title="Edit baris data (Admin)">✏️ Edit</button>
+        <button type="button" onclick="deleteDbRow(${idx})" style="padding:4px 9px; font-size:0.75rem; font-weight:700; border:1px solid #dc2626; color:#dc2626; background:#fef2f2; border-radius:6px; cursor:pointer;" title="Hapus baris data (Admin)">🗑️ Hapus</button>
       </td>
     `;
 
