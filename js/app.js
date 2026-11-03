@@ -355,11 +355,15 @@ function getPaymentPeriodeArisanLabel(payRow) {
 }
 
 function stripInternalMetaFromKeterangan(ket) {
-  return String(ket || '')
-    .replace(/\s*\[SPLIT:\d+,\d+,\d+\]\s*/g, '')
-    .replace(/\s*\[JENIS:[^\]]*\]\s*/g, '')
-    .replace(/\s*\[PERIODE:[^\]]*\]\s*/g, '')
-    .replace(/\s*\[LIVESPINSTATE:[^\]]*\]\s*/g, '')
+  if (!ket) return '';
+  return String(ket)
+    .replace(/\s*\[SPLIT:[^\]]*\]\s*/gi, '')
+    .replace(/\s*\[JENIS:[^\]]*\]\s*/gi, '')
+    .replace(/\s*\[PERIODE:[^\]]*\]\s*/gi, '')
+    .replace(/\s*\[LIVESPINSTATE:[^\]]*\]\s*/gi, '')
+    .replace(/\s*\[REK:[^\]]*\]\s*/gi, '')
+    .replace(/\[[^\]]*\]/g, '')
+    .replace(/[\[\]]/g, '')
     .split('|')
     .map((part) => part.trim())
     .filter((part) => {
@@ -367,6 +371,10 @@ function stripInternalMetaFromKeterangan(ket) {
       const lower = part.toLowerCase();
       if (lower.startsWith('group:')) return false;
       if (lower.startsWith('split arisan')) return false;
+      if (lower.includes('dibayarkan pemenang')) return false;
+      if (lower.includes('masuk kas')) return false;
+      if (lower.includes('sisa kas')) return false;
+      if (lower.includes('uang arisan') && lower.includes('konsumsi')) return false;
       return true;
     })
     .join(' | ')
@@ -2137,6 +2145,7 @@ function syncPayGroupSplitUI() {
   const nominalArisanDanKonsumsi = rates.nominal_arisan_konsumsi;
 
   if (matchedGroup) {
+    wrapper.classList.remove('hidden');
     const members = extractGroupMembersArray(matchedGroup);
     const isSameGroup =
       activeDetectedGroupForPay &&
@@ -2155,7 +2164,7 @@ function syncPayGroupSplitUI() {
       titleEl.innerHTML = `👨‍👩‍👧‍👦 Group Arisan Ditemukan: <span style="text-decoration:underline;">${matchedGroup.nama_group}</span> (${members.length} Orang)`;
     }
     if (subtitleEl) {
-      subtitleEl.innerHTML = `Penanggung Jawab: <strong>${matchedGroup.penanggung_jawab}</strong> • Rincian per orang: <strong>a. Uang Arisan (${formatRupiah(rates.uang_arisan)}) + b. Konsumsi (${formatRupiah(rates.uang_konsumsi)}) + c. Kas (${formatRupiah(rates.uang_kas)}) = ${formatRupiah(rates.total)}</strong> • Dibayarkan ke Pemenang: <strong>${formatRupiah(nominalArisanDanKonsumsi)}</strong> (Sisa <strong>${formatRupiah(rates.uang_kas)}</strong> masuk Kas).`;
+      subtitleEl.innerHTML = `Penanggung Jawab: <strong>${matchedGroup.penanggung_jawab}</strong> • Silakan centang anggota group yang ingin dibayarkan:`;
     }
     if (selectAllLabel) selectAllLabel.classList.remove('hidden');
 
@@ -2177,13 +2186,6 @@ function syncPayGroupSplitUI() {
                 <span class="gallery-badge" style="font-size:0.7rem; ${isPJ ? 'background:#fef3c7; color:#b45309;' : ''}">
                   ${isPJ ? '👑 Penanggung Jawab' : '👤 Anggota Group'}
                 </span>
-              </div>
-              <div style="font-size:0.78rem; font-weight:700; color:var(--text-secondary);">
-                a. Arisan: <span style="color:var(--primary);">${formatRupiah(rates.uang_arisan)}</span> +
-                b. Konsumsi: <span style="color:#0284c7;">${formatRupiah(rates.uang_konsumsi)}</span> +
-                c. Kas: <span style="color:#b45309;">${formatRupiah(rates.uang_kas)}</span> =
-                <strong>${formatRupiah(rates.total)}</strong> •
-                Pemenang: <strong style="color:#15803d;">${formatRupiah(nominalArisanDanKonsumsi)}</strong>
               </div>
             </label>
           `;
@@ -2212,42 +2214,34 @@ function syncPayGroupSplitUI() {
     const sumTotalRincian = activeCount * rates.total;
     const sumDibayarkanPemenang = activeCount * nominalArisanDanKonsumsi;
 
-    document.getElementById('splitPreviewArisan').textContent = formatRupiah(sumArisan);
-    document.getElementById('splitPreviewKas').textContent = formatRupiah(sumKas);
-    document.getElementById('splitPreviewKonsumsi').textContent = formatRupiah(sumKonsumsi);
+    const elArisan = document.getElementById('splitPreviewArisan');
+    if (elArisan) elArisan.textContent = formatRupiah(sumArisan);
+    const elKas = document.getElementById('splitPreviewKas');
+    if (elKas) elKas.textContent = formatRupiah(sumKas);
+    const elKonsumsi = document.getElementById('splitPreviewKonsumsi');
+    if (elKonsumsi) elKonsumsi.textContent = formatRupiah(sumKonsumsi);
     const elTotalIuran = document.getElementById('splitPreviewTotalIuran');
     if (elTotalIuran) elTotalIuran.textContent = formatRupiah(sumTotalRincian);
-    document.getElementById('splitPreviewTotal').textContent = formatRupiah(sumDibayarkanPemenang);
+    const elTotal = document.getElementById('splitPreviewTotal');
+    if (elTotal) elTotal.textContent = formatRupiah(sumDibayarkanPemenang);
 
     if (payNominal) payNominal.value = sumDibayarkanPemenang > 0 ? sumDibayarkanPemenang : '';
     if (payNominalHint) {
-      payNominalHint.textContent = `(${activeCount} Orang × [Arisan ${formatRupiah(rates.uang_arisan)} + Konsumsi ${formatRupiah(rates.uang_konsumsi)} = ${formatRupiah(nominalArisanDanKonsumsi)}]; Sisa Kas ${formatRupiah(sumKas)} masuk Kas)`;
+      payNominalHint.textContent = `(${activeCount} Orang Dipilih)`;
     }
   } else {
     activeDetectedGroupForPay = null;
     checkedGroupMembersMap = {};
 
-    if (titleEl) {
-      titleEl.textContent = `📋 Perincian Uang Arisan (a. Uang Arisan ${formatRupiah(rates.uang_arisan)} + b. Konsumsi ${formatRupiah(rates.uang_konsumsi)} + c. Kas ${formatRupiah(rates.uang_kas)} = ${formatRupiah(rates.total)})`;
-    }
-    if (subtitleEl) {
-      subtitleEl.innerHTML = `Dibayarkan ke Pemenang: <strong>Uang Arisan (${formatRupiah(rates.uang_arisan)}) + Uang Konsumsi (${formatRupiah(rates.uang_konsumsi)}) = ${formatRupiah(nominalArisanDanKonsumsi)}</strong> • Sisanya <strong>${formatRupiah(rates.uang_kas)} masuk Kas</strong>.`;
-    }
+    wrapper.classList.add('hidden');
     if (selectAllLabel) selectAllLabel.classList.add('hidden');
     if (memberListContainer) {
       memberListContainer.innerHTML = '';
     }
 
-    document.getElementById('splitPreviewArisan').textContent = formatRupiah(rates.uang_arisan);
-    document.getElementById('splitPreviewKas').textContent = formatRupiah(rates.uang_kas);
-    document.getElementById('splitPreviewKonsumsi').textContent = formatRupiah(rates.uang_konsumsi);
-    const elTotalIuran = document.getElementById('splitPreviewTotalIuran');
-    if (elTotalIuran) elTotalIuran.textContent = formatRupiah(rates.total);
-    document.getElementById('splitPreviewTotal').textContent = formatRupiah(nominalArisanDanKonsumsi);
-
     if (payNominal) payNominal.value = nominalArisanDanKonsumsi > 0 ? nominalArisanDanKonsumsi : '';
     if (payNominalHint) {
-      payNominalHint.textContent = `(Dibayarkan Pemenang: Arisan ${formatRupiah(rates.uang_arisan)} + Konsumsi ${formatRupiah(rates.uang_konsumsi)} = ${formatRupiah(nominalArisanDanKonsumsi)}; Sisa ${formatRupiah(rates.uang_kas)} masuk Kas dari Total ${formatRupiah(rates.total)})`;
+      payNominalHint.textContent = '';
     }
   }
 }
@@ -2878,7 +2872,6 @@ async function executeSavePembayaran(confirmedFromGroupModal = false) {
         const jenisMeta = `[JENIS:${jenisBayar}]`;
         const periodeMeta = selectedPeriodeLabel ? `[PERIODE:${selectedPeriodeLabel}]` : '';
         const fullKeterangan = [
-          `Dibayarkan Pemenang: Arisan ${formatRupiah(rates.uang_arisan)} + Konsumsi ${formatRupiah(rates.uang_konsumsi)} = ${formatRupiah(nominalPerMember)} (Sisa Kas ${formatRupiah(rates.uang_kas)} masuk Kas dari Total ${formatRupiah(rates.total)})`,
           ketInput,
           metode === 'Transfer Bank' && namaBank ? `Bank: ${namaBank}` : '',
           noRek ? `Rek: ${noRek}` : '',
@@ -2933,7 +2926,6 @@ async function executeSavePembayaran(confirmedFromGroupModal = false) {
       const periodeMeta = isArs && selectedPeriodeLabel ? `[PERIODE:${selectedPeriodeLabel}]` : '';
 
       const fullKeterangan = [
-        isArs ? `Dibayarkan Pemenang: Arisan ${formatRupiah(ua)} + Konsumsi ${formatRupiah(uko)} = ${formatRupiah(ua + uko)} (Sisa Kas ${formatRupiah(uk)} masuk Kas dari Total ${formatRupiah(ua + uko + uk)})` : '',
         ketInput,
         metode === 'Transfer Bank' && namaBank ? `Bank: ${namaBank}` : '',
         noRek ? `Rek: ${noRek}` : '',
@@ -4777,17 +4769,188 @@ function renderMemberGallery() {
         ? `<img src="${photoUrl}" alt="${nama}" onclick="openMediaByKey('${mediaKey}')" title="Klik untuk memperbesar foto ${nama}" />`
         : `<span>${initials}</span>`;
 
+      const memberKey = String(a.id || a.user_id || idx);
       return `
-        <div class="member-gallery-card">
+        <div class="member-gallery-card" onclick="showDetailBiodataAnggota('${memberKey}')" style="cursor:pointer;" title="Klik untuk melihat Biodata Lengkap ${nama}">
           <div class="member-photo-box">
             ${photoContent}
           </div>
           <div class="member-name-label">${nama}</div>
+          <div style="font-size:0.75rem; color:var(--primary); font-weight:700; margin-top:4px;">👤 Lihat Biodata Lengkap &rarr;</div>
         </div>
       `;
     })
     .join('');
 }
+
+function showDetailBiodataAnggota(memberKey) {
+  const allMembers = cachedAnggotaList || [];
+  const member = allMembers.find((a, idx) => String(a.id) === String(memberKey) || String(a.user_id) === String(memberKey) || String(idx) === String(memberKey)) ||
+                 allMembers.find((a) => String(a.nama_lengkap || '').trim().toLowerCase() === String(memberKey || '').trim().toLowerCase());
+  if (!member) {
+    showGlobalAlert('Data biodata anggota tidak ditemukan.', 'error');
+    return;
+  }
+
+  const modal = document.getElementById('modalDetailBiodataAnggota');
+  const container = document.getElementById('modalMemberDetailContent');
+  const footerExtra = document.getElementById('modalMemberFooterExtra');
+  if (!modal || !container) return;
+
+  const nama = member.nama_lengkap || 'Anggota Arisan';
+  const panggilan = member.nama_panggilan || member.panggilan || '';
+  const photoUrl = member.foto_url || member.foto || null;
+  const initials = nama.split(' ').filter(Boolean).slice(0, 2).map((p) => p[0].toUpperCase()).join('') || 'KA';
+  const mediaKey = `modal_member_${member.id || 'foto'}`;
+  if (photoUrl) {
+    registerMediaPreview(mediaKey, `Foto Profil - ${nama}`, photoUrl);
+  }
+
+  const avatarHtml = photoUrl
+    ? `<img src="${photoUrl}" alt="${nama}" onclick="openMediaByKey('${mediaKey}')" style="width:110px; height:110px; border-radius:50%; object-fit:cover; border:3.5px solid var(--primary); box-shadow:0 6px 16px rgba(15,118,110,0.25); cursor:pointer;" title="Klik untuk memperbesar foto" />`
+    : `<div style="width:110px; height:110px; border-radius:50%; background:linear-gradient(135deg, var(--primary), #115e59); color:#fff; display:flex; align-items:center; justify-content:center; font-size:2.3rem; font-weight:800; border:3.5px solid var(--primary-border); box-shadow:0 6px 16px rgba(15,118,110,0.2);">${initials}</div>`;
+
+  const cleanPhone = String(member.no_hp || '').replace(/[^0-9]/g, '');
+  const waUrl = cleanPhone ? (cleanPhone.startsWith('0') ? '62' + cleanPhone.slice(1) : cleanPhone) : null;
+
+  container.innerHTML = `
+    <!-- Header Avatar & Profil Singkat -->
+    <div style="display:flex; flex-direction:column; align-items:center; text-align:center; padding-bottom:18px; margin-bottom:18px; border-bottom:1px solid #e2e8f0;">
+      <div style="position:relative; margin-bottom:12px;">
+        ${avatarHtml}
+        ${photoUrl ? `<span style="position:absolute; bottom:2px; right:2px; background:var(--primary); color:#fff; border-radius:50%; width:26px; height:26px; display:flex; align-items:center; justify-content:center; font-size:0.75rem; border:2px solid #fff;" title="Foto Resmi Terverifikasi">✓</span>` : ''}
+      </div>
+      <h3 style="margin:0 0 4px 0; color:#0f172a; font-size:1.3rem; font-weight:800;">${nama}</h3>
+      ${panggilan ? `<div style="color:var(--text-secondary); font-size:0.9rem; font-weight:600; margin-bottom:8px;">Panggilan: <em>"${panggilan}"</em></div>` : ''}
+      <div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:center; margin-top:4px;">
+        <span class="gallery-badge" style="background:#f0fdfa; color:var(--primary); border:1px solid var(--primary-border); font-size:0.8rem; font-weight:700;">
+          🎯 ${member.jumlah_ikut_arisan || member.jumlah_slot || 1} Slot Arisan
+        </span>
+        <span class="gallery-badge" style="background:#f8fafc; color:#475569; border:1px solid #cbd5e1; font-size:0.8rem; font-weight:600;">
+          🌳 ${member.garis_sanad || 'Bani Adnan'}
+        </span>
+        ${member.sudah_menang ? '<span class="status-pill complete">🏆 Sudah Pernah Menang</span>' : '<span class="status-pill incomplete">⏳ Belum Menang</span>'}
+      </div>
+    </div>
+
+    <!-- Grid Data Biodata Lengkap -->
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:16px;">
+      
+      <!-- Kartu 1: Identitas Pribadi -->
+      <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:14px;">
+        <div style="font-weight:800; font-size:0.88rem; color:var(--primary); margin-bottom:10px; display:flex; align-items:center; gap:6px;">
+          <span>📌</span> Identitas Pribadi
+        </div>
+        <div style="display:flex; flex-direction:column; gap:8px; font-size:0.84rem;">
+          <div style="display:flex; justify-content:space-between; gap:10px;">
+            <span style="color:#64748b;">Jenis Kelamin:</span>
+            <strong style="color:#1e293b;">${member.jenis_kelamin || '-'}</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between; gap:10px;">
+            <span style="color:#64748b;">Tempat, Tgl Lahir:</span>
+            <strong style="color:#1e293b; text-align:right;">${[member.tempat_lahir, member.tanggal_lahir].filter(Boolean).join(', ') || '-'}</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between; gap:10px;">
+            <span style="color:#64748b;">Pekerjaan:</span>
+            <strong style="color:#1e293b; text-align:right;">${member.pekerjaan || '-'}</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between; gap:10px;">
+            <span style="color:#64748b;">No. HP / WA:</span>
+            <strong style="color:var(--primary);">${member.no_hp || '-'}</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between; gap:10px;">
+            <span style="color:#64748b;">Email:</span>
+            <strong style="color:#1e293b; word-break:break-all;">${member.email || '-'}</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between; gap:10px;">
+            <span style="color:#64748b;">Kota / Domisili:</span>
+            <strong style="color:#1e293b;">${member.kota || '-'}</strong>
+          </div>
+          <div style="border-top:1px dashed #cbd5e1; padding-top:6px; margin-top:2px;">
+            <span style="color:#64748b; font-size:0.78rem;">Alamat Lengkap:</span>
+            <div style="font-weight:600; color:#334155; margin-top:2px; line-height:1.4;">${member.alamat || '-'}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Kartu 2: Data Keluarga & Silsilah -->
+      <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:14px;">
+        <div style="font-weight:800; font-size:0.88rem; color:var(--primary); margin-bottom:10px; display:flex; align-items:center; gap:6px;">
+          <span>👨‍👩‍👧‍👦</span> Data Keluarga & Silsilah
+        </div>
+        <div style="display:flex; flex-direction:column; gap:8px; font-size:0.84rem;">
+          <div style="display:flex; justify-content:space-between; gap:10px;">
+            <span style="color:#64748b;">Nama Ayah:</span>
+            <strong style="color:#1e293b;">${member.nama_ayah || '-'}</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between; gap:10px;">
+            <span style="color:#64748b;">Nama Ibu:</span>
+            <strong style="color:#1e293b;">${member.nama_ibu || '-'}</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between; gap:10px;">
+            <span style="color:#64748b;">Nama Pasangan:</span>
+            <strong style="color:#1e293b;">${member.nama_pasangan || '-'}</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between; gap:10px;">
+            <span style="color:#64748b;">Jumlah Anak:</span>
+            <strong style="color:#1e293b;">${member.jumlah_anak != null ? member.jumlah_anak + ' Anak' : '-'}</strong>
+          </div>
+          <div style="display:flex; justify-content:space-between; gap:10px;">
+            <span style="color:#64748b;">Garis Sanad:</span>
+            <strong style="color:var(--primary);">${member.garis_sanad || 'Bani Adnan'}</strong>
+          </div>
+          <div style="border-top:1px dashed #cbd5e1; padding-top:6px; margin-top:2px;">
+            <span style="color:#64748b; font-size:0.78rem;">Catatan Silsilah:</span>
+            <div style="font-weight:600; color:#334155; margin-top:2px; line-height:1.4;">${member.silsilah_keluarga || '-'}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Kartu 3: Rekening Pembayaran & Akun -->
+      <div style="grid-column:1/-1; background:#f0fdf4; border:1.5px solid #86efac; border-radius:12px; padding:14px;">
+        <div style="font-weight:800; font-size:0.88rem; color:#15803d; margin-bottom:8px; display:flex; align-items:center; gap:6px;">
+          <span>💳</span> Data Rekening & Keikutsertaan Arisan
+        </div>
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; font-size:0.84rem;">
+          <div>
+            <div style="color:#64748b; font-size:0.75rem; text-transform:uppercase; font-weight:700;">Nama Bank</div>
+            <div style="font-weight:800; color:#1e293b; font-size:0.95rem;">${member.nama_bank || '-'}</div>
+          </div>
+          <div>
+            <div style="color:#64748b; font-size:0.75rem; text-transform:uppercase; font-weight:700;">Nomor Rekening</div>
+            <div style="font-weight:800; color:#0f766e; font-size:0.95rem;"><code>${member.no_rekening || '-'}</code></div>
+          </div>
+          <div>
+            <div style="color:#64748b; font-size:0.75rem; text-transform:uppercase; font-weight:700;">Atas Nama Rekening</div>
+            <div style="font-weight:800; color:#1e293b; font-size:0.95rem;">${member.atas_nama_rekening || member.nama_lengkap || '-'}</div>
+          </div>
+          <div>
+            <div style="color:#64748b; font-size:0.75rem; text-transform:uppercase; font-weight:700;">Status Peserta</div>
+            <div style="font-weight:800; color:#15803d; font-size:0.95rem;">${member.jumlah_ikut_arisan || 1} Slot Terdaftar</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  if (footerExtra) {
+    const waBtn = waUrl
+      ? `<a href="https://wa.me/${waUrl}" target="_blank" rel="noopener" class="btn-primary btn-sm" style="display:inline-flex; align-items:center; gap:6px; background:#22c55e; border-color:#16a34a; text-decoration:none;">
+           <span>💬</span> <span>Hubungi WhatsApp</span>
+         </a>`
+      : '';
+    footerExtra.innerHTML = waBtn;
+  }
+
+  modal.style.display = 'flex';
+}
+
+function closeMemberDetailModal() {
+  const modal = document.getElementById('modalDetailBiodataAnggota');
+  if (modal) modal.style.display = 'none';
+}
+window.showDetailBiodataAnggota = showDetailBiodataAnggota;
+window.closeMemberDetailModal = closeMemberDetailModal;
 
 const searchAnggotaInputEl = document.getElementById('searchAnggotaInput');
 if (searchAnggotaInputEl) {
@@ -4855,7 +5018,7 @@ let liveSpinState = {
   winner_user_id: '',
   winner_name: '',
   target_angle: 0,
-  duration_ms: 6500,
+  duration_ms: 60000,
   started_at: 0,
   triggered_by: 'Admin',
   official_history_id: null,
@@ -5138,7 +5301,7 @@ function updateSpinSpotlightUI(state) {
     }
     if (nameEl) nameEl.textContent = officialEntry.winner_name;
     if (metaEl) {
-      metaEl.innerHTML = `${officialEntry.periode_label || 'Periode Aktif'} • Dana Diterima: <strong>${formatRupiah(officialEntry.nominal_diterima || state.nominal_diterima || 0)}</strong> • Disahkan oleh ${officialEntry.disahkan_oleh || 'Admin'}`;
+      metaEl.innerHTML = `${officialEntry.periode_label || 'Periode Aktif'} • Disahkan oleh ${officialEntry.disahkan_oleh || 'Admin'}`;
     }
     if (avatarEl) {
       avatarEl.innerHTML = photoUrl ? `<img src="${photoUrl}" alt="${officialEntry.winner_name}" />` : '🏆';
@@ -5160,7 +5323,7 @@ function updateSpinSpotlightUI(state) {
     }
     if (nameEl) nameEl.textContent = state.winner_name;
     if (metaEl) {
-      metaEl.innerHTML = `Tercatat di History Putaran #${state.putaran_ke} • Nominal: <strong>${formatRupiah(state.nominal_diterima || 0)}</strong>. Admin dapat memutar lagi atau memilih putaran ini sebagai Pemenang Resmi.`;
+      metaEl.innerHTML = `Tercatat di History Putaran #${state.putaran_ke}. Admin dapat memutar lagi atau memilih putaran ini sebagai Pemenang Resmi.`;
     }
     if (avatarEl) {
       avatarEl.innerHTML = photoUrl ? `<img src="${photoUrl}" alt="${state.winner_name}" />` : '🎉';
@@ -5199,7 +5362,7 @@ function renderSpinHistoryTable() {
   if (historyList.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="7" style="text-align:center; color:var(--text-muted); padding:20px;">
+        <td colspan="6" style="text-align:center; color:var(--text-muted); padding:20px;">
           Belum ada history putaran undian. Setiap kali roda diputar (Putaran Ke-1, Ke-2, dst.), hasilnya akan tampil di sini.
         </td>
       </tr>
@@ -5274,7 +5437,6 @@ function renderSpinHistoryTable() {
               </div>
             </div>
           </td>
-          <td><strong style="color:var(--primary);">${formatRupiah(item.nominal_diterima || 0)}</strong></td>
           <td>${statusBadge}</td>
           <td>${actionHtml}</td>
         </tr>
@@ -5290,6 +5452,12 @@ function animateWheelSpinToState(stateObj) {
       : getActiveWheelCandidateNames();
 
   if (!candidates || candidates.length === 0) return;
+
+  // Layar langsung menuju putaran roda saat tombol putar diklik atau animasi spin dimulai
+  const wheelStage = document.querySelector('.wheel-stage-card') || document.getElementById('arisanWheelCanvas');
+  if (wheelStage) {
+    wheelStage.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
 
   if (activeSpinRafId) {
     cancelAnimationFrame(activeSpinRafId);
@@ -5307,11 +5475,11 @@ function animateWheelSpinToState(stateObj) {
   updateSpinSpotlightUI(stateObj);
 
   const startAngle = currentWheelAngleRad % (Math.PI * 2);
-  let targetAngle = Number(stateObj.target_angle || Math.PI * 16);
-  if (targetAngle <= startAngle + Math.PI * 6) {
-    targetAngle += Math.PI * 16;
+  let targetAngle = Number(stateObj.target_angle || (Math.PI * 2 * 50));
+  if (targetAngle <= startAngle + Math.PI * 10) {
+    targetAngle += Math.PI * 2 * 50;
   }
-  const duration = Number(stateObj.duration_ms || 6500);
+  const duration = Number(stateObj.duration_ms || 60000);
   let startTime = null;
 
   const nameEl = document.getElementById('spinSpotlightName');
@@ -5330,8 +5498,8 @@ function animateWheelSpinToState(stateObj) {
 
     const elapsed = Math.max(0, now - startTime);
     const progress = Math.min(1, elapsed / duration);
-    // Cubic ease-out agar putaran melambat secara dramatis dan halus
-    const eased = 1 - Math.pow(1 - progress, 3);
+    // Quintic ease-out agar putaran melambat secara dramatis dan halus selama 60 detik (1 menit)
+    const eased = 1 - Math.pow(1 - progress, 3.5);
     const angle = startAngle + (targetAngle - startAngle) * eased;
 
     currentWheelAngleRad = angle;
@@ -5692,7 +5860,8 @@ async function triggerAdminLiveSpin() {
   const sliceAngle = (Math.PI * 2) / candidates.length;
   const jitterWithinSlice = (0.25 + Math.random() * 0.5) * sliceAngle;
   const baseStopAngle = -Math.PI / 2 - (randomIdx * sliceAngle + jitterWithinSlice);
-  const extraFullRotations = (8 + Math.floor(Math.random() * 3)) * Math.PI * 2;
+  // Putaran 1 menit (60 detik) dengan ~50 putaran penuh
+  const extraFullRotations = (50 + Math.floor(Math.random() * 5)) * Math.PI * 2;
   const targetAngle = baseStopAngle + extraFullRotations;
 
   const existingHistory = Array.isArray(liveSpinState.history) ? [...liveSpinState.history] : [];
@@ -5732,7 +5901,7 @@ async function triggerAdminLiveSpin() {
     winner_user_id: winnerMember ? winnerMember.user_id || '' : '',
     winner_name: winnerName,
     target_angle: targetAngle,
-    duration_ms: 6500,
+    duration_ms: 60000,
     started_at: spinTimestamp,
     triggered_by: currentLoggedUser ? currentLoggedUser.nama_lengkap || currentLoggedUser.user_id : 'Admin',
     official_history_id: liveSpinState.official_history_id || null,
@@ -5740,6 +5909,13 @@ async function triggerAdminLiveSpin() {
   };
 
   lastProcessedSpinId = spinTimestamp;
+
+  // Layar langsung menuju putaran roda
+  const wheelStage = document.querySelector('.wheel-stage-card') || document.getElementById('arisanWheelCanvas');
+  if (wheelStage) {
+    wheelStage.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
   // Kirim sinyal ke seluruh client sekaligus mulai putaran roda
   broadcastLiveSpinStateToAllClients(nextState);
   animateWheelSpinToState(nextState);
@@ -5864,7 +6040,7 @@ async function resetLiveSpinHistoryByAdmin() {
     winner_user_id: '',
     winner_name: '',
     target_angle: 0,
-    duration_ms: 6500,
+    duration_ms: 60000,
     started_at: resetTs,
     triggered_by: currentLoggedUser ? currentLoggedUser.nama_lengkap || currentLoggedUser.user_id : 'Admin',
     official_history_id: null,
@@ -6342,16 +6518,50 @@ document.addEventListener('DOMContentLoaded', async () => {
 // ============================================================================
 
 const SUPABASE_REST = {
-  url: 'https://zufpuadipntstcnqxxpm.supabase.co/rest/v1',
-  key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp1ZnB1YWRpcG50c3RjbnF4eHBtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMwNjM2OTMsImV4cCI6MjEwODYzOTY5M30.gjXuVjWUjIaJX4JI6_d_fpq01fnsvDPedMuKD9SCYIA'
+  url: 'https://zufpuadipntstcnqxxpm.supabase.co/rest/v1'
 };
 
-const supabaseFetchHeaders = {
-  'apikey': SUPABASE_REST.key,
-  'Authorization': `Bearer ${SUPABASE_REST.key}`,
-  'Content-Type': 'application/json',
-  'Prefer': 'return=representation'
-};
+function getEffectiveSupabaseKey() {
+  const customKey = localStorage.getItem('adnan_custom_supabase_key');
+  if (customKey && customKey.trim()) return customKey.trim();
+  return SUPABASE_ANON_KEY;
+}
+
+function getSupabaseDbHeaders(preferReturnRepresentation = false) {
+  const activeKey = getEffectiveSupabaseKey();
+  const headers = {
+    'apikey': activeKey,
+    'Authorization': `Bearer ${activeKey}`,
+    'Content-Type': 'application/json'
+  };
+  if (preferReturnRepresentation) {
+    headers['Prefer'] = 'return=representation';
+  } else {
+    headers['Prefer'] = 'return=minimal';
+  }
+  return headers;
+}
+
+function promptConfigureSupabaseKey() {
+  const currentKey = localStorage.getItem('adnan_custom_supabase_key') || '';
+  const newKey = prompt(
+    '🔑 PENGATURAN KUNCI API SUPABASE (DATABASE EDITOR)\n\nJika tabel mengembalikan error 401 saat mengubah/menghapus data, Anda dapat memasukkan Service Role Key Supabase untuk bypass RLS secara penuh.\n\nKosongkan jika ingin kembali ke Anon Key default:',
+    currentKey
+  );
+  if (newKey !== null) {
+    if (newKey.trim()) {
+      localStorage.setItem('adnan_custom_supabase_key', newKey.trim());
+      alert('✅ Kunci API Supabase kustom berhasil disimpan!');
+    } else {
+      localStorage.removeItem('adnan_custom_supabase_key');
+      alert('🔄 Kunci API Supabase dikembalikan ke Anon Key default.');
+    }
+    if (activeDbTable) {
+      fetchDbTableData(activeDbTable);
+    }
+  }
+}
+window.promptConfigureSupabaseKey = promptConfigureSupabaseKey;
 
 let activeDbTable = '';
 let activeDbRows = [];
@@ -6404,17 +6614,24 @@ async function fetchDbTableData(tableName) {
 
   try {
     let res = await fetch(`${SUPABASE_REST.url}/${tableName}?select=*&order=id.desc`, {
-      headers: supabaseFetchHeaders
+      headers: getSupabaseDbHeaders(false)
     });
 
     if (!res.ok) {
       // Fallback jika tabel tidak memiliki kolom id untuk sorting
       res = await fetch(`${SUPABASE_REST.url}/${tableName}?select=*`, {
-        headers: supabaseFetchHeaders
+        headers: getSupabaseDbHeaders(false)
       });
     }
 
-    if (!res.ok) throw new Error(`HTTP Error: ${res.status}`);
+    if (!res.ok) {
+      let errMsg = `HTTP Error: ${res.status}`;
+      try {
+        const errJson = await res.json();
+        errMsg = errJson.message || errMsg;
+      } catch (_) {}
+      throw new Error(errMsg);
+    }
     activeDbRows = await res.json();
 
     renderDbTableData(tableName, activeDbRows);
@@ -6485,25 +6702,52 @@ async function deleteDbRow(rowIndex) {
   const row = activeDbRows[rowIndex];
   if (!row) return;
 
-  const idCol = row.id !== undefined ? 'id' : Object.keys(row)[0];
-  const idVal = row[idCol];
+  let idCol = 'id';
+  let idVal = row.id;
+  if (idVal === undefined || idVal === null || idVal === '') {
+    const altKeys = ['user_id', 'kode_transaksi', 'periode_ke', 'nama_group', 'kategori'];
+    const foundAlt = altKeys.find((k) => row[k] !== undefined && row[k] !== null && row[k] !== '');
+    if (foundAlt) {
+      idCol = foundAlt;
+      idVal = row[foundAlt];
+    } else {
+      idCol = Object.keys(row)[0];
+      idVal = row[idCol];
+    }
+  }
 
   if (!confirm(`Hapus baris data dengan ${idCol} = "${idVal}" dari tabel "${activeDbTable}"?`)) {
     return;
   }
 
+  const url = `${SUPABASE_REST.url}/${activeDbTable}?${idCol}=eq.${encodeURIComponent(idVal)}`;
+
   try {
-    const res = await fetch(`${SUPABASE_REST.url}/${activeDbTable}?${idCol}=eq.${encodeURIComponent(idVal)}`, {
+    let res = await fetch(url, {
       method: 'DELETE',
-      headers: supabaseFetchHeaders
+      headers: getSupabaseDbHeaders(false)
     });
 
-    if (!res.ok) throw new Error(`Status ${res.status}: ${res.statusText}`);
+    if (!res.ok) {
+      let errDetail = '';
+      try {
+        const errJson = await res.json();
+        errDetail = errJson.message || errJson.details || errJson.hint || JSON.stringify(errJson);
+      } catch (_) {
+        errDetail = res.statusText || `HTTP ${res.status}`;
+      }
+      if (res.status === 401 || res.status === 403) {
+        throw new Error(
+          `Status ${res.status}: ${errDetail}.\n\nSolusi: Gunakan tombol '🔑 Kunci API Supabase' di pojok atas tabel untuk memasukkan Service Role Key Supabase.`
+        );
+      }
+      throw new Error(`Status ${res.status}: ${errDetail}`);
+    }
 
-    alert('Data berhasil dihapus!');
+    alert('✅ Data berhasil dihapus!');
     fetchDbTableData(activeDbTable);
   } catch (err) {
-    alert('Gagal menghapus data: ' + err.message);
+    alert('❌ Gagal menghapus data: ' + err.message);
   }
 }
 
@@ -6522,7 +6766,7 @@ function openEditDbModal(rowIndex) {
   let html = '<div style="display:flex; flex-direction:column; gap:10px;">';
   for (const [key, value] of Object.entries(row)) {
     const isId = (key === 'id');
-    const isReadOnly = isId || key === 'created_at';
+    const isReadOnly = isId || key === 'created_at' || key === 'updated_at';
     const valStr = (typeof value === 'object' && value !== null) ? JSON.stringify(value) : (value ?? '');
 
     html += `
@@ -6557,20 +6801,43 @@ async function saveEditedDbRecord() {
   const row = activeDbRows[editingDbIndex];
   if (!row) return;
 
-  const idCol = row.id !== undefined ? 'id' : Object.keys(row)[0];
-  const idVal = row[idCol];
-  const payload = {};
+  // Temukan primary key identifier yang valid
+  let idCol = 'id';
+  let idVal = row.id;
+  if (idVal === undefined || idVal === null || idVal === '') {
+    const altKeys = ['user_id', 'kode_transaksi', 'periode_ke', 'nama_group', 'kategori'];
+    const foundAlt = altKeys.find((k) => row[k] !== undefined && row[k] !== null && row[k] !== '');
+    if (foundAlt) {
+      idCol = foundAlt;
+      idVal = row[foundAlt];
+    } else {
+      idCol = Object.keys(row)[0];
+      idVal = row[idCol];
+    }
+  }
 
+  if (idVal === undefined || idVal === null) {
+    alert('❌ Gagal menyimpan: Baris data tidak memiliki ID atau kunci penentu unik.');
+    return;
+  }
+
+  const payload = {};
   for (const key of Object.keys(row)) {
-    if (key === 'id' || key === 'created_at') continue;
+    // Jangan kirim primary key atau generated timestamp
+    if (key === 'id' || key === 'created_at' || key === 'updated_at') continue;
 
     const input = document.getElementById(`dbFieldInput_${key}`);
     if (input) {
       let val = input.value;
       if (typeof row[key] === 'number') {
-        val = val === '' ? null : Number(val);
+        val = (val === '' || val === null) ? null : Number(val);
       } else if (typeof row[key] === 'boolean') {
-        val = (val === 'true');
+        val = (val === 'true' || val === true);
+      } else if (val === '') {
+        // Jika aslinya null atau kolom bertipe foreign key/uuid/date/timestamp, kirim null bukan string kosong
+        if (row[key] === null || /^(tanggal.*|.*_at|.*_id|arisan_id|anggota_id|pemenang_id)$/i.test(key)) {
+          val = null;
+        }
       }
       payload[key] = val;
     }
@@ -6582,20 +6849,50 @@ async function saveEditedDbRecord() {
     btnSave.disabled = true;
   }
 
+  const url = `${SUPABASE_REST.url}/${activeDbTable}?${idCol}=eq.${encodeURIComponent(idVal)}`;
+
   try {
-    const res = await fetch(`${SUPABASE_REST.url}/${activeDbTable}?${idCol}=eq.${encodeURIComponent(idVal)}`, {
+    // Coba percobaan 1: Gunakan return=representation
+    let res = await fetch(url, {
       method: 'PATCH',
-      headers: supabaseFetchHeaders,
+      headers: getSupabaseDbHeaders(true),
       body: JSON.stringify(payload)
     });
 
-    if (!res.ok) throw new Error(`Status ${res.status}: ${res.statusText}`);
+    // Jika 401 atau 403 atau 406 (sering terjadi karena RLS SELECT atau format Prefer representation):
+    // Coba percobaan 2: Fallback ke Prefer: return=minimal
+    if (!res.ok && (res.status === 401 || res.status === 403 || res.status === 406)) {
+      console.warn(`PATCH percobaan 1 gagal dengan status ${res.status}. Mencoba percobaan 2 dengan return=minimal...`);
+      res = await fetch(url, {
+        method: 'PATCH',
+        headers: getSupabaseDbHeaders(false),
+        body: JSON.stringify(payload)
+      });
+    }
 
-    alert('Perubahan berhasil disimpan!');
+    if (!res.ok) {
+      let errDetail = '';
+      try {
+        const errJson = await res.json();
+        errDetail = errJson.message || errJson.details || errJson.hint || JSON.stringify(errJson);
+      } catch (_) {
+        errDetail = res.statusText || `HTTP ${res.status}`;
+      }
+
+      if (res.status === 401 || res.status === 403) {
+        throw new Error(
+          `Status ${res.status} (Izin Akses/RLS Supabase): ${errDetail}.\n\nTips Solusi:\n1. Pastikan RLS diizinkan untuk UPDATE di tabel ${activeDbTable}.\n2. Atau masukkan Service Role Key Supabase Anda pada tombol '🔑 Kunci API Supabase' di pojok atas tabel.`
+        );
+      }
+
+      throw new Error(`Status ${res.status}: ${errDetail}`);
+    }
+
+    alert('✅ Perubahan berhasil disimpan ke tabel Supabase!');
     closeEditDbModal();
     fetchDbTableData(activeDbTable);
   } catch (err) {
-    alert('Gagal menyimpan: ' + err.message);
+    alert('❌ Gagal menyimpan: ' + err.message);
   } finally {
     if (btnSave) {
       btnSave.textContent = 'Simpan Perubahan';
